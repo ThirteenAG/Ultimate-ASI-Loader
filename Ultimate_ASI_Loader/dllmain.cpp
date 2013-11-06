@@ -1,5 +1,5 @@
 #define APP_NAME    "ASI Loader"
-#define APP_VERSION "1.1 [12.09.2013]"
+#define APP_VERSION "1.0 [06.11.2013]"
 
 #include <windows.h>
 #include <stdio.h>
