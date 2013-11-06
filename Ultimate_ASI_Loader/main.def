@@ -1,0 +1,122 @@
+LIBRARY "dinput8"
+EXPORTS
+DirectInput8Create = _DirectInput8Create @100
+DllCanUnloadNow = _DllCanUnloadNow PRIVATE
+DllGetClassObject = _DllGetClassObject PRIVATE
+DllRegisterServer = _DllRegisterServer PRIVATE
+DllUnregisterServer = _DllUnregisterServer PRIVATE
+
+LIBRARY "dsound"
+EXPORTS
+DirectSoundCaptureCreate = _DirectSoundCaptureCreate @6
+DirectSoundCaptureCreate8 = _DirectSoundCaptureCreate8 @12
+DirectSoundCaptureEnumerateA = _DirectSoundCaptureEnumerateA @7
+DirectSoundCaptureEnumerateW = _DirectSoundCaptureEnumerateW @8
+DirectSoundCreate = _DirectSoundCreate @1
+DirectSoundCreate8 = _DirectSoundCreate8 @11
+DirectSoundEnumerateA = _DirectSoundEnumerateA @2
+DirectSoundEnumerateW = _DirectSoundEnumerateW @3
+DirectSoundFullDuplexCreate = _DirectSoundFullDuplexCreate @10
+DllCanUnloadNow_dsound = _DllCanUnloadNow_dsound PRIVATE
+DllGetClassObject = _DllGetClassObject PRIVATE
+GetDeviceID = _GetDeviceID @9
+
+LIBRARY "ddraw"
+EXPORTS
+AcquireDDThreadLock			= FakeAcquireDDThreadLock			@101
+CheckFullscreen				= FakeCheckFullscreen				@102
+CompleteCreateSysmemSurface	= FakeCompleteCreateSysmemSurface	@103
+D3DParseUnknownCommand		= FakeD3DParseUnknownCommand		@104
+DDGetAttachedSurfaceLcl		= FakeDDGetAttachedSurfaceLcl		@105
+DDInternalLock				= FakeDDInternalLock				@106
+DDInternalUnlock			= FakeDDInternalUnlock				@107
+DSoundHelp					= FakeDSoundHelp					@108
+DirectDrawCreate			= FakeDirectDrawCreate				@109
+DirectDrawCreateClipper		= FakeDirectDrawCreateClipper		@110
+DirectDrawCreateEx			= FakeDirectDrawCreateEx			@111
+DirectDrawEnumerateA		= FakeDirectDrawEnumerateA			@112
+DirectDrawEnumerateExA		= FakeDirectDrawEnumerateExA		@113
+DirectDrawEnumerateExW		= FakeDirectDrawEnumerateExW		@114
+DirectDrawEnumerateW		= FakeDirectDrawEnumerateW			@115
+DllCanUnloadNow				= FakeDllCanUnloadNow				PRIVATE
+DllGetClassObject			= FakeDllGetClassObject				PRIVATE
+GetDDSurfaceLocal			= FakeGetDDSurfaceLocal				@118
+GetOLEThunkData				= FakeGetOLEThunkData				@119
+GetSurfaceFromDC			= FakeGetSurfaceFromDC				@120
+RegisterSpecialCase			= FakeRegisterSpecialCase			@121
+ReleaseDDThreadLock			= FakeReleaseDDThreadLock			@122
+
+LIBRARY "d3d8"
+EXPORTS
+DebugSetMute_d3d8 = _DebugSetMute_d3d8 @140
+Direct3DCreate8 = _Direct3DCreate8 @141
+ValidatePixelShader = _ValidatePixelShader @142
+ValidateVertexShader = _ValidateVertexShader @143
+
+LIBRARY "d3d9"
+EXPORTS
+D3DPERF_BeginEvent = _D3DPERF_BeginEvent @144
+D3DPERF_EndEvent = _D3DPERF_EndEvent @145
+D3DPERF_GetStatus = _D3DPERF_GetStatus @146
+D3DPERF_QueryRepeatFrame = _D3DPERF_QueryRepeatFrame @147
+D3DPERF_SetMarker = _D3DPERF_SetMarker @148
+D3DPERF_SetOptions = _D3DPERF_SetOptions @149
+D3DPERF_SetRegion = _D3DPERF_SetRegion @150
+DebugSetLevel = _DebugSetLevel @151
+DebugSetMute = _DebugSetMute @152
+;Direct3D9EnableMaximizedWindowedModeShim = _Direct3D9EnableMaximizedWindowedModeShim @153
+Direct3DCreate9 = _Direct3DCreate9 @154
+Direct3DCreate9Ex = _Direct3DCreate9Ex @155
+Direct3DShaderValidatorCreate9 = _Direct3DShaderValidatorCreate9 @156
+PSGPError = _PSGPError @157
+PSGPSampleTexture = _PSGPSampleTexture @158
+
+LIBRARY "d3d11"
+EXPORTS
+D3D11CoreCreateDevice = _D3D11CoreCreateDevice @160
+D3D11CoreCreateLayeredDevice = _D3D11CoreCreateLayeredDevice @161
+D3D11CoreGetLayeredDeviceSize = _D3D11CoreGetLayeredDeviceSize @162
+D3D11CoreRegisterLayers = _D3D11CoreRegisterLayers @163
+D3D11CreateDevice = _D3D11CreateDevice @164
+D3D11CreateDeviceAndSwapChain = _D3D11CreateDeviceAndSwapChain @165
+D3DKMTCloseAdapter = _D3DKMTCloseAdapter @166
+D3DKMTCreateAllocation = _D3DKMTCreateAllocation @167
+D3DKMTCreateContext = _D3DKMTCreateContext @168
+D3DKMTCreateDevice = _D3DKMTCreateDevice @169
+D3DKMTCreateSynchronizationObject = _D3DKMTCreateSynchronizationObject @170
+D3DKMTDestroyAllocation = _D3DKMTDestroyAllocation @171
+D3DKMTDestroyContext = _D3DKMTDestroyContext @172
+D3DKMTDestroyDevice = _D3DKMTDestroyDevice @173
+D3DKMTDestroySynchronizationObject = _D3DKMTDestroySynchronizationObject @174
+D3DKMTEscape = _D3DKMTEscape @175
+D3DKMTGetContextSchedulingPriority = _D3DKMTGetContextSchedulingPriority @176
+D3DKMTGetDeviceState = _D3DKMTGetDeviceState @177
+D3DKMTGetDisplayModeList = _D3DKMTGetDisplayModeList @178
+D3DKMTGetMultisampleMethodList = _D3DKMTGetMultisampleMethodList @179
+D3DKMTGetRuntimeData = _D3DKMTGetRuntimeData @180
+D3DKMTGetSharedPrimaryHandle = _D3DKMTGetSharedPrimaryHandle @181
+D3DKMTLock = _D3DKMTLock @182
+D3DKMTOpenAdapterFromHdc = _D3DKMTOpenAdapterFromHdc @183
+D3DKMTOpenResource = _D3DKMTOpenResource @184
+D3DKMTPresent = _D3DKMTPresent @185
+D3DKMTQueryAdapterInfo = _D3DKMTQueryAdapterInfo @186
+D3DKMTQueryAllocationResidency = _D3DKMTQueryAllocationResidency @187
+D3DKMTQueryResourceInfo = _D3DKMTQueryResourceInfo @188
+D3DKMTRender = _D3DKMTRender @189
+D3DKMTSetAllocationPriority = _D3DKMTSetAllocationPriority @190
+D3DKMTSetContextSchedulingPriority = _D3DKMTSetContextSchedulingPriority @191
+D3DKMTSetDisplayMode = _D3DKMTSetDisplayMode @192
+D3DKMTSetDisplayPrivateDriverFormat = _D3DKMTSetDisplayPrivateDriverFormat @193
+D3DKMTSetGammaRamp = _D3DKMTSetGammaRamp @194
+D3DKMTSetVidPnSourceOwner = _D3DKMTSetVidPnSourceOwner @195
+D3DKMTSignalSynchronizationObject = _D3DKMTSignalSynchronizationObject @196
+D3DKMTUnlock = _D3DKMTUnlock @197
+D3DKMTWaitForSynchronizationObject = _D3DKMTWaitForSynchronizationObject @198
+D3DKMTWaitForVerticalBlankEvent = _D3DKMTWaitForVerticalBlankEvent @199
+D3DPerformance_BeginEvent = _D3DPerformance_BeginEvent @200
+D3DPerformance_EndEvent = _D3DPerformance_EndEvent @201
+D3DPerformance_GetStatus = _D3DPerformance_GetStatus @202
+D3DPerformance_SetMarker = _D3DPerformance_SetMarker @203
+EnableFeatureLevelUpgrade = _EnableFeatureLevelUpgrade @204
+OpenAdapter10 = _OpenAdapter10 @205
+OpenAdapter10_2 = _OpenAdapter10_2 @206
