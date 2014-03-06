@@ -1,5 +1,5 @@
 #define APP_NAME    "ASI Loader"
-#define APP_VERSION "1.0 [06.11.2013]"
+#define APP_VERSION "1.1 [07.03.2014]"
 
 #include <windows.h>
 #include <stdio.h>
@@ -28,7 +28,7 @@ BYTE* 					originalEP = 0;
 HINSTANCE				hExecutableInstance;
 HINSTANCE Inst;
 HMEMORYMODULE h_wndmode_dll;
-char ini_buf[550];
+char ini_buf[850];
 void StartDXWND();
 	STARTUPINFO si;
 	PROCESS_INFORMATION pi;
@@ -527,38 +527,7 @@ void Main_DoInit()
 	  }
 	  }
 
-	  fstream wndmode_ini;
-	  wndmode_ini.open("wndmode.ini", ios_base::out | ios_base::in);  // will not create wndmode.ini
-	  if (wndmode_ini.is_open())
-	  {
-		  wndmode_ini.read(ini_buf, 550);
-			if (stristr(ini_buf, "[WINDOWMODE]") == NULL) {
-				wndmode_ini.clear();
-				wndmode_ini.write(wndmode_ini_hex, 539);
-			} 
-			wndmode_ini.close();
-			h_wndmode_dll = MemoryLoadLibrary(wndmode_dll_hex);
-	  } else {
-	  fstream dxwnd_ini;
-	  dxwnd_ini.open("dxwnd.ini", ios_base::out | ios_base::in);
-	  if (dxwnd_ini.is_open())
-	  {
-		  dxwnd_ini.read(ini_buf, 550);
-			if (stristr(ini_buf, "[target]") == NULL) {
-				dxwnd_ini.clear();
-				dxwnd_ini.write(dxwnd_ini_hex, 285);
-			} 
-			dxwnd_ini.close();
-			//adding game path
-			TCHAR exepath[MAX_PATH+1];
-			if(0 != GetModuleFileName(0, exepath, MAX_PATH+1)) 
-			{
-			WritePrivateProfileString("target", "title0", exepath, ".\\dxwnd.ini");
-			WritePrivateProfileString("target", "path0", exepath, ".\\dxwnd.ini");
-			StartDXWND();
-			}
-	  }
-	  }
+
 
 	  
 		// Regular ASI Loader
@@ -581,6 +550,40 @@ void Main_DoInit()
 		dllPath[tempPointer - moduleName + 1] = '\0';
 		SetCurrentDirectory(dllPath);
 
+		fstream wndmode_ini;
+		wndmode_ini.open("wndmode.ini", ios_base::out | ios_base::in);  // will not create wndmode.ini
+		if (wndmode_ini.is_open())
+		{
+			wndmode_ini.read(ini_buf, 850);
+			if (stristr(ini_buf, "[WINDOWMODE]") == NULL) {
+				wndmode_ini.clear();
+				wndmode_ini.write(wndmode_ini_hex, 539);
+			}
+			wndmode_ini.close();
+			h_wndmode_dll = MemoryLoadLibrary(wndmode_dll_hex);
+		}
+		else {
+			fstream dxwnd_ini;
+			dxwnd_ini.open("dxwnd.ini", ios_base::out | ios_base::in);
+			if (dxwnd_ini.is_open())
+			{
+				dxwnd_ini.read(ini_buf, 850);
+				if (stristr(ini_buf, "[target]") == NULL) {
+					dxwnd_ini.clear();
+					dxwnd_ini.write(dxwnd_ini_hex, 285);
+				}
+				dxwnd_ini.close();
+				//adding game path
+				TCHAR exepath[MAX_PATH + 1];
+				if (0 != GetModuleFileName(0, exepath, MAX_PATH + 1))
+				{
+					WritePrivateProfileString("target", "title0", exepath, ".\\dxwnd.ini");
+					WritePrivateProfileString("target", "path0", exepath, ".\\dxwnd.ini");
+					StartDXWND();
+				}
+			}
+		}
+
 		strncpy(preparedPath, "scripts", 8);
 		strcat(preparedPath, tempPointer);
 		strcat(preparedPath, "\\settings.ini");
@@ -593,7 +596,11 @@ void Main_DoInit()
 		if (stristr(ini_buf, "LoadPlugins=0") == NULL) {
 		nWndModeWantsToLoadPlugins = TRUE;
 		}
-
+		bool onlyscripts;
+		if (stristr(ini_buf, "LoadFromScriptsOnly=1") != NULL) {
+			onlyscripts = true;
+		}
+		
 		if ( nThatExeWantsPlugins && nWndModeWantsToLoadPlugins == TRUE )	// Will not process only if this EXE wishes not to load anything but its exclusive plugins
 		{
 			if ( nWantsToLoadPlugins || nThatExeWantsPlugins == TRUE )
@@ -629,7 +636,10 @@ void Main_DoInit()
 					fclose(iniFile);
 				}
 
-				FindFiles(&fd, &excludes);
+				if (!onlyscripts)
+				{
+					FindFiles(&fd, &excludes);
+				}
 				if ( SetCurrentDirectory("scripts\\") )
 				{
 					FindFiles(&fd, &excludes);
