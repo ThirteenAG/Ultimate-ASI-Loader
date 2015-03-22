@@ -4,6 +4,7 @@ Ultimate_ASI_Loader
 DESCRIPTION
 ------------------------
 	This is a DLL file which adds ASI plugin loading functionality to any game, which uses any of the following libraries:
+	- vorbisFile.dll
 	- dsound.dll
 	- dinput8.dll
 	- ddraw.dll
