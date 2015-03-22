@@ -1,7 +1,11 @@
 ﻿
-Microsoft Visual Studio Solution File, Format Version 11.00
-# Visual Studio 2010
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Ultimate_ASI_Loader", "Ultimate_ASI_Loader\Ultimate_ASI_Loader.vcxproj", "{51642C9A-2741-4D65-9FB3-8CD2BF72216B}"
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 2013
+VisualStudioVersion = 12.0.31101.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Ultimate_ASI_Loader", "Ultimate_ASI_Loader\Ultimate_ASI_Loader.vcxproj", "{7DC0614D-562B-4CFE-B860-7122A1D80847}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "AsiLoaderTestPlugin", "AsiLoaderTestPlugin\AsiLoaderTestPlugin.vcxproj", "{0DDCF404-A821-43C6-B410-1F777F5298C6}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -9,10 +13,14 @@ Global
 		Release|Win32 = Release|Win32
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{51642C9A-2741-4D65-9FB3-8CD2BF72216B}.Debug|Win32.ActiveCfg = Debug|Win32
-		{51642C9A-2741-4D65-9FB3-8CD2BF72216B}.Debug|Win32.Build.0 = Debug|Win32
-		{51642C9A-2741-4D65-9FB3-8CD2BF72216B}.Release|Win32.ActiveCfg = Release|Win32
-		{51642C9A-2741-4D65-9FB3-8CD2BF72216B}.Release|Win32.Build.0 = Release|Win32
+		{7DC0614D-562B-4CFE-B860-7122A1D80847}.Debug|Win32.ActiveCfg = Debug|Win32
+		{7DC0614D-562B-4CFE-B860-7122A1D80847}.Debug|Win32.Build.0 = Debug|Win32
+		{7DC0614D-562B-4CFE-B860-7122A1D80847}.Release|Win32.ActiveCfg = Release|Win32
+		{7DC0614D-562B-4CFE-B860-7122A1D80847}.Release|Win32.Build.0 = Release|Win32
+		{0DDCF404-A821-43C6-B410-1F777F5298C6}.Debug|Win32.ActiveCfg = Debug|Win32
+		{0DDCF404-A821-43C6-B410-1F777F5298C6}.Debug|Win32.Build.0 = Debug|Win32
+		{0DDCF404-A821-43C6-B410-1F777F5298C6}.Release|Win32.ActiveCfg = Release|Win32
+		{0DDCF404-A821-43C6-B410-1F777F5298C6}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
