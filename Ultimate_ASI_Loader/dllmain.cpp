@@ -394,8 +394,56 @@ void LoadOriginalLibrary()
 								}
 								else
 								{
-									MessageBox(0, "This library isn't supported. Try to rename it to d3d8.dll, d3d9.dll, d3d11.dll, winmmbase.dll, dinput8.dll, dsound.dll, vorbisFile.dll or ddraw.dll.", "ASI Loader", MB_ICONERROR);
-									ExitProcess(0);
+									if (_stricmp(DllName + 1, "msacm32.dll") == NULL) {
+										msacm32.dll = LoadLibrary(szSystemPath);
+										msacm32.acmDriverAddA = GetProcAddress(msacm32.dll, "acmDriverAddA");
+										msacm32.acmDriverAddW = GetProcAddress(msacm32.dll, "acmDriverAddW");
+										msacm32.acmDriverClose = GetProcAddress(msacm32.dll, "acmDriverClose");
+										msacm32.acmDriverDetailsA = GetProcAddress(msacm32.dll, "acmDriverDetailsA");
+										msacm32.acmDriverDetailsW = GetProcAddress(msacm32.dll, "acmDriverDetailsW");
+										msacm32.acmDriverEnum = GetProcAddress(msacm32.dll, "acmDriverEnum");
+										msacm32.acmDriverID = GetProcAddress(msacm32.dll, "acmDriverID");
+										msacm32.acmDriverMessage = GetProcAddress(msacm32.dll, "acmDriverMessage");
+										msacm32.acmDriverOpen = GetProcAddress(msacm32.dll, "acmDriverOpen");
+										msacm32.acmDriverPriority = GetProcAddress(msacm32.dll, "acmDriverPriority");
+										msacm32.acmDriverRemove = GetProcAddress(msacm32.dll, "acmDriverRemove");
+										msacm32.acmFilterChooseA = GetProcAddress(msacm32.dll, "acmFilterChooseA");
+										msacm32.acmFilterChooseW = GetProcAddress(msacm32.dll, "acmFilterChooseW");
+										msacm32.acmFilterDetailsA = GetProcAddress(msacm32.dll, "acmFilterDetailsA");
+										msacm32.acmFilterDetailsW = GetProcAddress(msacm32.dll, "acmFilterDetailsW");
+										msacm32.acmFilterEnumA = GetProcAddress(msacm32.dll, "acmFilterEnumA");
+										msacm32.acmFilterEnumW = GetProcAddress(msacm32.dll, "acmFilterEnumW");
+										msacm32.acmFilterTagDetailsA = GetProcAddress(msacm32.dll, "acmFilterTagDetailsA");
+										msacm32.acmFilterTagDetailsW = GetProcAddress(msacm32.dll, "acmFilterTagDetailsW");
+										msacm32.acmFilterTagEnumA = GetProcAddress(msacm32.dll, "acmFilterTagEnumA");
+										msacm32.acmFilterTagEnumW = GetProcAddress(msacm32.dll, "acmFilterTagEnumW");
+										msacm32.acmFormatChooseA = GetProcAddress(msacm32.dll, "acmFormatChooseA");
+										msacm32.acmFormatChooseW = GetProcAddress(msacm32.dll, "acmFormatChooseW");
+										msacm32.acmFormatDetailsA = GetProcAddress(msacm32.dll, "acmFormatDetailsA");
+										msacm32.acmFormatDetailsW = GetProcAddress(msacm32.dll, "acmFormatDetailsW");
+										msacm32.acmFormatEnumA = GetProcAddress(msacm32.dll, "acmFormatEnumA");
+										msacm32.acmFormatEnumW = GetProcAddress(msacm32.dll, "acmFormatEnumW");
+										msacm32.acmFormatSuggest = GetProcAddress(msacm32.dll, "acmFormatSuggest");
+										msacm32.acmFormatTagDetailsA = GetProcAddress(msacm32.dll, "acmFormatTagDetailsA");
+										msacm32.acmFormatTagDetailsW = GetProcAddress(msacm32.dll, "acmFormatTagDetailsW");
+										msacm32.acmFormatTagEnumA = GetProcAddress(msacm32.dll, "acmFormatTagEnumA");
+										msacm32.acmFormatTagEnumW = GetProcAddress(msacm32.dll, "acmFormatTagEnumW");
+										msacm32.acmGetVersion = GetProcAddress(msacm32.dll, "acmGetVersion");
+										msacm32.acmMetrics = GetProcAddress(msacm32.dll, "acmMetrics");
+										msacm32.acmStreamClose = GetProcAddress(msacm32.dll, "acmStreamClose");
+										msacm32.acmStreamConvert = GetProcAddress(msacm32.dll, "acmStreamConvert");
+										msacm32.acmStreamMessage = GetProcAddress(msacm32.dll, "acmStreamMessage");
+										msacm32.acmStreamOpen = GetProcAddress(msacm32.dll, "acmStreamOpen");
+										msacm32.acmStreamPrepareHeader = GetProcAddress(msacm32.dll, "acmStreamPrepareHeader");
+										msacm32.acmStreamReset = GetProcAddress(msacm32.dll, "acmStreamReset");
+										msacm32.acmStreamSize = GetProcAddress(msacm32.dll, "acmStreamSize");
+										msacm32.acmStreamUnprepareHeader = GetProcAddress(msacm32.dll, "acmStreamUnprepareHeader");
+									}
+									else
+									{
+										MessageBox(0, "This library isn't supported. Try to rename it to d3d8.dll, d3d9.dll, d3d11.dll, winmmbase.dll, msacm32.dll, dinput8.dll, dsound.dll, vorbisFile.dll or ddraw.dll.", "ASI Loader", MB_ICONERROR);
+										ExitProcess(0);
+									}
 								}
 							}
 						}
@@ -683,6 +731,7 @@ BOOL WINAPI DllMain(HINSTANCE hInst, DWORD reason, LPVOID)
 		FreeLibrary(d3d9.dll);
 		FreeLibrary(d3d11.dll);
 		FreeLibrary(winmmbase.dll);
+		FreeLibrary(msacm32.dll);
 		MemoryFreeLibrary(hwndmode_dll);
 	}
 	return TRUE;
