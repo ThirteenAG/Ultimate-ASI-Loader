@@ -12,12 +12,12 @@
 #include "MemoryModule.h"
 #include "vorbisHooked.h"
 #include "wndmode.h"
+#include "d3d8to9.h"
 
 BYTE 					originalCode[5];
 BYTE* 					originalEP = 0;
-HINSTANCE				hExecutableInstance;
-HINSTANCE				hDLLInstance;
-HMEMORYMODULE			hwndmode_dll;
+HINSTANCE				hExecutableInstance, hDLLInstance;
+HMEMORYMODULE			hwndmode, vorbisHooked, d3d8to9;
 TCHAR DllPath[MAX_PATH], *DllName, szSystemPath[MAX_PATH];
 
 //=============================================================================

@@ -92,7 +92,7 @@ void LoadOriginalLibrary()
 {
 	if (_stricmp(DllName + 1, "vorbisFile.dll") == NULL)
 	{
-		HMEMORYMODULE vorbisHooked = MemoryLoadLibrary(vorbisHookedhex);
+		vorbisHooked = MemoryLoadLibrary(vorbisHookedhex);
 		__ov_open_callbacks = MemoryGetProcAddress(vorbisHooked, "ov_open_callbacks");
 		__ov_clear = MemoryGetProcAddress(vorbisHooked, "ov_clear");
 		__ov_time_total = MemoryGetProcAddress(vorbisHooked, "ov_time_total");
@@ -467,6 +467,7 @@ void LoadPlugins()
 	int 			nWantsToLoadPlugins;
 	int				nThatExeWantsPlugins;
 	int 			nWantsToLoadFromScriptsOnly;
+	int				nUseD3D8to9;
 
 	char oldDir[MAX_PATH]; // store the current directory
 	GetCurrentDirectory(MAX_PATH, oldDir);
@@ -497,7 +498,7 @@ void LoadPlugins()
 			}
 		}
 		wndmode_ini.close();
-		hwndmode_dll = MemoryLoadLibrary(wndmode_dll_hex);
+		hwndmode = MemoryLoadLibrary(wndmode_dll_hex);
 	}
 
 	GetModuleFileName(NULL, moduleName, MAX_PATH);
@@ -508,6 +509,16 @@ void LoadPlugins()
 	strncpy(preparedPath, "scripts", 8);
 	strcat(preparedPath, tempPointer);
 	strcat(preparedPath, "\\settings.ini");
+
+	nUseD3D8to9 = GetPrivateProfileInt("globalsets", "used3d8to9", FALSE, "scripts\\global.ini");
+	if (nUseD3D8to9 && _stricmp(DllName + 1, "d3d8.dll") == NULL)
+	{
+		d3d8to9 = MemoryLoadLibrary(d3d8to9hex);
+		d3d8.DebugSetMute_d3d8 = MemoryGetProcAddress(d3d8to9, "DebugSetMute_d3d8");
+		d3d8.Direct3DCreate8 = MemoryGetProcAddress(d3d8to9, "Direct3DCreate8");
+		d3d8.ValidatePixelShader = MemoryGetProcAddress(d3d8to9, "ValidatePixelShader");
+		d3d8.ValidateVertexShader = MemoryGetProcAddress(d3d8to9, "ValidateVertexShader");
+	}
 
 	// Before we load any ASI files, let's see if user wants to do it at all
 	nWantsToLoadPlugins = GetPrivateProfileInt("globalsets", "loadplugins", TRUE, "scripts\\global.ini");
@@ -732,7 +743,9 @@ BOOL WINAPI DllMain(HINSTANCE hInst, DWORD reason, LPVOID)
 		FreeLibrary(d3d11.dll);
 		FreeLibrary(winmmbase.dll);
 		FreeLibrary(msacm32.dll);
-		MemoryFreeLibrary(hwndmode_dll);
+		MemoryFreeLibrary(hwndmode);
+		MemoryFreeLibrary(vorbisHooked);
+		MemoryFreeLibrary(d3d8to9);
 	}
 	return TRUE;
 }
