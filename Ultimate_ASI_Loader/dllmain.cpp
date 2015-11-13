@@ -115,8 +115,8 @@ void LoadOriginalLibrary()
 			dsound.DirectSoundEnumerateA = GetProcAddress(dsound.dll, "DirectSoundEnumerateA");
 			dsound.DirectSoundEnumerateW = GetProcAddress(dsound.dll, "DirectSoundEnumerateW");
 			dsound.DirectSoundFullDuplexCreate = GetProcAddress(dsound.dll, "DirectSoundFullDuplexCreate");
-			dsound.DllCanUnloadNow_dsound = GetProcAddress(dsound.dll, "DllCanUnloadNow_dsound");
-			dsound.DllGetClassObject_dsound = GetProcAddress(dsound.dll, "DllGetClassObject_dsound");
+			dsound.DllCanUnloadNow_dsound = GetProcAddress(dsound.dll, "DllCanUnloadNow");
+			dsound.DllGetClassObject_dsound = GetProcAddress(dsound.dll, "DllGetClassObject");
 			dsound.GetDeviceID = GetProcAddress(dsound.dll, "GetDeviceID");
 		}
 		else
