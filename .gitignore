@@ -213,3 +213,7 @@ pip-log.txt
 
 #Mr Developer
 .mr.developer.cfg
+
+!d3d8to9.dll
+!vorbisHooked.dll
+!wndmode.dll
