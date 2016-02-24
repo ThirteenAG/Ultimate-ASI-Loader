@@ -1,4 +1,4 @@
-Ultimate_ASI_Loader
+Ultimate ASI Loader
 ===================
 
 DESCRIPTION
@@ -11,7 +11,7 @@ This is a DLL file which adds ASI plugin loading functionality to any game, whic
 * winmmbase.dll
 * msacm32.dll
 * dinput8.dll
-* dsound.dll
+* dsound.dll (x86 and x64)
 * ddraw.dll
 
 
