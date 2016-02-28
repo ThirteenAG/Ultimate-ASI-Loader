@@ -745,7 +745,9 @@ BOOL WINAPI DllMain(HINSTANCE hInst, DWORD reason, LPVOID)
 		SHGetFolderPath(NULL, CSIDL_SYSTEM, NULL, 0, szSystemPath);
 		strcat(szSystemPath, DllName);
 
-		if (hExecutableInstance && _stricmp(DllName + 1, "vorbisFile.dll") == NULL)
+		int nForceEPHook = GetPrivateProfileInt("globalsets", "forceentrypointhook", FALSE, "scripts\\global.ini");
+
+		if (hExecutableInstance && (_stricmp(DllName + 1, "vorbisFile.dll") == NULL || nForceEPHook != FALSE))
 		{
 			VorbisFile();
 		}
