@@ -150,7 +150,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="vorbisFile.h" />
-    <ClInclude Include="vorbisHooked.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="UALx86.rc" />

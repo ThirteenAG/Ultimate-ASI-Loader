@@ -418,6 +418,7 @@ void LoadPlugins()
 	int				nThatExeWantsPlugins;
 	int 			nWantsToLoadFromScriptsOnly;
 	int				nUseD3D8to9;
+	int             nDirect3D8DisableMaximizedWindowedModeShim;
 
 	char oldDir[MAX_PATH]; // store the current directory
 	GetCurrentDirectory(MAX_PATH, oldDir);
@@ -517,6 +518,36 @@ void LoadPlugins()
 						}
 					}
 				}
+			}
+		}
+	}
+
+	nDirect3D8DisableMaximizedWindowedModeShim = GetPrivateProfileInt("globalsets", "Direct3D8DisableMaximizedWindowedModeShim", FALSE, "scripts\\global.ini");
+	if (nDirect3D8DisableMaximizedWindowedModeShim)
+	{
+		HMODULE pd3d8 = NULL;
+		if (d3d8.dll)
+		{
+			pd3d8 = d3d8.dll;
+		}
+		else
+		{
+			TCHAR szSystemPath[MAX_PATH];
+			SHGetFolderPath(NULL, CSIDL_SYSTEM, NULL, 0, szSystemPath);
+			strcat(szSystemPath, "\\d3d8.dll");
+			pd3d8 = LoadLibrary(szSystemPath);
+		}
+
+		if (pd3d8)
+		{
+			auto addr = (uintptr_t)GetProcAddress(pd3d8, "Direct3D8EnableMaximizedWindowedModeShim");
+			if (addr)
+			{
+				DWORD Protect;
+				VirtualProtect((LPVOID)(addr + 6), 4, PAGE_EXECUTE_READWRITE, &Protect) != 0;
+				*(uint32_t*)(addr + 6) = 0;
+				*(uint32_t*)(*(uint32_t*)(addr + 2)) = 0;
+				VirtualProtect((LPVOID)(addr + 6), 4, Protect, &Protect) != 0;
 			}
 		}
 	}

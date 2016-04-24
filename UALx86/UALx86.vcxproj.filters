@@ -26,9 +26,6 @@
     <ClInclude Include="vorbisFile.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="vorbisHooked.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="UALx86.rc">
