@@ -544,10 +544,10 @@ void LoadPlugins()
 			if (addr)
 			{
 				DWORD Protect;
-				VirtualProtect((LPVOID)(addr + 6), 4, PAGE_EXECUTE_READWRITE, &Protect) != 0;
+				VirtualProtect((LPVOID)(addr + 6), 4, PAGE_EXECUTE_READWRITE, &Protect);
 				*(uint32_t*)(addr + 6) = 0;
 				*(uint32_t*)(*(uint32_t*)(addr + 2)) = 0;
-				VirtualProtect((LPVOID)(addr + 6), 4, Protect, &Protect) != 0;
+				VirtualProtect((LPVOID)(addr + 6), 4, Protect, &Protect);
 			}
 		}
 	}
