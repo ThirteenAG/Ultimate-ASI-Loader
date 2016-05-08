@@ -5,9 +5,10 @@
 #include <Shlobj.h>
 #include "MemoryModule\MemoryModule.h"
 #include "vorbisFile.h"
+#include "d3d8to9\d3d8to9.hpp"
+extern "C" Direct3D8 *WINAPI Direct3DCreate8(UINT SDKVersion);
 
 #define IDR_VBHKD   101
-#define IDR_D3D8TO9 102
 #define IDR_WNDMODE 103
 #define IDR_WNDWINI 104
 
@@ -17,7 +18,8 @@ HMODULE dllModule;
 HINSTANCE hExecutableInstance;
 TCHAR DllPath[MAX_PATH], *DllName, szSystemPath[MAX_PATH];
 
-HMEMORYMODULE vorbisHooked, d3d8to9, wndmode;
+HMEMORYMODULE vorbisHooked, wndmode;
+
 
 void LoadOriginalLibrary()
 {
@@ -496,30 +498,7 @@ void LoadPlugins()
 	nUseD3D8to9 = GetPrivateProfileInt("globalsets", "used3d8to9", FALSE, "scripts\\global.ini");
 	if (nUseD3D8to9 && _stricmp(DllName + 1, "d3d8.dll") == NULL)
 	{
-		HRSRC hResource = FindResource(dllModule, MAKEINTRESOURCE(IDR_D3D8TO9), RT_RCDATA); //https://github.com/crosire/d3d8to9
-		if (hResource)
-		{
-			HGLOBAL hLoadedResource = LoadResource(dllModule, hResource);
-			if (hLoadedResource)
-			{
-				LPVOID pLockedResource = LockResource(hLoadedResource);
-				if (pLockedResource)
-				{
-					DWORD dwResourceSize = SizeofResource(dllModule, hResource);
-					if (0 != dwResourceSize)
-					{
-						d3d8to9 = MemoryLoadLibrary((const void*)pLockedResource, dwResourceSize);
-						if (d3d8to9)
-						{
-							d3d8.DebugSetMute_d3d8 = MemoryGetProcAddress(d3d8to9, "DebugSetMute_d3d8");
-							d3d8.Direct3DCreate8 = MemoryGetProcAddress(d3d8to9, "Direct3DCreate8");
-							d3d8.ValidatePixelShader = MemoryGetProcAddress(d3d8to9, "ValidatePixelShader");
-							d3d8.ValidateVertexShader = MemoryGetProcAddress(d3d8to9, "ValidateVertexShader");
-						}
-					}
-				}
-			}
-		}
+		d3d8.Direct3DCreate8 = (FARPROC)Direct3DCreate8;
 	}
 
 	nDirect3D8DisableMaximizedWindowedModeShim = GetPrivateProfileInt("globalsets", "Direct3D8DisableMaximizedWindowedModeShim", FALSE, "scripts\\global.ini");
@@ -800,7 +779,6 @@ BOOL WINAPI DllMain(HINSTANCE hInst, DWORD reason, LPVOID)
 		FreeLibrary(winmmbase.dll);
 		FreeLibrary(msacm32.dll);
 		MemoryFreeLibrary(vorbisHooked);
-		MemoryFreeLibrary(d3d8to9);
 		MemoryFreeLibrary(wndmode);
 	}
 	return TRUE;

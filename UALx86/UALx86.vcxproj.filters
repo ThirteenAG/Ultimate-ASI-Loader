@@ -21,6 +21,9 @@
     <ClCompile Include="MemoryModule\MemoryModule.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="d3d8to9\d3d8to9.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="vorbisFile.h">
