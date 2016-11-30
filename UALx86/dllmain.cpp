@@ -5,7 +5,7 @@
 #include <Shlobj.h>
 #include "MemoryModule\MemoryModule.h"
 #include "vorbisFile.h"
-#include "d3d8to9\d3d8to9.hpp"
+#include "d3d8to9\d3d8to9-master\source\d3d8to9.hpp"
 extern "C" Direct3D8 *WINAPI Direct3DCreate8(UINT SDKVersion);
 
 #define IDR_VBHKD   101

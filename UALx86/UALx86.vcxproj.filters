@@ -21,12 +21,45 @@
     <ClCompile Include="MemoryModule\MemoryModule.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="d3d8to9\d3d8to9.cpp">
+    <ClCompile Include="d3d8to9\d3d8to9-master\source\d3d8to9.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="d3d8to9\d3d8to9-master\source\d3d8to9_base.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="d3d8to9\d3d8to9-master\source\d3d8to9_device.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="d3d8to9\d3d8to9-master\source\d3d8to9_index_buffer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="d3d8to9\d3d8to9-master\source\d3d8to9_surface.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="d3d8to9\d3d8to9-master\source\d3d8to9_swap_chain.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="d3d8to9\d3d8to9-master\source\d3d8to9_texture.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="d3d8to9\d3d8to9-master\source\d3d8to9_vertex_buffer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="d3d8to9\d3d8to9-master\source\d3d8to9_volume.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="d3d8to9\d3d8to9-master\source\d3d8types.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="vorbisFile.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="d3d8to9\d3d8to9-master\source\d3d8to9.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="d3d8to9\d3d8to9-master\source\d3d8types.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
