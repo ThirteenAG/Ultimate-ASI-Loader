@@ -5,6 +5,7 @@
 #include <Shlobj.h>
 #include "MemoryModule\MemoryModule.h"
 #include "vorbisFile.h"
+#include "xlive\xliveless.h"
 #include "d3d8to9\d3d8to9-master\source\d3d8to9.hpp"
 extern "C" Direct3D8 *WINAPI Direct3DCreate8(UINT SDKVersion);
 
@@ -12,14 +13,13 @@ extern "C" Direct3D8 *WINAPI Direct3DCreate8(UINT SDKVersion);
 #define IDR_WNDMODE 103
 #define IDR_WNDWINI 104
 
-BYTE 					originalCode[5];
-BYTE* 					originalEP = 0;
+BYTE originalCode[5];
+BYTE* originalEP = 0;
 HMODULE dllModule;
 HINSTANCE hExecutableInstance;
 TCHAR DllPath[MAX_PATH], *DllName, szSystemPath[MAX_PATH];
 
 HMEMORYMODULE vorbisHooked, wndmode;
-
 
 void LoadOriginalLibrary()
 {
@@ -393,8 +393,15 @@ void LoadOriginalLibrary()
 									}
 									else
 									{
-										MessageBox(0, "This library isn't supported. Try to rename it to d3d8.dll, d3d9.dll, d3d11.dll, winmmbase.dll, msacm32.dll, dinput8.dll, dsound.dll, vorbisFile.dll or ddraw.dll.", "ASI Loader", MB_ICONERROR);
-										ExitProcess(0);
+										if (_stricmp(DllName + 1, "xlive.dll") == NULL) 
+										{
+											//
+										}
+										else
+										{
+											MessageBox(0, "This library isn't supported. Try to rename it to d3d8.dll, d3d9.dll, d3d11.dll, winmmbase.dll, msacm32.dll, dinput8.dll, dsound.dll, vorbisFile.dll, xlive.dll or ddraw.dll.", "ASI Loader", MB_ICONERROR);
+											ExitProcess(0);
+										}
 									}
 								}
 							}
