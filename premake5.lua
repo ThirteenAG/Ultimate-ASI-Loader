@@ -72,10 +72,10 @@ project "Ultimate-ASI-Loader-x64"
    targetname "dsound"
    targetextension ".dll"
    
-   includedirs { "source/x64" }
+   includedirs { "source/x64loader" }
    
-   files { "source/x64/*.h", "source/x64/*.cpp" }
-   files { "source/x64/*.def" }
+   files { "source/x64loader/*.h", "source/x64loader/*.cpp" }
+   files { "source/x64loader/*.def" }
    files { "source/verinfo/*.rc" }
    
    filter "configurations:Debug"
