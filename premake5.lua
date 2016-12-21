@@ -69,7 +69,7 @@ project "Ultimate-ASI-Loader-x64"
    kind "SharedLib"
    language "C++"
    targetdir "bin/%{cfg.buildcfg}/x64/"
-   targetname "dsound"
+   targetname "dinput8"
    targetextension ".dll"
    
    includedirs { "source/x64loader" }
