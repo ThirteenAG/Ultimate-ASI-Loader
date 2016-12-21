@@ -12,3 +12,11 @@ DirectSoundFullDuplexCreate = _DirectSoundFullDuplexCreate @10
 DllCanUnloadNow_dsound = _DllCanUnloadNow_dsound PRIVATE
 DllGetClassObject_dsound = _DllGetClassObject_dsound PRIVATE
 GetDeviceID = _GetDeviceID @9
+
+LIBRARY "dinput8"
+EXPORTS
+DirectInput8Create = _DirectInput8Create
+DllCanUnloadNow = _DllCanUnloadNow PRIVATE
+DllGetClassObject = _DllGetClassObject PRIVATE
+DllRegisterServer = _DllRegisterServer PRIVATE
+DllUnregisterServer = _DllUnregisterServer PRIVATE

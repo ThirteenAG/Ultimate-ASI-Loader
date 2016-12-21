@@ -92,6 +92,7 @@ project "TestPlugin-x64"
    kind "SharedLib"
    language "C++"
    targetdir "bin/%{cfg.buildcfg}/x64/examples/scripts"
+   targetname "RE7Demo.InfiniteAmmo"
    targetextension ".asi"
    
    files { "source/x64test/*.h", "source/x64test/*.cpp" }

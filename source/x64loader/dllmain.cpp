@@ -5,7 +5,7 @@
 #include <Shlobj.h>
 #include <dsound.h>
 
-HINSTANCE				hExecutableInstance, hDLLInstance;
+HINSTANCE hExecutableInstance, hDLLInstance;
 TCHAR DllPath[MAX_PATH], *DllName, szSystemPath[MAX_PATH];
 
 struct dsound_dll
@@ -24,6 +24,16 @@ struct dsound_dll
 	FARPROC DllGetClassObject_dsound;
 	FARPROC GetDeviceID;
 } dsound;
+
+struct dinput8_dll
+{
+	HMODULE dll;
+	FARPROC DirectInput8Create;
+	FARPROC DllCanUnloadNow;
+	FARPROC DllGetClassObject;
+	FARPROC DllRegisterServer;
+	FARPROC DllUnregisterServer;
+} dinput8;
 
 typedef HRESULT(*fn_DirectSoundCaptureCreate)(LPGUID lpGUID, LPDIRECTSOUNDCAPTURE *lplpDSC, LPUNKNOWN pUnkOuter);
 void _DirectSoundCaptureCreate() { (fn_DirectSoundCaptureCreate)dsound.DirectSoundCaptureCreate(); }
@@ -60,6 +70,23 @@ void _DllGetClassObject_dsound() { (fn_DllGetClassObject_dsound)dsound.DllGetCla
 
 typedef HRESULT(*fn_GetDeviceID)(LPCGUID pGuidSrc, LPGUID pGuidDest);
 void _GetDeviceID() { (fn_GetDeviceID)dsound.GetDeviceID(); }
+
+
+typedef HRESULT(*fn_DirectInput8Create)(HINSTANCE hinst, DWORD dwVersion, REFIID riidltf, LPVOID * ppvOut, LPUNKNOWN punkOuter);
+void _DirectInput8Create() { (fn_DirectInput8Create)dinput8.DirectInput8Create(); }
+
+typedef HRESULT(*fn_DllCanUnloadNow)();
+void _DllCanUnloadNow() { (fn_DllCanUnloadNow)dinput8.DllCanUnloadNow(); }
+
+typedef HRESULT(*fn_DllGetClassObject)(REFCLSID rclsid, REFIID riid, LPVOID *ppv);
+void _DllGetClassObject() { (fn_DllGetClassObject)dinput8.DllGetClassObject(); }
+
+typedef HRESULT(*fn_DllRegisterServer)();
+void _DllRegisterServer() { (fn_DllRegisterServer)dinput8.DllRegisterServer(); }
+
+typedef HRESULT(*fn_DllUnregisterServer)();
+void _DllUnregisterServer() { (fn_DllUnregisterServer)dinput8.DllUnregisterServer(); }
+
 
 struct ExcludedEntry {
 	char*			entry;
@@ -179,8 +206,20 @@ void LoadOriginalLibrary()
 	}
 	else
 	{
-		MessageBox(0, "This library isn't supported. dsound.dll is the only one supported.", "x64 ASI Loader", MB_ICONERROR);
-		ExitProcess(0);
+		if (_stricmp(DllName + 1, "dinput8.dll") == NULL) 
+		{
+			dinput8.dll = LoadLibrary(szSystemPath);
+			dinput8.DirectInput8Create = GetProcAddress(dinput8.dll, "DirectInput8Create");
+			dinput8.DllCanUnloadNow = GetProcAddress(dinput8.dll, "DllCanUnloadNow");
+			dinput8.DllGetClassObject = GetProcAddress(dinput8.dll, "DllGetClassObject");
+			dinput8.DllRegisterServer = GetProcAddress(dinput8.dll, "DllRegisterServer");
+			dinput8.DllUnregisterServer = GetProcAddress(dinput8.dll, "DllUnregisterServer");
+		}
+		else
+		{
+			MessageBox(0, "This library isn't supported. dsound.dll and dinput8.dll are the only ones supported.", "x64 ASI Loader", MB_ICONERROR);
+			ExitProcess(0);
+		}
 	}
 }
 
@@ -321,6 +360,7 @@ BOOL WINAPI DllMain(HINSTANCE hInst, DWORD reason, LPVOID)
 	if (reason == DLL_PROCESS_DETACH)
 	{
 		FreeLibrary(dsound.dll);
+		FreeLibrary(dinput8.dll);
 	}
 	return TRUE;
 }

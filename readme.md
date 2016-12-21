@@ -10,7 +10,7 @@ This is a DLL file which adds ASI plugin loading functionality to any game, whic
 * d3d11.dll
 * winmmbase.dll
 * msacm32.dll
-* dinput8.dll
+* dinput8.dll (x86 and x64)
 * dsound.dll (x86 and x64)
 * ddraw.dll
 * xlive.dll
