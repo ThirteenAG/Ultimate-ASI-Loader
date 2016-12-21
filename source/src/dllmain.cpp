@@ -1,12 +1,14 @@
+#pragma comment(lib, "d3d9.lib")
+#pragma comment(lib, "d3dx9.lib")
 #include <windows.h>
 #include <iostream>
 #include <fstream>
 #include <string>
 #include <Shlobj.h>
-#include "MemoryModule\MemoryModule.h"
-#include "vorbisFile.h"
-#include "xlive\xliveless.h"
-#include "d3d8to9\d3d8to9-master\source\d3d8to9.hpp"
+#include <MemoryModule\MemoryModule.h>
+#include <d3d8to9\source\d3d8to9.hpp>
+#include <xliveless.h>
+#include "dllmain.h"
 extern "C" Direct3D8 *WINAPI Direct3DCreate8(UINT SDKVersion);
 
 #define IDR_VBHKD   101
@@ -100,8 +102,8 @@ void LoadOriginalLibrary()
 					ddraw.DirectDrawEnumerateExA = GetProcAddress(ddraw.dll, "DirectDrawEnumerateExA");
 					ddraw.DirectDrawEnumerateExW = GetProcAddress(ddraw.dll, "DirectDrawEnumerateExW");
 					ddraw.DirectDrawEnumerateW = GetProcAddress(ddraw.dll, "DirectDrawEnumerateW");
-					ddraw.DllCanUnloadNow = GetProcAddress(ddraw.dll, "DllCanUnloadNow");
-					ddraw.DllGetClassObject = GetProcAddress(ddraw.dll, "DllGetClassObject");
+					ddraw.DllCanUnloadNow_ddraw = GetProcAddress(ddraw.dll, "DllCanUnloadNow");
+					ddraw.DllGetClassObject_ddraw = GetProcAddress(ddraw.dll, "DllGetClassObject");
 					ddraw.GetDDSurfaceLocal = GetProcAddress(ddraw.dll, "GetDDSurfaceLocal");
 					ddraw.GetOLEThunkData = GetProcAddress(ddraw.dll, "GetOLEThunkData");
 					ddraw.GetSurfaceFromDC = GetProcAddress(ddraw.dll, "GetSurfaceFromDC");

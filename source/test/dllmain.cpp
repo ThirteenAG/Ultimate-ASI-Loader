@@ -47,7 +47,7 @@ DWORD WINAPI Thread(LPVOID param)
 	}
 	settingsFile.close();
 
-	MessageBox(0, "ASI Loader works correctly, UALx86.TestPlugin.asi will no longer be loaded. Check settings.ini inside scripts\\*your_exe_name* folder for more info.", "ASI Loader Test Plugin", MB_ICONWARNING);
+	MessageBox(0, "ASI Loader works correctly, TestPlugin-x86.asi will no longer be loaded. Check settings.ini inside scripts\\*your_exe_name* folder for more info.", "ASI Loader Test Plugin", MB_ICONWARNING);
 	return 0;
 }
 

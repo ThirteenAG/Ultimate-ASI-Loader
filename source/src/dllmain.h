@@ -105,8 +105,8 @@ struct ddraw_dll
 	FARPROC	DirectDrawEnumerateExA;
 	FARPROC	DirectDrawEnumerateExW;
 	FARPROC	DirectDrawEnumerateW;
-	FARPROC	DllCanUnloadNow;
-	FARPROC	DllGetClassObject;
+	FARPROC	DllCanUnloadNow_ddraw;
+	FARPROC	DllGetClassObject_ddraw;
 	FARPROC	GetDDSurfaceLocal;
 	FARPROC	GetOLEThunkData;
 	FARPROC	GetSurfaceFromDC;
@@ -439,8 +439,8 @@ __declspec(naked) void FakeDirectDrawEnumerateExA() { _asm { jmp[ddraw.DirectDra
 __declspec(naked) void FakeDirectDrawEnumerateExW() { _asm { jmp[ddraw.DirectDrawEnumerateExW] } }
 // HRESULT WINAPI DirectDrawEnumerateW( LPDDENUMCALLBACKW lpCallback, LPVOID lpContext );
 __declspec(naked) void FakeDirectDrawEnumerateW() { _asm { jmp[ddraw.DirectDrawEnumerateW] } }
-__declspec(naked) void FakeDllCanUnloadNow() { _asm { jmp[ddraw.DllCanUnloadNow] } }
-__declspec(naked) void FakeDllGetClassObject() { _asm { jmp[ddraw.DllGetClassObject] } }
+__declspec(naked) void FakeDllCanUnloadNow() { _asm { jmp[ddraw.DllCanUnloadNow_ddraw] } }
+__declspec(naked) void FakeDllGetClassObject() { _asm { jmp[ddraw.DllGetClassObject_ddraw] } }
 __declspec(naked) void FakeGetDDSurfaceLocal() { _asm { jmp[ddraw.GetDDSurfaceLocal] } }
 __declspec(naked) void FakeGetOLEThunkData() { _asm { jmp[ddraw.GetOLEThunkData] } }
 __declspec(naked) void FakeGetSurfaceFromDC() { _asm { jmp[ddraw.GetSurfaceFromDC] } }
