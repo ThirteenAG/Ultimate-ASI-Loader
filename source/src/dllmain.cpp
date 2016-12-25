@@ -460,6 +460,7 @@ void LoadPlugins()
 	dllPath[tempPointer - moduleName + 1] = '\0';
 	SetCurrentDirectory(dllPath);
 
+	LoadLibrary(".\\modloader\\modupdater.asi");
 	LoadLibrary(".\\modloader\\modloader.asi");
 
 	std::fstream wndmode_ini;
