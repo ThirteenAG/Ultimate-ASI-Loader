@@ -17,38 +17,14 @@ DirectSoundCreate8 = _DirectSoundCreate8
 DirectSoundEnumerateA = _DirectSoundEnumerateA
 DirectSoundEnumerateW = _DirectSoundEnumerateW
 DirectSoundFullDuplexCreate = _DirectSoundFullDuplexCreate
-DllCanUnloadNow_dsound = _DllCanUnloadNow_dsound
-DllGetClassObject_dsound = _DllGetClassObject_dsound
+DllCanUnloadNow = _DllCanUnloadNow PRIVATE
+DllGetClassObject = _DllGetClassObject PRIVATE
 GetDeviceID = _GetDeviceID
-
-LIBRARY "ddraw"
-EXPORTS
-AcquireDDThreadLock			= FakeAcquireDDThreadLock		
-CheckFullscreen				= FakeCheckFullscreen			
-CompleteCreateSysmemSurface	= FakeCompleteCreateSysmemSurface
-D3DParseUnknownCommand		= FakeD3DParseUnknownCommand	
-DDGetAttachedSurfaceLcl		= FakeDDGetAttachedSurfaceLcl	
-DDInternalLock				= FakeDDInternalLock			
-DDInternalUnlock			= FakeDDInternalUnlock			
-DSoundHelp					= FakeDSoundHelp				
-DirectDrawCreate			= FakeDirectDrawCreate			
-DirectDrawCreateClipper		= FakeDirectDrawCreateClipper	
-DirectDrawCreateEx			= FakeDirectDrawCreateEx		
-DirectDrawEnumerateA		= FakeDirectDrawEnumerateA		
-DirectDrawEnumerateExA		= FakeDirectDrawEnumerateExA	
-DirectDrawEnumerateExW		= FakeDirectDrawEnumerateExW	
-DirectDrawEnumerateW		= FakeDirectDrawEnumerateW		
-DllCanUnloadNow_ddraw		= FakeDllCanUnloadNow
-DllGetClassObject_ddraw		= FakeDllGetClassObject
-GetDDSurfaceLocal			= FakeGetDDSurfaceLocal			
-GetOLEThunkData				= FakeGetOLEThunkData			
-GetSurfaceFromDC			= FakeGetSurfaceFromDC			
-RegisterSpecialCase			= FakeRegisterSpecialCase		
-ReleaseDDThreadLock			= FakeReleaseDDThreadLock		
 
 LIBRARY "d3d8"
 EXPORTS
-DebugSetMute_d3d8 = _DebugSetMute_d3d8
+DebugSetMute = _DebugSetMute
+Direct3D8EnableMaximizedWindowedModeShim = _Direct3D8EnableMaximizedWindowedModeShim
 Direct3DCreate8 = _Direct3DCreate8
 ValidatePixelShader = _ValidatePixelShader
 ValidateVertexShader = _ValidateVertexShader
@@ -64,7 +40,7 @@ D3DPERF_SetOptions = _D3DPERF_SetOptions
 D3DPERF_SetRegion = _D3DPERF_SetRegion
 DebugSetLevel = _DebugSetLevel
 DebugSetMute = _DebugSetMute
-;Direct3D9EnableMaximizedWindowedModeShim = _Direct3D9EnableMaximizedWindowedModeShim
+Direct3D9EnableMaximizedWindowedModeShim = _Direct3D9EnableMaximizedWindowedModeShim
 Direct3DCreate9 = _Direct3DCreate9
 Direct3DCreate9Ex = _Direct3DCreate9Ex
 Direct3DShaderValidatorCreate9 = _Direct3DShaderValidatorCreate9
@@ -120,6 +96,31 @@ D3DPerformance_SetMarker = _D3DPerformance_SetMarker
 EnableFeatureLevelUpgrade = _EnableFeatureLevelUpgrade
 OpenAdapter10 = _OpenAdapter10
 OpenAdapter10_2 = _OpenAdapter10_2
+
+LIBRARY "ddraw"
+EXPORTS
+AcquireDDThreadLock = _AcquireDDThreadLock
+CompleteCreateSysmemSurface = _CompleteCreateSysmemSurface
+D3DParseUnknownCommand = _D3DParseUnknownCommand
+DDGetAttachedSurfaceLcl = _DDGetAttachedSurfaceLcl
+DDInternalLock = _DDInternalLock
+DDInternalUnlock = _DDInternalUnlock
+DSoundHelp = _DSoundHelp
+DirectDrawCreate = _DirectDrawCreate
+DirectDrawCreateClipper = _DirectDrawCreateClipper
+DirectDrawCreateEx = _DirectDrawCreateEx
+DirectDrawEnumerateA = _DirectDrawEnumerateA
+DirectDrawEnumerateExA = _DirectDrawEnumerateExA
+DirectDrawEnumerateExW = _DirectDrawEnumerateExW
+DirectDrawEnumerateW = _DirectDrawEnumerateW
+DllCanUnloadNow = _DllCanUnloadNow PRIVATE
+DllGetClassObject = _DllGetClassObject PRIVATE
+GetDDSurfaceLocal = _GetDDSurfaceLocal
+GetOLEThunkData = _GetOLEThunkData
+GetSurfaceFromDC = _GetSurfaceFromDC
+RegisterSpecialCase = _RegisterSpecialCase
+ReleaseDDThreadLock = _ReleaseDDThreadLock
+SetAppCompatData = _SetAppCompatData
 
 LIBRARY "winmmbase"
 EXPORTS

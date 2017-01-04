@@ -82,42 +82,16 @@ struct dsound_dll
 	FARPROC DirectSoundEnumerateA;
 	FARPROC DirectSoundEnumerateW;
 	FARPROC DirectSoundFullDuplexCreate;
-	FARPROC DllCanUnloadNow_dsound;
-	FARPROC DllGetClassObject_dsound;
+	FARPROC DllCanUnloadNow;
+	FARPROC DllGetClassObject;
 	FARPROC GetDeviceID;
 } dsound;
-
-struct ddraw_dll
-{
-	HMODULE dll;
-	FARPROC	AcquireDDThreadLock;
-	FARPROC	CheckFullscreen;
-	FARPROC	CompleteCreateSysmemSurface;
-	FARPROC	D3DParseUnknownCommand;
-	FARPROC	DDGetAttachedSurfaceLcl;
-	FARPROC	DDInternalLock;
-	FARPROC	DDInternalUnlock;
-	FARPROC	DSoundHelp;
-	FARPROC	DirectDrawCreate;
-	FARPROC	DirectDrawCreateClipper;
-	FARPROC	DirectDrawCreateEx;
-	FARPROC	DirectDrawEnumerateA;
-	FARPROC	DirectDrawEnumerateExA;
-	FARPROC	DirectDrawEnumerateExW;
-	FARPROC	DirectDrawEnumerateW;
-	FARPROC	DllCanUnloadNow_ddraw;
-	FARPROC	DllGetClassObject_ddraw;
-	FARPROC	GetDDSurfaceLocal;
-	FARPROC	GetOLEThunkData;
-	FARPROC	GetSurfaceFromDC;
-	FARPROC	RegisterSpecialCase;
-	FARPROC	ReleaseDDThreadLock;
-} ddraw;
 
 struct d3d8_dll
 {
 	HMODULE dll;
-	FARPROC DebugSetMute_d3d8;
+	FARPROC DebugSetMute;
+	FARPROC Direct3D8EnableMaximizedWindowedModeShim;
 	FARPROC Direct3DCreate8;
 	FARPROC ValidatePixelShader;
 	FARPROC ValidateVertexShader;
@@ -135,7 +109,7 @@ struct d3d9_dll
 	FARPROC D3DPERF_SetRegion;
 	FARPROC DebugSetLevel;
 	FARPROC DebugSetMute;
-	//  FARPROC Direct3D9EnableMaximizedWindowedModeShim;
+	FARPROC Direct3D9EnableMaximizedWindowedModeShim;
 	FARPROC Direct3DCreate9;
 	FARPROC Direct3DCreate9Ex;
 	FARPROC Direct3DShaderValidatorCreate9;
@@ -194,6 +168,33 @@ struct d3d11_dll
 	FARPROC OpenAdapter10;
 	FARPROC OpenAdapter10_2;
 } d3d11;
+
+struct ddraw_dll
+{
+	HMODULE dll;
+	FARPROC AcquireDDThreadLock;
+	FARPROC CompleteCreateSysmemSurface;
+	FARPROC D3DParseUnknownCommand;
+	FARPROC DDGetAttachedSurfaceLcl;
+	FARPROC DDInternalLock;
+	FARPROC DDInternalUnlock;
+	FARPROC DSoundHelp;
+	FARPROC DirectDrawCreate;
+	FARPROC DirectDrawCreateClipper;
+	FARPROC DirectDrawCreateEx;
+	FARPROC DirectDrawEnumerateA;
+	FARPROC DirectDrawEnumerateExA;
+	FARPROC DirectDrawEnumerateExW;
+	FARPROC DirectDrawEnumerateW;
+	FARPROC DllCanUnloadNow;
+	FARPROC DllGetClassObject;
+	FARPROC GetDDSurfaceLocal;
+	FARPROC GetOLEThunkData;
+	FARPROC GetSurfaceFromDC;
+	FARPROC RegisterSpecialCase;
+	FARPROC ReleaseDDThreadLock;
+	FARPROC SetAppCompatData;
+} ddraw;
 
 struct winmmbase_dll
 {
@@ -399,8 +400,28 @@ struct msacm32_dll
 } msacm32;
 
 __declspec(naked) void _DirectInput8Create() { _asm { jmp[dinput8.DirectInput8Create] } }
-__declspec(naked) void _DllCanUnloadNow() { _asm { jmp[dinput8.DllCanUnloadNow] } }
-__declspec(naked) void _DllGetClassObject() { _asm { jmp[dinput8.DllGetClassObject] } }
+__declspec(naked) void _DllCanUnloadNow() 
+{ 
+	if (dinput8.DllCanUnloadNow)
+		_asm { jmp[dinput8.DllCanUnloadNow] } 
+	else
+		if (dsound.DllCanUnloadNow)
+			_asm { jmp[dsound.DllCanUnloadNow] }
+		else
+			if (ddraw.DllCanUnloadNow)
+			_asm { jmp[ddraw.DllCanUnloadNow] }
+}
+__declspec(naked) void _DllGetClassObject() 
+{ 
+	if (dinput8.DllGetClassObject)
+		_asm { jmp[dinput8.DllGetClassObject] }
+	else
+		if (dsound.DllGetClassObject)
+			_asm { jmp[dsound.DllGetClassObject] }
+		else
+			if (ddraw.DllGetClassObject)
+			_asm { jmp[ddraw.DllGetClassObject] }
+}
 __declspec(naked) void _DllRegisterServer() { _asm { jmp[dinput8.DllRegisterServer] } }
 __declspec(naked) void _DllUnregisterServer() { _asm { jmp[dinput8.DllUnregisterServer] } }
 
@@ -413,41 +434,19 @@ __declspec(naked) void _DirectSoundCreate8() { _asm { jmp[dsound.DirectSoundCrea
 __declspec(naked) void _DirectSoundEnumerateA() { _asm { jmp[dsound.DirectSoundEnumerateA] } }
 __declspec(naked) void _DirectSoundEnumerateW() { _asm { jmp[dsound.DirectSoundEnumerateW] } }
 __declspec(naked) void _DirectSoundFullDuplexCreate() { _asm { jmp[dsound.DirectSoundFullDuplexCreate] } }
-__declspec(naked) void _DllCanUnloadNow_dsound() { _asm { jmp[dsound.DllCanUnloadNow_dsound] } }
-__declspec(naked) void _DllGetClassObject_dsound() { _asm { jmp[dsound.DllGetClassObject_dsound] } }
+//__declspec(naked) void _DllCanUnloadNow() { _asm { jmp[dsound.DllCanUnloadNow] } }
+//__declspec(naked) void _DllGetClassObject() { _asm { jmp[dsound.DllGetClassObject] } }
 __declspec(naked) void _GetDeviceID() { _asm { jmp[dsound.GetDeviceID] } }
 
-__declspec(naked) void FakeAcquireDDThreadLock() { _asm { jmp[ddraw.AcquireDDThreadLock] } }
-__declspec(naked) void FakeCheckFullscreen() { _asm { jmp[ddraw.CheckFullscreen] } }
-__declspec(naked) void FakeCompleteCreateSysmemSurface() { _asm { jmp[ddraw.CompleteCreateSysmemSurface] } }
-__declspec(naked) void FakeD3DParseUnknownCommand() { _asm { jmp[ddraw.D3DParseUnknownCommand] } }
-__declspec(naked) void FakeDDGetAttachedSurfaceLcl() { _asm { jmp[ddraw.DDGetAttachedSurfaceLcl] } }
-__declspec(naked) void FakeDDInternalLock() { _asm { jmp[ddraw.DDInternalLock] } }
-__declspec(naked) void FakeDDInternalUnlock() { _asm { jmp[ddraw.DDInternalUnlock] } }
-__declspec(naked) void FakeDSoundHelp() { _asm { jmp[ddraw.DSoundHelp] } }
-// HRESULT WINAPI DirectDrawCreate( GUID FAR *lpGUID, LPDIRECTDRAW FAR *lplpDD, IUnknown FAR *pUnkOuter );
-__declspec(naked) void FakeDirectDrawCreate() { _asm { jmp[ddraw.DirectDrawCreate] } }
-// HRESULT WINAPI DirectDrawCreateClipper( DWORD dwFlags, LPDIRECTDRAWCLIPPER FAR *lplpDDClipper, IUnknown FAR *pUnkOuter );
-__declspec(naked) void FakeDirectDrawCreateClipper() { _asm { jmp[ddraw.DirectDrawCreateClipper] } }
-// HRESULT WINAPI DirectDrawCreateEx( GUID FAR * lpGuid, LPVOID *lplpDD, REFIID iid,IUnknown FAR *pUnkOuter );
-__declspec(naked) void FakeDirectDrawCreateEx() { _asm { jmp[ddraw.DirectDrawCreateEx] } }
-// HRESULT WINAPI DirectDrawEnumerateA( LPDDENUMCALLBACKA lpCallback, LPVOID lpContext );
-__declspec(naked) void FakeDirectDrawEnumerateA() { _asm { jmp[ddraw.DirectDrawEnumerateA] } }
-// HRESULT WINAPI DirectDrawEnumerateExA( LPDDENUMCALLBACKEXA lpCallback, LPVOID lpContext, DWORD dwFlags );
-__declspec(naked) void FakeDirectDrawEnumerateExA() { _asm { jmp[ddraw.DirectDrawEnumerateExA] } }
-// HRESULT WINAPI DirectDrawEnumerateExW( LPDDENUMCALLBACKEXW lpCallback, LPVOID lpContext, DWORD dwFlags );
-__declspec(naked) void FakeDirectDrawEnumerateExW() { _asm { jmp[ddraw.DirectDrawEnumerateExW] } }
-// HRESULT WINAPI DirectDrawEnumerateW( LPDDENUMCALLBACKW lpCallback, LPVOID lpContext );
-__declspec(naked) void FakeDirectDrawEnumerateW() { _asm { jmp[ddraw.DirectDrawEnumerateW] } }
-__declspec(naked) void FakeDllCanUnloadNow() { _asm { jmp[ddraw.DllCanUnloadNow_ddraw] } }
-__declspec(naked) void FakeDllGetClassObject() { _asm { jmp[ddraw.DllGetClassObject_ddraw] } }
-__declspec(naked) void FakeGetDDSurfaceLocal() { _asm { jmp[ddraw.GetDDSurfaceLocal] } }
-__declspec(naked) void FakeGetOLEThunkData() { _asm { jmp[ddraw.GetOLEThunkData] } }
-__declspec(naked) void FakeGetSurfaceFromDC() { _asm { jmp[ddraw.GetSurfaceFromDC] } }
-__declspec(naked) void FakeRegisterSpecialCase() { _asm { jmp[ddraw.RegisterSpecialCase] } }
-__declspec(naked) void FakeReleaseDDThreadLock() { _asm { jmp[ddraw.ReleaseDDThreadLock] } }
-
-__declspec(naked) void _DebugSetMute_d3d8() { _asm { jmp[d3d8.DebugSetMute_d3d8] } }
+__declspec(naked) void _DebugSetMute() 
+{ 
+	if (d3d8.DebugSetMute)
+		_asm { jmp[d3d8.DebugSetMute] } 
+	else
+		if (d3d9.DebugSetMute)
+		_asm { jmp[d3d9.DebugSetMute] }
+}
+__declspec(naked) void _Direct3D8EnableMaximizedWindowedModeShim() { _asm { jmp[d3d8.Direct3D8EnableMaximizedWindowedModeShim] } }
 __declspec(naked) void _Direct3DCreate8() { _asm { jmp[d3d8.Direct3DCreate8] } }
 __declspec(naked) void _ValidatePixelShader() { _asm { jmp[d3d8.ValidatePixelShader] } }
 __declspec(naked) void _ValidateVertexShader() { _asm { jmp[d3d8.ValidateVertexShader] } }
@@ -460,8 +459,8 @@ __declspec(naked) void _D3DPERF_SetMarker() { _asm { jmp[d3d9.D3DPERF_SetMarker]
 __declspec(naked) void _D3DPERF_SetOptions() { _asm { jmp[d3d9.D3DPERF_SetOptions] } }
 __declspec(naked) void _D3DPERF_SetRegion() { _asm { jmp[d3d9.D3DPERF_SetRegion] } }
 __declspec(naked) void _DebugSetLevel() { _asm { jmp[d3d9.DebugSetLevel] } }
-__declspec(naked) void _DebugSetMute() { _asm { jmp[d3d9.DebugSetMute] } }
-//__declspec(naked) void _Direct3D9EnableMaximizedWindowedModeShim() { _asm { jmp [d3d9.Direct3D9EnableMaximizedWindowedModeShim] } }
+//__declspec(naked) void _DebugSetMute() { _asm { jmp[d3d9.DebugSetMute] } }
+__declspec(naked) void _Direct3D9EnableMaximizedWindowedModeShim() { _asm { jmp[d3d9.Direct3D9EnableMaximizedWindowedModeShim] } }
 __declspec(naked) void _Direct3DCreate9() { _asm { jmp[d3d9.Direct3DCreate9] } }
 __declspec(naked) void _Direct3DCreate9Ex() { _asm { jmp[d3d9.Direct3DCreate9Ex] } }
 __declspec(naked) void _Direct3DShaderValidatorCreate9() { _asm { jmp[d3d9.Direct3DShaderValidatorCreate9] } }
@@ -515,6 +514,29 @@ __declspec(naked) void _D3DPerformance_SetMarker() { _asm { jmp[d3d11.D3DPerform
 __declspec(naked) void _EnableFeatureLevelUpgrade() { _asm { jmp[d3d11.EnableFeatureLevelUpgrade] } }
 __declspec(naked) void _OpenAdapter10() { _asm { jmp[d3d11.OpenAdapter10] } }
 __declspec(naked) void _OpenAdapter10_2() { _asm { jmp[d3d11.OpenAdapter10_2] } }
+
+__declspec(naked) void _AcquireDDThreadLock() { _asm { jmp[ddraw.AcquireDDThreadLock] } }
+__declspec(naked) void _CompleteCreateSysmemSurface() { _asm { jmp[ddraw.CompleteCreateSysmemSurface] } }
+__declspec(naked) void _D3DParseUnknownCommand() { _asm { jmp[ddraw.D3DParseUnknownCommand] } }
+__declspec(naked) void _DDGetAttachedSurfaceLcl() { _asm { jmp[ddraw.DDGetAttachedSurfaceLcl] } }
+__declspec(naked) void _DDInternalLock() { _asm { jmp[ddraw.DDInternalLock] } }
+__declspec(naked) void _DDInternalUnlock() { _asm { jmp[ddraw.DDInternalUnlock] } }
+__declspec(naked) void _DSoundHelp() { _asm { jmp[ddraw.DSoundHelp] } }
+__declspec(naked) void _DirectDrawCreate() { _asm { jmp[ddraw.DirectDrawCreate] } }
+__declspec(naked) void _DirectDrawCreateClipper() { _asm { jmp[ddraw.DirectDrawCreateClipper] } }
+__declspec(naked) void _DirectDrawCreateEx() { _asm { jmp[ddraw.DirectDrawCreateEx] } }
+__declspec(naked) void _DirectDrawEnumerateA() { _asm { jmp[ddraw.DirectDrawEnumerateA] } }
+__declspec(naked) void _DirectDrawEnumerateExA() { _asm { jmp[ddraw.DirectDrawEnumerateExA] } }
+__declspec(naked) void _DirectDrawEnumerateExW() { _asm { jmp[ddraw.DirectDrawEnumerateExW] } }
+__declspec(naked) void _DirectDrawEnumerateW() { _asm { jmp[ddraw.DirectDrawEnumerateW] } }
+//__declspec(naked) void _DllCanUnloadNow() { _asm { jmp[ddraw.DllCanUnloadNow] } }
+//__declspec(naked) void _DllGetClassObject() { _asm { jmp[ddraw.DllGetClassObject] } }
+__declspec(naked) void _GetDDSurfaceLocal() { _asm { jmp[ddraw.GetDDSurfaceLocal] } }
+__declspec(naked) void _GetOLEThunkData() { _asm { jmp[ddraw.GetOLEThunkData] } }
+__declspec(naked) void _GetSurfaceFromDC() { _asm { jmp[ddraw.GetSurfaceFromDC] } }
+__declspec(naked) void _RegisterSpecialCase() { _asm { jmp[ddraw.RegisterSpecialCase] } }
+__declspec(naked) void _ReleaseDDThreadLock() { _asm { jmp[ddraw.ReleaseDDThreadLock] } }
+__declspec(naked) void _SetAppCompatData() { _asm { jmp[ddraw.SetAppCompatData] } }
 
 __declspec(naked) void _CloseDriver() { _asm { jmp[winmmbase.CloseDriver] } }
 __declspec(naked) void _DefDriverProc() { _asm { jmp[winmmbase.DefDriverProc] } }

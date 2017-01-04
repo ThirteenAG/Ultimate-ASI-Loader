@@ -69,8 +69,8 @@ void LoadOriginalLibrary()
 			dsound.DirectSoundEnumerateA = GetProcAddress(dsound.dll, "DirectSoundEnumerateA");
 			dsound.DirectSoundEnumerateW = GetProcAddress(dsound.dll, "DirectSoundEnumerateW");
 			dsound.DirectSoundFullDuplexCreate = GetProcAddress(dsound.dll, "DirectSoundFullDuplexCreate");
-			dsound.DllCanUnloadNow_dsound = GetProcAddress(dsound.dll, "DllCanUnloadNow");
-			dsound.DllGetClassObject_dsound = GetProcAddress(dsound.dll, "DllGetClassObject");
+			dsound.DllCanUnloadNow = GetProcAddress(dsound.dll, "DllCanUnloadNow");
+			dsound.DllGetClassObject = GetProcAddress(dsound.dll, "DllGetClassObject");
 			dsound.GetDeviceID = GetProcAddress(dsound.dll, "GetDeviceID");
 		}
 		else
@@ -88,7 +88,6 @@ void LoadOriginalLibrary()
 				if (_stricmp(DllName + 1, "ddraw.dll") == NULL) {
 					ddraw.dll = LoadLibrary(szSystemPath);
 					ddraw.AcquireDDThreadLock = GetProcAddress(ddraw.dll, "AcquireDDThreadLock");
-					ddraw.CheckFullscreen = GetProcAddress(ddraw.dll, "CheckFullscreen");
 					ddraw.CompleteCreateSysmemSurface = GetProcAddress(ddraw.dll, "CompleteCreateSysmemSurface");
 					ddraw.D3DParseUnknownCommand = GetProcAddress(ddraw.dll, "D3DParseUnknownCommand");
 					ddraw.DDGetAttachedSurfaceLcl = GetProcAddress(ddraw.dll, "DDGetAttachedSurfaceLcl");
@@ -102,19 +101,21 @@ void LoadOriginalLibrary()
 					ddraw.DirectDrawEnumerateExA = GetProcAddress(ddraw.dll, "DirectDrawEnumerateExA");
 					ddraw.DirectDrawEnumerateExW = GetProcAddress(ddraw.dll, "DirectDrawEnumerateExW");
 					ddraw.DirectDrawEnumerateW = GetProcAddress(ddraw.dll, "DirectDrawEnumerateW");
-					ddraw.DllCanUnloadNow_ddraw = GetProcAddress(ddraw.dll, "DllCanUnloadNow");
-					ddraw.DllGetClassObject_ddraw = GetProcAddress(ddraw.dll, "DllGetClassObject");
+					ddraw.DllCanUnloadNow = GetProcAddress(ddraw.dll, "DllCanUnloadNow");
+					ddraw.DllGetClassObject = GetProcAddress(ddraw.dll, "DllGetClassObject");
 					ddraw.GetDDSurfaceLocal = GetProcAddress(ddraw.dll, "GetDDSurfaceLocal");
 					ddraw.GetOLEThunkData = GetProcAddress(ddraw.dll, "GetOLEThunkData");
 					ddraw.GetSurfaceFromDC = GetProcAddress(ddraw.dll, "GetSurfaceFromDC");
 					ddraw.RegisterSpecialCase = GetProcAddress(ddraw.dll, "RegisterSpecialCase");
 					ddraw.ReleaseDDThreadLock = GetProcAddress(ddraw.dll, "ReleaseDDThreadLock");
+					ddraw.SetAppCompatData = GetProcAddress(ddraw.dll, "SetAppCompatData");
 				}
 				else
 				{
 					if (_stricmp(DllName + 1, "d3d8.dll") == NULL) {
 						d3d8.dll = LoadLibrary(szSystemPath);
-						d3d8.DebugSetMute_d3d8 = GetProcAddress(d3d8.dll, "DebugSetMute_d3d8");
+						d3d8.DebugSetMute = GetProcAddress(d3d8.dll, "DebugSetMute");
+						d3d8.Direct3D8EnableMaximizedWindowedModeShim = GetProcAddress(d3d8.dll, "Direct3D8EnableMaximizedWindowedModeShim");
 						d3d8.Direct3DCreate8 = GetProcAddress(d3d8.dll, "Direct3DCreate8");
 						d3d8.ValidatePixelShader = GetProcAddress(d3d8.dll, "ValidatePixelShader");
 						d3d8.ValidateVertexShader = GetProcAddress(d3d8.dll, "ValidateVertexShader");
@@ -131,7 +132,7 @@ void LoadOriginalLibrary()
 							d3d9.D3DPERF_SetRegion = GetProcAddress(d3d9.dll, "D3DPERF_SetRegion");
 							d3d9.DebugSetLevel = GetProcAddress(d3d9.dll, "DebugSetLevel");
 							d3d9.DebugSetMute = GetProcAddress(d3d9.dll, "DebugSetMute");
-							//d3d9.Direct3D9EnableMaximizedWindowedModeShim = GetProcAddress(d3d9.dll, "Direct3D9EnableMaximizedWindowedModeShim");
+							d3d9.Direct3D9EnableMaximizedWindowedModeShim = GetProcAddress(d3d9.dll, "Direct3D9EnableMaximizedWindowedModeShim");
 							d3d9.Direct3DCreate9 = GetProcAddress(d3d9.dll, "Direct3DCreate9");
 							d3d9.Direct3DCreate9Ex = GetProcAddress(d3d9.dll, "Direct3DCreate9Ex");
 							d3d9.Direct3DShaderValidatorCreate9 = GetProcAddress(d3d9.dll, "Direct3DShaderValidatorCreate9");
@@ -464,34 +465,31 @@ void LoadPlugins()
 	LoadLibrary(".\\modloader\\modloader.asi");
 
 	std::fstream wndmode_ini;
-	wndmode_ini.open("wndmode.ini", std::ios_base::out | std::ios_base::in);  // will not create wndmode.ini
+	wndmode_ini.open("wndmode.ini", std::ios_base::out | std::ios_base::in | std::ios_base::binary);
 	if (wndmode_ini.is_open())
 	{
-		std::string line;
-		while (!wndmode_ini.eof())
+		wndmode_ini.seekg(0, wndmode_ini.end);
+		bool bIsEmpty = !wndmode_ini.tellg();
+		wndmode_ini.seekg(wndmode_ini.tellg(), wndmode_ini.beg);
+
+		if (bIsEmpty)
 		{
-			std::getline(wndmode_ini, line);
-			if ((line.find("[WINDOWMODE]", 0)) == std::string::npos)
+			HRSRC hResource = FindResource(dllModule, MAKEINTRESOURCE(IDR_WNDWINI), RT_RCDATA);
+			if (hResource)
 			{
-				wndmode_ini.clear();
-				HRSRC hResource = FindResource(dllModule, MAKEINTRESOURCE(IDR_WNDWINI), RT_RCDATA);
-				if (hResource)
+				HGLOBAL hLoadedResource = LoadResource(dllModule, hResource);
+				if (hLoadedResource)
 				{
-					HGLOBAL hLoadedResource = LoadResource(dllModule, hResource);
-					if (hLoadedResource)
+					LPVOID pLockedResource = LockResource(hLoadedResource);
+					if (pLockedResource)
 					{
-						LPVOID pLockedResource = LockResource(hLoadedResource);
-						if (pLockedResource)
+						DWORD dwResourceSize = SizeofResource(dllModule, hResource);
+						if (0 != dwResourceSize)
 						{
-							DWORD dwResourceSize = SizeofResource(dllModule, hResource);
-							if (0 != dwResourceSize)
-							{
-								wndmode_ini.write((char*)pLockedResource, dwResourceSize);
-							}
+							wndmode_ini.write((char*)pLockedResource, dwResourceSize);
 						}
 					}
 				}
-				break;
 			}
 		}
 		wndmode_ini.close();
@@ -539,10 +537,14 @@ void LoadPlugins()
 		}
 		else
 		{
-			TCHAR szSystemPath[MAX_PATH];
-			SHGetFolderPath(NULL, CSIDL_SYSTEM, NULL, 0, szSystemPath);
-			strcat(szSystemPath, "\\d3d8.dll");
-			pd3d8 = LoadLibrary(szSystemPath);
+			pd3d8 = LoadLibrary("d3d8.dll");
+			if (!pd3d8)
+			{
+				TCHAR szSystemPath[MAX_PATH];
+				SHGetFolderPath(NULL, CSIDL_SYSTEM, NULL, 0, szSystemPath);
+				strcat(szSystemPath, "\\d3d8.dll");
+				pd3d8 = LoadLibrary(szSystemPath);
+			}
 		}
 
 		if (pd3d8)
