@@ -24,7 +24,7 @@ GetDeviceID = _GetDeviceID
 LIBRARY "d3d8"
 EXPORTS
 DebugSetMute = _DebugSetMute
-Direct3D8EnableMaximizedWindowedModeShim = _Direct3D8EnableMaximizedWindowedModeShim
+;Direct3D8EnableMaximizedWindowedModeShim = _Direct3D8EnableMaximizedWindowedModeShim
 Direct3DCreate8 = _Direct3DCreate8
 ValidatePixelShader = _ValidatePixelShader
 ValidateVertexShader = _ValidateVertexShader
