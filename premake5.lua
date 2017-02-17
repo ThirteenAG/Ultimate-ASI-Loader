@@ -31,7 +31,7 @@ project "Ultimate-ASI-Loader-x86"
       flags { "Symbols" }
 
    filter "configurations:Release"
-      defines { "NDEBUG" }
+      defines { "NDEBUG", "D3D8TO9NOLOG" }
       optimize "On"
 	  flags { "StaticRuntime" }
 	  characterset ("MBCS")
