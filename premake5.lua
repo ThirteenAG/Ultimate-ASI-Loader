@@ -28,9 +28,10 @@ project "Ultimate-ASI-Loader-x86"
    
    filter "configurations:Debug"
       defines { "DEBUG" }
-      flags { "Symbols" }
+      symbols "On"
 
    filter "configurations:Release"
+      targetdir "data"
       defines { "NDEBUG", "D3D8TO9NOLOG" }
       optimize "On"
 	  flags { "StaticRuntime" }
@@ -50,9 +51,10 @@ project "TestPlugin-x86"
 
    filter "configurations:Debug"
       defines { "DEBUG" }
-      flags { "Symbols" }
+      symbols "On"
 
    filter "configurations:Release"
+      targetdir "data/examples/scripts"
       defines { "NDEBUG" }
       optimize "On"
 	  flags { "StaticRuntime" }
@@ -83,6 +85,7 @@ project "Ultimate-ASI-Loader-x64"
       flags { "Symbols" }
 
    filter "configurations:Release"
+      targetdir "data/x64/"
       defines { "NDEBUG" }
       optimize "On"
 	  flags { "StaticRuntime" }
@@ -105,6 +108,7 @@ project "TestPlugin-x64"
       flags { "Symbols" }
 
    filter "configurations:Release"
+      targetdir "data/x64/examples/scripts"
       defines { "NDEBUG" }
       optimize "On"
 	  flags { "StaticRuntime" }
