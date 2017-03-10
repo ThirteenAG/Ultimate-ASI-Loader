@@ -1,0 +1,27 @@
+version: 3.{build}
+skip_tags: true
+image: Visual Studio 2015
+configuration: Release
+install:
+- cmd: >-
+    git submodule update --init --recursive
+
+    premake5 vs2015
+build:
+  project: build/Ultimate-ASI-Loader-x86.sln
+  verbosity: minimal
+before_package:
+- cmd: msbuild.exe build/Ultimate-ASI-Loader-x64.sln /t:Build /p:Configuration=Release;Platform=x64
+after_build:
+- cmd: release.bat
+artifacts:
+- path: Ultimate-ASI-Loader.zip
+  name: Ultimate-ASI-Loader.zip
+deploy:
+- provider: GitHub
+  tag: v$(appveyor_build_version)
+  release: Ultimate ASI Loader v$(appveyor_build_version)
+  description: '## INSTALLATION\n\nIn order to install it, you just need to place DLL into game directory. Usually it works as dinput8.dll, but if it''s not, there is a possibility to rename it to d3d8.dll, d3d9.dll, d3d11.dll, winmmbase.dll, dinput8.dll (x86 and x64), dsound.dll (x86 and x64), ddraw.dll, vorbisFile.dll, xlive.dll.'
+  auth_token:
+    secure: SXMI7bm5RKh5j1S8A8dnUP2HFw97xHHlJH+mA0hx819vtxOPCpMFY3aFZ+2v16ri
+  artifact: Ultimate-ASI-Loader.zip

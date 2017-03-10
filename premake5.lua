@@ -105,7 +105,7 @@ project "TestPlugin-x64"
 
    filter "configurations:Debug"
       defines { "DEBUG" }
-      flags { "Symbols" }
+      symbols "On"
 
    filter "configurations:Release"
       targetdir "data/x64/examples/scripts"
