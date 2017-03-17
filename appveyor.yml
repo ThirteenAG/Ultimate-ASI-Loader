@@ -1,12 +1,21 @@
 version: 3.{build}
 skip_tags: true
-image: Visual Studio 2015
+image: Visual Studio 2017
 configuration: Release
+init:
+- ps: >-
+    Start-FileDownload 'https://download.microsoft.com/download/A/E/7/AE743F1F-632B-4809-87A9-AA1BB3458E31/DXSDK_Jun10.exe' -FileName 'C:\DXSDK_Jun10.exe'
+
+    Start-FileDownload 'https://github.com/chocolatey/chocolatey/raw/master/src/redirects/RefreshEnv.cmd' -FileName 'C:\RefreshEnv.cmd'
+
+    $exitCode = [Diagnostics.Process]::Start("C:\DXSDK_Jun10.exe","/F /S /O /U").WaitForExit(100000)
 install:
 - cmd: >-
     git submodule update --init --recursive
 
-    premake5 vs2015
+    premake5.bat
+before_build:
+- cmd: C:\RefreshEnv.cmd
 build:
   project: build/Ultimate-ASI-Loader-x86.sln
   verbosity: minimal
