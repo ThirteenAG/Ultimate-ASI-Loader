@@ -11,11 +11,11 @@ init:
     $exitCode = [Diagnostics.Process]::Start("C:\DXSDK_Jun10.exe","/F /S /O /U").WaitForExit(100000)
 install:
 - cmd: >-
+    C:\RefreshEnv.cmd
+
     git submodule update --init --recursive
 
     premake5.bat
-before_build:
-- cmd: C:\RefreshEnv.cmd
 build:
   project: build/Ultimate-ASI-Loader-x86.sln
   verbosity: minimal
