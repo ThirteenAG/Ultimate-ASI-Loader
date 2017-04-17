@@ -3,6 +3,13 @@ workspace "Ultimate-ASI-Loader-x86"
    configurations { "Release", "Debug" }
    architecture "x86"
    location "build"
+   
+   defines { "rsc_CompanyName=\"ThirteenAG\"" }
+   defines { "rsc_LegalCopyright=\"MIT License\""} 
+   defines { "rsc_FileVersion=\"1.0.0.0\"", "rsc_ProductVersion=\"1.0.0.0\"" }
+   defines { "rsc_InternalName=\"%{prj.name}\"", "rsc_ProductName=\"%{prj.name}\"", "rsc_OriginalFilename=\"%{prj.name}.dll\"" }
+   defines { "rsc_FileDescription=\"Ultimate ASI Loader\"" }
+   defines { "rsc_UpdateUrl=\"https://github.com/ThirteenAG/Ultimate-ASI-Loader\"" }
      
 project "Ultimate-ASI-Loader-x86"
    kind "SharedLib"
@@ -66,6 +73,13 @@ workspace "Ultimate-ASI-Loader-x64"
    configurations { "Release", "Debug" }
    architecture "x86_64"
    location "build"
+   
+   defines { "rsc_CompanyName=\"ThirteenAG\"" }
+   defines { "rsc_LegalCopyright=\"MIT License\""} 
+   defines { "rsc_FileVersion=\"1.0.0.0\"", "rsc_ProductVersion=\"1.0.0.0\"" }
+   defines { "rsc_InternalName=\"%{prj.name}\"", "rsc_ProductName=\"%{prj.name}\"", "rsc_OriginalFilename=\"%{prj.name}.dll\"" }
+   defines { "rsc_FileDescription=\"Ultimate ASI Loader\"" }
+   defines { "rsc_UpdateUrl=\"https://github.com/ThirteenAG/Ultimate-ASI-Loader\"" }
      
 project "Ultimate-ASI-Loader-x64"
    kind "SharedLib"
