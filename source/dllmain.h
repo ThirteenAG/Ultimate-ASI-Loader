@@ -1,6 +1,10 @@
 #pragma once
 #include <windows.h>
 #include <Shlobj.h>
+#if X64
+#include <dsound.h>
+#endif
+#if !X64
 #include <MemoryModule\MemoryModule.h>
 #include <xliveless.h>
 #pragma comment(lib, "d3d9.lib")
@@ -83,6 +87,7 @@ struct vorbisfile_dll
         ov_time_total = MemoryGetProcAddress(dll, "ov_time_total");
     }
 } vorbisfile;
+#endif
 
 struct dinput8_dll
 {
@@ -138,6 +143,7 @@ struct dsound_dll
     }
 } dsound;
 
+#if !X64
 struct d3d8_dll
 {
     HMODULE dll;
@@ -1130,3 +1136,65 @@ __declspec(naked) void _acmStreamPrepareHeader() { _asm { jmp[msacm32.acmStreamP
 __declspec(naked) void _acmStreamReset() { _asm { jmp[msacm32.acmStreamReset] } }
 __declspec(naked) void _acmStreamSize() { _asm { jmp[msacm32.acmStreamSize] } }
 __declspec(naked) void _acmStreamUnprepareHeader() { _asm { jmp[msacm32.acmStreamUnprepareHeader] } }
+#endif
+
+#if X64
+typedef HRESULT(*fn_DirectSoundCaptureCreate)(LPGUID lpGUID, LPDIRECTSOUNDCAPTURE *lplpDSC, LPUNKNOWN pUnkOuter);
+void _DirectSoundCaptureCreate() { (fn_DirectSoundCaptureCreate)dsound.DirectSoundCaptureCreate(); }
+
+typedef HRESULT(*fn_DirectSoundCaptureCreate8)(LPCGUID lpcGUID, LPDIRECTSOUNDCAPTURE8 * lplpDSC, LPUNKNOWN pUnkOuter);
+void _DirectSoundCaptureCreate8() { (fn_DirectSoundCaptureCreate8)dsound.DirectSoundCaptureCreate8(); }
+
+typedef HRESULT(*fn_DirectSoundCaptureEnumerateA)(LPDSENUMCALLBACKA lpDSEnumCallback, LPVOID lpContext);
+void _DirectSoundCaptureEnumerateA() { (fn_DirectSoundCaptureEnumerateA)dsound.DirectSoundCaptureEnumerateA(); }
+
+typedef HRESULT(*fn_DirectSoundCaptureEnumerateW)(LPDSENUMCALLBACKW lpDSEnumCallback, LPVOID lpContext);
+void _DirectSoundCaptureEnumerateW() { (fn_DirectSoundCaptureEnumerateW)dsound.DirectSoundCaptureEnumerateW(); }
+
+typedef HRESULT(*fn_DirectSoundCreate)(LPCGUID lpcGUID, LPDIRECTSOUND* ppDS, IUnknown* pUnkOuter);
+void _DirectSoundCreate() { (fn_DirectSoundCreate)dsound.DirectSoundCreate(); }
+
+typedef HRESULT(*fn_DirectSoundCreate8)(LPCGUID lpcGUID, LPDIRECTSOUND8* ppDS, IUnknown* pUnkOuter);
+void _DirectSoundCreate8() { (fn_DirectSoundCreate8)dsound.DirectSoundCreate8(); }
+
+typedef HRESULT(*fn_DirectSoundEnumerateA)(LPDSENUMCALLBACKA lpDSEnumCallback, LPVOID lpContext);
+void _DirectSoundEnumerateA() { (fn_DirectSoundEnumerateA)dsound.DirectSoundEnumerateA(); }
+
+typedef HRESULT(*fn_DirectSoundEnumerateW)(LPDSENUMCALLBACKW lpDSEnumCallback, LPVOID lpContext);
+void _DirectSoundEnumerateW() { (fn_DirectSoundEnumerateW)dsound.DirectSoundEnumerateW(); }
+
+typedef HRESULT(*fn_DirectSoundFullDuplexCreate)(const GUID* capture_dev, const GUID* render_dev, const DSCBUFFERDESC* cbufdesc, const DSBUFFERDESC* bufdesc, HWND  hwnd, DWORD level, IDirectSoundFullDuplex**  dsfd, IDirectSoundCaptureBuffer8** dscb8, IDirectSoundBuffer8** dsb8, IUnknown* outer_unk);
+void _DirectSoundFullDuplexCreate() { (fn_DirectSoundFullDuplexCreate)dsound.DirectSoundFullDuplexCreate(); }
+
+typedef HRESULT(*fn_GetDeviceID)(LPCGUID pGuidSrc, LPGUID pGuidDest);
+void _GetDeviceID() { (fn_GetDeviceID)dsound.GetDeviceID(); }
+
+
+typedef HRESULT(*fn_DirectInput8Create)(HINSTANCE hinst, DWORD dwVersion, REFIID riidltf, LPVOID * ppvOut, LPUNKNOWN punkOuter);
+void _DirectInput8Create() { (fn_DirectInput8Create)dinput8.DirectInput8Create(); }
+
+typedef HRESULT(*fn_DllRegisterServer)();
+void _DllRegisterServer() { (fn_DllRegisterServer)dinput8.DllRegisterServer(); }
+
+typedef HRESULT(*fn_DllUnregisterServer)();
+void _DllUnregisterServer() { (fn_DllUnregisterServer)dinput8.DllUnregisterServer(); }
+
+
+typedef HRESULT(*fn_DllCanUnloadNow)();
+void _DllCanUnloadNow()
+{
+    if (dinput8.DllCanUnloadNow)
+        (fn_DllCanUnloadNow)dinput8.DllCanUnloadNow();
+    else
+        (fn_DllCanUnloadNow)dsound.DllCanUnloadNow();
+}
+
+typedef HRESULT(*fn_DllGetClassObject)(REFCLSID rclsid, REFIID riid, LPVOID *ppv);
+void _DllGetClassObject()
+{
+    if (dinput8.DllGetClassObject)
+        (fn_DllGetClassObject)dinput8.DllGetClassObject();
+    else
+        (fn_DllGetClassObject)dsound.DllGetClassObject();
+}
+#endif

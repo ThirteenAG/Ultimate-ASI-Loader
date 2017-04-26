@@ -26,7 +26,6 @@ bld/
 [Oo]bj/
 [Ll]og/
 [Bb]uild/
-!source/**
 
 # Visual Studio 2015 cache/options directory
 .vs/

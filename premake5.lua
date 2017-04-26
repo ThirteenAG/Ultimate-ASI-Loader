@@ -18,12 +18,11 @@ project "Ultimate-ASI-Loader-x86"
    targetname "dinput8"
    targetextension ".dll"
    
-   includedirs { "source/x86" }
+   includedirs { "source" }
    includedirs { "external" }
    
-   files { "source/x86/*.h", "source/x86/*.cpp" }
-   files { "source/x86/x86.def" }
-   files { "source/dllmain.cpp" }
+   files { "source/dllmain.h", "source/dllmain.cpp" }
+   files { "source/x86.def" }
    files { "source/resources/*.rc" }
    files { "external/d3d8to9/source/*.h", "external/d3d8to9/source/*.cpp" }
    files { "external/MemoryModule/*.h", "external/MemoryModule/*.c" }
@@ -49,9 +48,8 @@ project "MessageBox"
    targetdir "bin/x86/%{cfg.buildcfg}/scripts"
    targetextension ".asi"
    
-   files { "demo_plugins/x86/*.cpp" }
+   files { "source/demo_plugins/MessageBox.cpp" }
    files { "source/resources/Versioninfo.rc" }
-   includedirs { "demo_plugins/x86" }
 
    characterset ("MBCS")
    
@@ -87,12 +85,11 @@ project "Ultimate-ASI-Loader-x64"
    targetname "dinput8"
    targetextension ".dll"
    
-   includedirs { "source/x64" }
+   includedirs { "source" }
    includedirs { "external" }
    
-   files { "source/x64/*.h", "source/x64/*.cpp" }
-   files { "source/x64/x64.def" }
-   files { "source/dllmain.cpp" }
+   files { "source/dllmain.h", "source/dllmain.cpp" }
+   files { "source/x64.def" }
    files { "source/resources/Versioninfo.rc" }
    
    characterset ("MBCS")
@@ -112,9 +109,8 @@ project "RE7Demo.InfiniteAmmo"
    targetdir "bin/x64/%{cfg.buildcfg}/scripts"
    targetextension ".asi"
    
-   files { "demo_plugins/x64/*.cpp" }
+   files { "source/demo_plugins/RE7Demo.InfiniteAmmo.cpp" }
    files { "source/resources/Versioninfo.rc" }
-   includedirs { "demo_plugins/x64" }
 
    characterset ("MBCS")
    
