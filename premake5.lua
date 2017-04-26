@@ -23,6 +23,7 @@ project "Ultimate-ASI-Loader-x86"
    
    files { "source/x86/*.h", "source/x86/*.cpp" }
    files { "source/x86/x86.def" }
+   files { "source/x86/dllmain.h" }
    files { "source/dllmain.cpp" }
    files { "source/resources/*.rc" }
    files { "external/d3d8to9/source/*.h", "external/d3d8to9/source/*.cpp" }
@@ -92,6 +93,7 @@ project "Ultimate-ASI-Loader-x64"
    
    files { "source/x64/*.h", "source/x64/*.cpp" }
    files { "source/x64/x64.def" }
+   files { "source/x64/dllmain.h" }
    files { "source/dllmain.cpp" }
    files { "source/resources/Versioninfo.rc" }
    
