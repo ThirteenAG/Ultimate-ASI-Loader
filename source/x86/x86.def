@@ -1,0 +1,499 @@
+LIBRARY "vorbisfile"
+EXPORTS
+ov_bitrate = _ov_bitrate
+ov_bitrate_instant = _ov_bitrate_instant
+ov_clear = _ov_clear
+ov_comment = _ov_comment
+ov_crosslap = _ov_crosslap
+ov_halfrate = _ov_halfrate
+ov_halfrate_p = _ov_halfrate_p
+ov_info = _ov_info
+ov_open = _ov_open
+ov_open_callbacks = _ov_open_callbacks
+ov_pcm_seek = _ov_pcm_seek
+ov_pcm_seek_lap = _ov_pcm_seek_lap
+ov_pcm_seek_page = _ov_pcm_seek_page
+ov_pcm_seek_page_lap = _ov_pcm_seek_page_lap
+ov_pcm_tell = _ov_pcm_tell
+ov_pcm_total = _ov_pcm_total
+ov_raw_seek = _ov_raw_seek
+ov_raw_seek_lap = _ov_raw_seek_lap
+ov_raw_tell = _ov_raw_tell
+ov_raw_total = _ov_raw_total
+ov_read = _ov_read
+ov_read_float = _ov_read_float
+ov_seekable = _ov_seekable
+ov_serialnumber = _ov_serialnumber
+ov_streams = _ov_streams
+ov_test = _ov_test
+ov_test_callbacks = _ov_test_callbacks
+ov_test_open = _ov_test_open
+ov_time_seek = _ov_time_seek
+ov_time_seek_lap = _ov_time_seek_lap
+ov_time_seek_page = _ov_time_seek_page
+ov_time_seek_page_lap = _ov_time_seek_page_lap
+ov_time_tell = _ov_time_tell
+ov_time_total = _ov_time_total
+
+LIBRARY "dinput8"
+EXPORTS
+DirectInput8Create = _DirectInput8Create
+DllCanUnloadNow = _DllCanUnloadNow PRIVATE
+DllGetClassObject = _DllGetClassObject PRIVATE
+DllRegisterServer = _DllRegisterServer PRIVATE
+DllUnregisterServer = _DllUnregisterServer PRIVATE
+
+LIBRARY "dsound"
+EXPORTS
+DirectSoundCaptureCreate = _DirectSoundCaptureCreate
+DirectSoundCaptureCreate8 = _DirectSoundCaptureCreate8
+DirectSoundCaptureEnumerateA = _DirectSoundCaptureEnumerateA
+DirectSoundCaptureEnumerateW = _DirectSoundCaptureEnumerateW
+DirectSoundCreate = _DirectSoundCreate
+DirectSoundCreate8 = _DirectSoundCreate8
+DirectSoundEnumerateA = _DirectSoundEnumerateA
+DirectSoundEnumerateW = _DirectSoundEnumerateW
+DirectSoundFullDuplexCreate = _DirectSoundFullDuplexCreate
+DllCanUnloadNow = _DllCanUnloadNow PRIVATE
+DllGetClassObject = _DllGetClassObject PRIVATE
+GetDeviceID = _GetDeviceID
+
+LIBRARY "d3d8"
+EXPORTS
+DebugSetMute = _DebugSetMute
+;Direct3D8EnableMaximizedWindowedModeShim = _Direct3D8EnableMaximizedWindowedModeShim
+Direct3DCreate8 = _Direct3DCreate8
+ValidatePixelShader = _ValidatePixelShader
+ValidateVertexShader = _ValidateVertexShader
+
+LIBRARY "d3d9"
+EXPORTS
+D3DPERF_BeginEvent = _D3DPERF_BeginEvent
+D3DPERF_EndEvent = _D3DPERF_EndEvent
+D3DPERF_GetStatus = _D3DPERF_GetStatus
+D3DPERF_QueryRepeatFrame = _D3DPERF_QueryRepeatFrame
+D3DPERF_SetMarker = _D3DPERF_SetMarker
+D3DPERF_SetOptions = _D3DPERF_SetOptions
+D3DPERF_SetRegion = _D3DPERF_SetRegion
+DebugSetLevel = _DebugSetLevel
+DebugSetMute = _DebugSetMute
+Direct3D9EnableMaximizedWindowedModeShim = _Direct3D9EnableMaximizedWindowedModeShim
+Direct3DCreate9 = _Direct3DCreate9
+Direct3DCreate9Ex = _Direct3DCreate9Ex
+Direct3DShaderValidatorCreate9 = _Direct3DShaderValidatorCreate9
+PSGPError = _PSGPError
+PSGPSampleTexture = _PSGPSampleTexture
+
+LIBRARY "d3d11"
+EXPORTS
+D3D11CoreCreateDevice = _D3D11CoreCreateDevice
+D3D11CoreCreateLayeredDevice = _D3D11CoreCreateLayeredDevice
+D3D11CoreGetLayeredDeviceSize = _D3D11CoreGetLayeredDeviceSize
+D3D11CoreRegisterLayers = _D3D11CoreRegisterLayers
+D3D11CreateDevice = _D3D11CreateDevice
+D3D11CreateDeviceAndSwapChain = _D3D11CreateDeviceAndSwapChain
+D3DKMTCloseAdapter = _D3DKMTCloseAdapter
+D3DKMTCreateAllocation = _D3DKMTCreateAllocation
+D3DKMTCreateContext = _D3DKMTCreateContext
+D3DKMTCreateDevice = _D3DKMTCreateDevice
+D3DKMTCreateSynchronizationObject = _D3DKMTCreateSynchronizationObject
+D3DKMTDestroyAllocation = _D3DKMTDestroyAllocation
+D3DKMTDestroyContext = _D3DKMTDestroyContext
+D3DKMTDestroyDevice = _D3DKMTDestroyDevice
+D3DKMTDestroySynchronizationObject = _D3DKMTDestroySynchronizationObject
+D3DKMTEscape = _D3DKMTEscape
+D3DKMTGetContextSchedulingPriority = _D3DKMTGetContextSchedulingPriority
+D3DKMTGetDeviceState = _D3DKMTGetDeviceState
+D3DKMTGetDisplayModeList = _D3DKMTGetDisplayModeList
+D3DKMTGetMultisampleMethodList = _D3DKMTGetMultisampleMethodList
+D3DKMTGetRuntimeData = _D3DKMTGetRuntimeData
+D3DKMTGetSharedPrimaryHandle = _D3DKMTGetSharedPrimaryHandle
+D3DKMTLock = _D3DKMTLock
+D3DKMTOpenAdapterFromHdc = _D3DKMTOpenAdapterFromHdc
+D3DKMTOpenResource = _D3DKMTOpenResource
+D3DKMTPresent = _D3DKMTPresent
+D3DKMTQueryAdapterInfo = _D3DKMTQueryAdapterInfo
+D3DKMTQueryAllocationResidency = _D3DKMTQueryAllocationResidency
+D3DKMTQueryResourceInfo = _D3DKMTQueryResourceInfo
+D3DKMTRender = _D3DKMTRender
+D3DKMTSetAllocationPriority = _D3DKMTSetAllocationPriority
+D3DKMTSetContextSchedulingPriority = _D3DKMTSetContextSchedulingPriority
+D3DKMTSetDisplayMode = _D3DKMTSetDisplayMode
+D3DKMTSetDisplayPrivateDriverFormat = _D3DKMTSetDisplayPrivateDriverFormat
+D3DKMTSetGammaRamp = _D3DKMTSetGammaRamp
+D3DKMTSetVidPnSourceOwner = _D3DKMTSetVidPnSourceOwner
+D3DKMTSignalSynchronizationObject = _D3DKMTSignalSynchronizationObject
+D3DKMTUnlock = _D3DKMTUnlock
+D3DKMTWaitForSynchronizationObject = _D3DKMTWaitForSynchronizationObject
+D3DKMTWaitForVerticalBlankEvent = _D3DKMTWaitForVerticalBlankEvent
+D3DPerformance_BeginEvent = _D3DPerformance_BeginEvent
+D3DPerformance_EndEvent = _D3DPerformance_EndEvent
+D3DPerformance_GetStatus = _D3DPerformance_GetStatus
+D3DPerformance_SetMarker = _D3DPerformance_SetMarker
+EnableFeatureLevelUpgrade = _EnableFeatureLevelUpgrade
+OpenAdapter10 = _OpenAdapter10
+OpenAdapter10_2 = _OpenAdapter10_2
+
+LIBRARY "ddraw"
+EXPORTS
+AcquireDDThreadLock = _AcquireDDThreadLock
+CompleteCreateSysmemSurface = _CompleteCreateSysmemSurface
+D3DParseUnknownCommand = _D3DParseUnknownCommand
+DDGetAttachedSurfaceLcl = _DDGetAttachedSurfaceLcl
+DDInternalLock = _DDInternalLock
+DDInternalUnlock = _DDInternalUnlock
+DSoundHelp = _DSoundHelp
+DirectDrawCreate = _DirectDrawCreate
+DirectDrawCreateClipper = _DirectDrawCreateClipper
+DirectDrawCreateEx = _DirectDrawCreateEx
+DirectDrawEnumerateA = _DirectDrawEnumerateA
+DirectDrawEnumerateExA = _DirectDrawEnumerateExA
+DirectDrawEnumerateExW = _DirectDrawEnumerateExW
+DirectDrawEnumerateW = _DirectDrawEnumerateW
+DllCanUnloadNow = _DllCanUnloadNow PRIVATE
+DllGetClassObject = _DllGetClassObject PRIVATE
+GetDDSurfaceLocal = _GetDDSurfaceLocal
+GetOLEThunkData = _GetOLEThunkData
+GetSurfaceFromDC = _GetSurfaceFromDC
+RegisterSpecialCase = _RegisterSpecialCase
+ReleaseDDThreadLock = _ReleaseDDThreadLock
+SetAppCompatData = _SetAppCompatData
+
+LIBRARY "winmmbase"
+EXPORTS
+CloseDriver = _CloseDriver
+DefDriverProc = _DefDriverProc
+DriverCallback = _DriverCallback
+DrvGetModuleHandle = _DrvGetModuleHandle
+GetDriverModuleHandle = _GetDriverModuleHandle
+OpenDriver = _OpenDriver
+SendDriverMessage = _SendDriverMessage
+auxGetDevCapsA = _auxGetDevCapsA
+auxGetDevCapsW = _auxGetDevCapsW
+auxGetNumDevs = _auxGetNumDevs
+auxGetVolume = _auxGetVolume
+auxOutMessage = _auxOutMessage
+auxSetVolume = _auxSetVolume
+joyConfigChanged = _joyConfigChanged
+joyGetDevCapsA = _joyGetDevCapsA
+joyGetDevCapsW = _joyGetDevCapsW
+joyGetNumDevs = _joyGetNumDevs
+joyGetPos = _joyGetPos
+joyGetPosEx = _joyGetPosEx
+joyGetThreshold = _joyGetThreshold
+joyReleaseCapture = _joyReleaseCapture
+joySetCapture = _joySetCapture
+joySetThreshold = _joySetThreshold
+midiConnect = _midiConnect
+midiDisconnect = _midiDisconnect
+midiInAddBuffer = _midiInAddBuffer
+midiInClose = _midiInClose
+midiInGetDevCapsA = _midiInGetDevCapsA
+midiInGetDevCapsW = _midiInGetDevCapsW
+midiInGetErrorTextA = _midiInGetErrorTextA
+midiInGetErrorTextW = _midiInGetErrorTextW
+midiInGetID = _midiInGetID
+midiInGetNumDevs = _midiInGetNumDevs
+midiInMessage = _midiInMessage
+midiInOpen = _midiInOpen
+midiInPrepareHeader = _midiInPrepareHeader
+midiInReset = _midiInReset
+midiInStart = _midiInStart
+midiInStop = _midiInStop
+midiInUnprepareHeader = _midiInUnprepareHeader
+midiOutCacheDrumPatches = _midiOutCacheDrumPatches
+midiOutCachePatches = _midiOutCachePatches
+midiOutClose = _midiOutClose
+midiOutGetDevCapsA = _midiOutGetDevCapsA
+midiOutGetDevCapsW = _midiOutGetDevCapsW
+midiOutGetErrorTextA = _midiOutGetErrorTextA
+midiOutGetErrorTextW = _midiOutGetErrorTextW
+midiOutGetID = _midiOutGetID
+midiOutGetNumDevs = _midiOutGetNumDevs
+midiOutGetVolume = _midiOutGetVolume
+midiOutLongMsg = _midiOutLongMsg
+midiOutMessage = _midiOutMessage
+midiOutOpen = _midiOutOpen
+midiOutPrepareHeader = _midiOutPrepareHeader
+midiOutReset = _midiOutReset
+midiOutSetVolume = _midiOutSetVolume
+midiOutShortMsg = _midiOutShortMsg
+midiOutUnprepareHeader = _midiOutUnprepareHeader
+midiStreamClose = _midiStreamClose
+midiStreamOpen = _midiStreamOpen
+midiStreamOut = _midiStreamOut
+midiStreamPause = _midiStreamPause
+midiStreamPosition = _midiStreamPosition
+midiStreamProperty = _midiStreamProperty
+midiStreamRestart = _midiStreamRestart
+midiStreamStop = _midiStreamStop
+mixerClose = _mixerClose
+mixerGetControlDetailsA = _mixerGetControlDetailsA
+mixerGetControlDetailsW = _mixerGetControlDetailsW
+mixerGetDevCapsA = _mixerGetDevCapsA
+mixerGetDevCapsW = _mixerGetDevCapsW
+mixerGetID = _mixerGetID
+mixerGetLineControlsA = _mixerGetLineControlsA
+mixerGetLineControlsW = _mixerGetLineControlsW
+mixerGetLineInfoA = _mixerGetLineInfoA
+mixerGetLineInfoW = _mixerGetLineInfoW
+mixerGetNumDevs = _mixerGetNumDevs
+mixerMessage = _mixerMessage
+mixerOpen = _mixerOpen
+mixerSetControlDetails = _mixerSetControlDetails
+mmDrvInstall = _mmDrvInstall
+mmGetCurrentTask = _mmGetCurrentTask
+mmTaskBlock = _mmTaskBlock
+mmTaskCreate = _mmTaskCreate
+mmTaskSignal = _mmTaskSignal
+mmTaskYield = _mmTaskYield
+mmioAdvance = _mmioAdvance
+mmioAscend = _mmioAscend
+mmioClose = _mmioClose
+mmioCreateChunk = _mmioCreateChunk
+mmioDescend = _mmioDescend
+mmioFlush = _mmioFlush
+mmioGetInfo = _mmioGetInfo
+mmioInstallIOProcA = _mmioInstallIOProcA
+mmioInstallIOProcW = _mmioInstallIOProcW
+mmioOpenA = _mmioOpenA
+mmioOpenW = _mmioOpenW
+mmioRead = _mmioRead
+mmioRenameA = _mmioRenameA
+mmioRenameW = _mmioRenameW
+mmioSeek = _mmioSeek
+mmioSendMessage = _mmioSendMessage
+mmioSetBuffer = _mmioSetBuffer
+mmioSetInfo = _mmioSetInfo
+mmioStringToFOURCCA = _mmioStringToFOURCCA
+mmioStringToFOURCCW = _mmioStringToFOURCCW
+mmioWrite = _mmioWrite
+sndOpenSound = _sndOpenSound
+waveInAddBuffer = _waveInAddBuffer
+waveInClose = _waveInClose
+waveInGetDevCapsA = _waveInGetDevCapsA
+waveInGetDevCapsW = _waveInGetDevCapsW
+waveInGetErrorTextA = _waveInGetErrorTextA
+waveInGetErrorTextW = _waveInGetErrorTextW
+waveInGetID = _waveInGetID
+waveInGetNumDevs = _waveInGetNumDevs
+waveInGetPosition = _waveInGetPosition
+waveInMessage = _waveInMessage
+waveInOpen = _waveInOpen
+waveInPrepareHeader = _waveInPrepareHeader
+waveInReset = _waveInReset
+waveInStart = _waveInStart
+waveInStop = _waveInStop
+waveInUnprepareHeader = _waveInUnprepareHeader
+waveOutBreakLoop = _waveOutBreakLoop
+waveOutClose = _waveOutClose
+waveOutGetDevCapsA = _waveOutGetDevCapsA
+waveOutGetDevCapsW = _waveOutGetDevCapsW
+waveOutGetErrorTextA = _waveOutGetErrorTextA
+waveOutGetErrorTextW = _waveOutGetErrorTextW
+waveOutGetID = _waveOutGetID
+waveOutGetNumDevs = _waveOutGetNumDevs
+waveOutGetPitch = _waveOutGetPitch
+waveOutGetPlaybackRate = _waveOutGetPlaybackRate
+waveOutGetPosition = _waveOutGetPosition
+waveOutGetVolume = _waveOutGetVolume
+waveOutMessage = _waveOutMessage
+waveOutOpen = _waveOutOpen
+waveOutPause = _waveOutPause
+waveOutPrepareHeader = _waveOutPrepareHeader
+waveOutReset = _waveOutReset
+waveOutRestart = _waveOutRestart
+waveOutSetPitch = _waveOutSetPitch
+waveOutSetPlaybackRate = _waveOutSetPlaybackRate
+waveOutSetVolume = _waveOutSetVolume
+waveOutUnprepareHeader = _waveOutUnprepareHeader
+waveOutWrite = _waveOutWrite
+winmmbaseFreeMMEHandles = _winmmbaseFreeMMEHandles
+winmmbaseGetWOWHandle = _winmmbaseGetWOWHandle
+winmmbaseHandle32FromHandle16 = _winmmbaseHandle32FromHandle16
+winmmbaseSetWOWHandle = _winmmbaseSetWOWHandle
+
+LIBRARY "msacm32"
+EXPORTS
+acmDriverAddA = _acmDriverAddA
+acmDriverAddW = _acmDriverAddW
+acmDriverClose = _acmDriverClose
+acmDriverDetailsA = _acmDriverDetailsA
+acmDriverDetailsW = _acmDriverDetailsW
+acmDriverEnum = _acmDriverEnum
+acmDriverID = _acmDriverID
+acmDriverMessage = _acmDriverMessage
+acmDriverOpen = _acmDriverOpen
+acmDriverPriority = _acmDriverPriority
+acmDriverRemove = _acmDriverRemove
+acmFilterChooseA = _acmFilterChooseA
+acmFilterChooseW = _acmFilterChooseW
+acmFilterDetailsA = _acmFilterDetailsA
+acmFilterDetailsW = _acmFilterDetailsW
+acmFilterEnumA = _acmFilterEnumA
+acmFilterEnumW = _acmFilterEnumW
+acmFilterTagDetailsA = _acmFilterTagDetailsA
+acmFilterTagDetailsW = _acmFilterTagDetailsW
+acmFilterTagEnumA = _acmFilterTagEnumA
+acmFilterTagEnumW = _acmFilterTagEnumW
+acmFormatChooseA = _acmFormatChooseA
+acmFormatChooseW = _acmFormatChooseW
+acmFormatDetailsA = _acmFormatDetailsA
+acmFormatDetailsW = _acmFormatDetailsW
+acmFormatEnumA = _acmFormatEnumA
+acmFormatEnumW = _acmFormatEnumW
+acmFormatSuggest = _acmFormatSuggest
+acmFormatTagDetailsA = _acmFormatTagDetailsA
+acmFormatTagDetailsW = _acmFormatTagDetailsW
+acmFormatTagEnumA = _acmFormatTagEnumA
+acmFormatTagEnumW = _acmFormatTagEnumW
+acmGetVersion = _acmGetVersion
+acmMetrics = _acmMetrics
+acmStreamClose = _acmStreamClose
+acmStreamConvert = _acmStreamConvert
+acmStreamMessage = _acmStreamMessage
+acmStreamOpen = _acmStreamOpen
+acmStreamPrepareHeader = _acmStreamPrepareHeader
+acmStreamReset = _acmStreamReset
+acmStreamSize = _acmStreamSize
+acmStreamUnprepareHeader = _acmStreamUnprepareHeader
+
+LIBRARY "xlive"
+EXPORTS
+_XWSAStartup@8 @1
+_XGetOverlappedExtendedError@4 @1082
+_XGetOverlappedResult@12 @1083
+_XSocketBind@12 @11
+_XSocketConnect@12 @12
+_XSocketListen@8 @13
+_XSocketAccept@12 @14
+_XSocketSelect@20 @15
+_XSocketRecv@16 @18
+_XWSACleanup@0 @2
+_XSocketRecvFrom@24 @20
+_XSocketSend@16 @22
+_XSocketSendTo@24 @24
+_XSocketInet_Addr@4 @26
+_XWSAGetLastError@0 @27
+_XCreateSocket@12 @3
+_XSocketNTOHS@4 @38
+_XSocketNTOHL@4 @39
+_XSockeClose@4 @4
+_XCustomGetLastActionPress@12 @473
+_XSocketShutdown@8 @5
+_XLiveInitialize@4 @5000
+_XLiveInput@4 @5001
+_XLiveRender@0 @5002
+_XLiveUninitialize@0 @5003
+_XLiveOnCreateDevice@8 @5005
+_XLiveOnResetDevice@4 @5007
+_XHVCreateEngine@12 @5008
+_XLivePBufferAllocate@8 @5016
+_XLivePBufferFree@4 @5017
+_XLivePBufferGetByte@12 @5018
+_XLivePBufferSetByte@12 @5019
+_XLivePBufferGetDWORD@12 @5020
+_XLivePBufferSetDWORD@12 @5021
+_XLiveGetUpdateInformation@4 @5022
+_XLiveUpdateSystem@4 @5024
+_XLiveSetSponsorToken@8 @5026
+_XLivePreTranslateMessage@4 @5030
+_XLiveSetDebugLevel@8 @5031
+_XLiveProtectData@20 @5034
+_XLiveUnprotectData@20 @5035
+_XLiveCreateProtectedDataContext@8 @5036
+_XLiveQueryProtectedDataInformation@8 @5037
+_XLiveCloseProtectedDataContext@4 @5038
+_XNetStartup@4 @51
+_XNetCleanup@0 @52
+_XShowPlayerReviewUI@12 @5214
+_XShowGuideUI@4 @5215
+_XShowKeyboardUI@32 @5216
+_XCloseHandle@4 @5251
+_XShowGamerCardUI@12 @5252
+_XCancelOverlapped@4 @5254
+_XEnumerate@20 @5256
+_XShowSigninUI@8 @5260
+_XUserGetXUID@8 @5261
+_XUserGetSigninState@4 @5262
+_XUserGetName@12 @5263
+_XUserAreUsersFriends@20 @5264
+_XUserCheckPrivilege@12 @5265
+_XUserGetSigninInfo@12 @5267
+_XNotifyCreateListener@8 @5270
+_XUserReadGamerpictureByKey@24 @5273
+_XShowFriendsUI@4 @5275
+_XUserSetProperty@16 @5276
+_XUserSetContext@12 @5277
+_XUserWriteAchievements@12 @5278
+_XUserCreateAchievementEnumerator@36 @5280
+_XUserReadStats@32 @5281
+_XUserCreateStatsEnumeratorByRank@28 @5284
+_XUserCreateStatsEnumeratorByXuid@32 @5286
+_XUserSetContextEx@16 @5292
+_XUserSetPropertyEx@20 @5293
+_XLivePBufferGetByteArray@16 @5294
+_XLivePBufferSetByteArray@16 @5295
+_XLiveInitializeEx@8 @5297
+_XSessionCreate@32 @5300
+_XStringVerify@28 @5303
+_XStorageUploadFromMemory@20 @5305
+_XStorageEnumerate@28 @5306
+_XOnlineStartup@0 @5310
+_XOnlineCleanup@0 @5311
+_XFriendsCreateEnumerator@20 @5312
+_XUserMuteListQuery@16 @5314
+_XInviteGetAcceptedInfo@8 @5315
+_XInviteSend@20 @5316
+_XSessionWriteStats@24 @5317
+_XSessionStart@12 @5318
+_XSessionSearchEx@44 @5319
+_XSessionModify@20 @5322
+_XSessionMigrateHost@16 @5323
+_XOnlineGetNatType@0 @5324
+_XSessionLeaveLocal@16 @5325
+_XSessionJoinRemote@20 @5326
+_XSessionJoinLocal@20 @5327
+_XSessionGetDetails@16 @5328
+_XSessionFlushStats@8 @5329
+_XSessionDelete@8 @5330
+_XUserReadProfileSettings@28 @5331
+_XSessionEnd@8 @5332
+_XSessionArbitrationRegister@28 @5333
+_XTitleServerCreateEnumerator@16 @5335
+_XSessionLeaveRemote@16 @5336
+_XUserWriteProfileSettings@16 @5337
+_XUserReadProfileSettingsByXuid@36 @5339
+_XLiveCalculateSkill@20 @5343
+_XStorageBuildServerPath@28 @5344
+_XStorageDownloadToMemory@28 @5345
+_XLiveProtectedVerifyFile@12 @5349
+_XLiveContentCreateAccessHandle@28 @5350
+_XLiveContentUninstall@12 @5352
+_XLiveContentGetPath@16 @5355
+_XLiveContentCreateEnumerator@16 @5360
+_XLiveContentRetrieveOffersByDate@24 @5361
+_XShowMarketplaceUI@20 @5365
+_xlive_5367@20 @5367
+_xlive_5372@24 @5372
+_XNetCreateKey@8 @54 
+_XNetRegisterKey@8 @55
+_XNetUnregisterKey@4 @56
+_XNetXnAddrToInAddr@12 @57
+_XNetServerToInAddr@12 @58
+_XSocketIOCTLSocket@12 @6
+_XNetInAddrToXnAddr@12 @60
+_XNetUnregisterInAddr@4 @63
+_XNetConnect@4 @65
+_XNotifyGetNext@16 @651
+_XNotifyPositionUI@4 @652
+_XNetGetConnectStatus@4 @66
+_XNetQosListen@20 @69
+_XSocketSetSockOpt@20 @7
+_XNetQosLookup@48 @70
+_XNetQosServiceLookup@12 @71
+_XNetQosRelease@4 @72
+_XNetGetTitleXnAddr@4 @73
+_XNetGetEthernetLinkStatus@0 @75
+_XNetSetSystemLinkPort@4 @84
+_XSocketGetSockName@12 @9

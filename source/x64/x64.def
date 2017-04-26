@@ -1,0 +1,22 @@
+LIBRARY "dinput8"
+EXPORTS
+DirectInput8Create = _DirectInput8Create
+DllCanUnloadNow = _DllCanUnloadNow PRIVATE
+DllGetClassObject = _DllGetClassObject PRIVATE
+DllRegisterServer = _DllRegisterServer PRIVATE
+DllUnregisterServer = _DllUnregisterServer PRIVATE
+
+LIBRARY "dsound"
+EXPORTS
+DirectSoundCaptureCreate = _DirectSoundCaptureCreate
+DirectSoundCaptureCreate8 = _DirectSoundCaptureCreate8
+DirectSoundCaptureEnumerateA = _DirectSoundCaptureEnumerateA
+DirectSoundCaptureEnumerateW = _DirectSoundCaptureEnumerateW
+DirectSoundCreate = _DirectSoundCreate
+DirectSoundCreate8 = _DirectSoundCreate8
+DirectSoundEnumerateA = _DirectSoundEnumerateA
+DirectSoundEnumerateW = _DirectSoundEnumerateW
+DirectSoundFullDuplexCreate = _DirectSoundFullDuplexCreate
+DllCanUnloadNow = _DllCanUnloadNow PRIVATE
+DllGetClassObject = _DllGetClassObject PRIVATE
+GetDeviceID = _GetDeviceID
