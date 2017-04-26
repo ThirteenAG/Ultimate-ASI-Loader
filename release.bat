@@ -1,4 +1,5 @@
-7za a -tzip ".\Ultimate-ASI-Loader.zip" ".\data\*" -xr!*.pdb -xr!*.ipdb -xr!*.iobj -xr!*.db -xr!*.exp -xr!*.lib
+7za a -tzip ".\bin\Ultimate-ASI-Loader.zip" ".\bin\x86\Release\dinput8.dll"
+7za a -tzip ".\bin\Ultimate-ASI-Loader_x64.zip" ".\bin\x64\Release\dinput8.dll"
 EXIT
 
 7-Zip Extra

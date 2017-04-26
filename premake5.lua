@@ -14,18 +14,17 @@ workspace "Ultimate-ASI-Loader-x86"
 project "Ultimate-ASI-Loader-x86"
    kind "SharedLib"
    language "C++"
-   targetdir "bin/%{cfg.buildcfg}"
+   targetdir "bin/x86/%{cfg.buildcfg}"
    targetname "dinput8"
    targetextension ".dll"
    
-   includedirs { "source/src" }
+   includedirs { "source/x86" }
    includedirs { "external" }
-   includedirs { "source/xlive" }
    
-   files { "source/src/*.h", "source/src/*.cpp" }
-   files { "source/def/*.def" }
-   files { "source/res/*.rc" }
-   files { "source/verinfo/*.rc" }
+   files { "source/x86/*.h", "source/x86/*.cpp" }
+   files { "source/x86/x86.def" }
+   files { "source/dllmain.cpp" }
+   files { "source/resources/*.rc" }
    files { "external/d3d8to9/source/*.h", "external/d3d8to9/source/*.cpp" }
    files { "external/MemoryModule/*.h", "external/MemoryModule/*.c" }
 
@@ -33,41 +32,39 @@ project "Ultimate-ASI-Loader-x86"
    includedirs { dxsdk .. "/include" }
    libdirs { dxsdk .. "/lib/x86" }
    
+   characterset ("MBCS")
+   
    filter "configurations:Debug"
       defines { "DEBUG" }
       symbols "On"
 
    filter "configurations:Release"
-      targetdir "data"
       defines { "NDEBUG", "D3D8TO9NOLOG" }
       optimize "On"
-	  flags { "StaticRuntime" }
-	  characterset ("MBCS")
-	  
-project "TestPlugin-x86"
+      flags { "StaticRuntime" }
+      
+project "MessageBox"
    kind "SharedLib"
    language "C++"
-   targetdir "bin/%{cfg.buildcfg}/examples/scripts"
+   targetdir "bin/x86/%{cfg.buildcfg}/scripts"
    targetextension ".asi"
    
-   files { "source/test/*.h", "source/test/*.cpp" }
-   files { "source/test/*.rc" }
-   files { "source/verinfo/*.rc" }
-   
-   includedirs { "source/test" }
+   files { "demo_plugins/x86/*.cpp" }
+   files { "source/resources/Versioninfo.rc" }
+   includedirs { "demo_plugins/x86" }
 
+   characterset ("MBCS")
+   
    filter "configurations:Debug"
       defines { "DEBUG" }
       symbols "On"
 
    filter "configurations:Release"
-      targetdir "data/examples/scripts"
       defines { "NDEBUG" }
       optimize "On"
-	  flags { "StaticRuntime" }
-	  characterset ("MBCS")
-	  
-	  
+      flags { "StaticRuntime" }
+      
+      
 -- x64
 workspace "Ultimate-ASI-Loader-x64"
    configurations { "Release", "Debug" }
@@ -80,50 +77,52 @@ workspace "Ultimate-ASI-Loader-x64"
    defines { "rsc_InternalName=\"%{prj.name}\"", "rsc_ProductName=\"%{prj.name}\"", "rsc_OriginalFilename=\"%{prj.name}.dll\"" }
    defines { "rsc_FileDescription=\"Ultimate ASI Loader\"" }
    defines { "rsc_UpdateUrl=\"https://github.com/ThirteenAG/Ultimate-ASI-Loader\"" }
+   
+   defines { "X64" }
      
 project "Ultimate-ASI-Loader-x64"
    kind "SharedLib"
    language "C++"
-   targetdir "bin/%{cfg.buildcfg}/x64/"
+   targetdir "bin/x64/%{cfg.buildcfg}"
    targetname "dinput8"
    targetextension ".dll"
    
-   includedirs { "source/x64loader" }
+   includedirs { "source/x64" }
+   includedirs { "external" }
    
-   files { "source/x64loader/*.h", "source/x64loader/*.cpp" }
-   files { "source/x64loader/*.def" }
-   files { "source/verinfo/*.rc" }
+   files { "source/x64/*.h", "source/x64/*.cpp" }
+   files { "source/x64/x64.def" }
+   files { "source/dllmain.cpp" }
+   files { "source/resources/Versioninfo.rc" }
+   
+   characterset ("MBCS")
    
    filter "configurations:Debug"
       defines { "DEBUG" }
       symbols "On"
 
    filter "configurations:Release"
-      targetdir "data/x64/"
       defines { "NDEBUG" }
       optimize "On"
-	  flags { "StaticRuntime" }
-	  characterset ("MBCS")
-	  
-project "TestPlugin-x64"
+      flags { "StaticRuntime" }
+      
+project "RE7Demo.InfiniteAmmo"
    kind "SharedLib"
    language "C++"
-   targetdir "bin/%{cfg.buildcfg}/x64/examples/scripts"
-   targetname "RE7Demo.InfiniteAmmo"
+   targetdir "bin/x64/%{cfg.buildcfg}/scripts"
    targetextension ".asi"
    
-   files { "source/x64test/*.h", "source/x64test/*.cpp" }
-   files { "source/verinfo/*.rc" }
-   
-   includedirs { "source/x64test" }
+   files { "demo_plugins/x64/*.cpp" }
+   files { "source/resources/Versioninfo.rc" }
+   includedirs { "demo_plugins/x64" }
 
+   characterset ("MBCS")
+   
    filter "configurations:Debug"
       defines { "DEBUG" }
       symbols "On"
 
    filter "configurations:Release"
-      targetdir "data/x64/examples/scripts"
       defines { "NDEBUG" }
       optimize "On"
-	  flags { "StaticRuntime" }
-	  characterset ("MBCS")
+      flags { "StaticRuntime" }
