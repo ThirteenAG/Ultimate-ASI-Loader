@@ -339,7 +339,7 @@ void HookKernel32IAT()
 
     IMAGE_NT_HEADERS*			ntHeader = (IMAGE_NT_HEADERS*)(hExecutableInstance + ((IMAGE_DOS_HEADER*)hExecutableInstance)->e_lfanew);
     IMAGE_IMPORT_DESCRIPTOR*	pImports = (IMAGE_IMPORT_DESCRIPTOR*)(hExecutableInstance + ntHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress);
-    size_t						nNumImports = ntHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].Size / sizeof(IMAGE_IMPORT_DESCRIPTOR) - 1;
+    size_t	                	nNumImports = ntHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].Size / sizeof(IMAGE_IMPORT_DESCRIPTOR) - 1;
 
     // Find kernel32.dll
     for (size_t i = 0; i < nNumImports; i++)
@@ -347,7 +347,7 @@ void HookKernel32IAT()
         if (!_stricmp((const char*)(hExecutableInstance + pImports->Name), "KERNEL32.DLL"))
         {
             auto start = hExecutableInstance + pImports->FirstThunk;
-            auto end = (pImports + 1) ? (hExecutableInstance + (pImports + 1)->FirstThunk) : start + 0x100;
+            auto end = (*(size_t*)(pImports + 1) != NULL) ? (hExecutableInstance + (pImports + 1)->FirstThunk) : (start + 0x100);
 
             if (start && end)
             {
@@ -357,7 +357,7 @@ void HookKernel32IAT()
                 Kernel32Data[eGetModuleHandleW][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "GetModuleHandleW");
                 Kernel32Data[eGetProcAddress]  [ProcAddress] = (size_t)GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "GetProcAddress");
 
-                for (auto i = start; i < end; i += 4)
+                for (auto i = start; i < end; i += sizeof(size_t))
                 {
                     DWORD dwProtect[2];
                     VirtualProtect((size_t*)i, sizeof(size_t), PAGE_EXECUTE_READWRITE, &dwProtect[0]);
