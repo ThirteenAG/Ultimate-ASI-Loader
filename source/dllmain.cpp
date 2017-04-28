@@ -341,61 +341,67 @@ void HookKernel32IAT()
     IMAGE_IMPORT_DESCRIPTOR*	pImports = (IMAGE_IMPORT_DESCRIPTOR*)(hExecutableInstance + ntHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress);
     size_t	                	nNumImports = ntHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].Size / sizeof(IMAGE_IMPORT_DESCRIPTOR) - 1;
 
+    size_t start = 0;
+    size_t end = 0;
+
     // Find kernel32.dll
     for (size_t i = 0; i < nNumImports; i++)
     {
         if (!_stricmp((const char*)(hExecutableInstance + pImports->Name), "KERNEL32.DLL"))
         {
-            auto start = hExecutableInstance + pImports->FirstThunk;
-            auto end = (*(size_t*)(pImports + 1) != NULL) ? (hExecutableInstance + (pImports + 1)->FirstThunk) : (start + 0x100);
-
-            if (start && end)
-            {
-                Kernel32Data[eGetStartupInfoA] [ProcAddress] = (size_t)GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "GetStartupInfoA");
-                Kernel32Data[eGetStartupInfoW] [ProcAddress] = (size_t)GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "GetStartupInfoW");
-                Kernel32Data[eGetModuleHandleA][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "GetModuleHandleA");
-                Kernel32Data[eGetModuleHandleW][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "GetModuleHandleW");
-                Kernel32Data[eGetProcAddress]  [ProcAddress] = (size_t)GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "GetProcAddress");
-
-                for (auto i = start; i < end; i += sizeof(size_t))
-                {
-                    DWORD dwProtect[2];
-                    VirtualProtect((size_t*)i, sizeof(size_t), PAGE_EXECUTE_READWRITE, &dwProtect[0]);
-
-                    auto ptr = *(size_t*)i;
-
-                    if (ptr == Kernel32Data[eGetStartupInfoA][ProcAddress])
-                    {
-                        Kernel32Data[eGetStartupInfoA][IATPtr] = i;
-                        *(size_t*)i = (size_t)CustomGetStartupInfoA;
-                    }
-                    else if (ptr == Kernel32Data[eGetStartupInfoW][ProcAddress])
-                    {
-                        Kernel32Data[eGetStartupInfoW][IATPtr] = i;
-                        *(size_t*)i = (size_t)CustomGetStartupInfoW;
-                    }
-                    else if (ptr == Kernel32Data[eGetModuleHandleA][ProcAddress])
-                    {
-                        Kernel32Data[eGetModuleHandleA][IATPtr] = i;
-                        *(size_t*)i = (size_t)CustomGetModuleHandleA;
-                    }
-                    else if (ptr == Kernel32Data[eGetModuleHandleW][ProcAddress])
-                    {
-                        Kernel32Data[eGetModuleHandleW][IATPtr] = i;
-                        *(size_t*)i = (size_t)CustomGetModuleHandleW;
-                    }
-                    else if (ptr == Kernel32Data[eGetProcAddress][ProcAddress])
-                    {
-                        Kernel32Data[eGetProcAddress][IATPtr] = i;
-                        *(size_t*)i = (size_t)CustomGetProcAddress;
-                    }
-
-                    VirtualProtect((size_t*)i, sizeof(size_t), dwProtect[0], &dwProtect[1]);
-                }
-            }
-            return;
+            start = hExecutableInstance + pImports->FirstThunk;
+        }
+        else
+        {
+            if ((end <= start) || end > (hExecutableInstance + pImports->FirstThunk))
+                end = hExecutableInstance + pImports->FirstThunk;
         }
         pImports++;
+    }
+
+    if (end == 0)
+        end = start + 0x100;
+
+    Kernel32Data[eGetStartupInfoA] [ProcAddress] = (size_t)GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "GetStartupInfoA");
+    Kernel32Data[eGetStartupInfoW] [ProcAddress] = (size_t)GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "GetStartupInfoW");
+    Kernel32Data[eGetModuleHandleA][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "GetModuleHandleA");
+    Kernel32Data[eGetModuleHandleW][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "GetModuleHandleW");
+    Kernel32Data[eGetProcAddress]  [ProcAddress] = (size_t)GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "GetProcAddress");
+
+    for (auto i = start; i < end; i += sizeof(size_t))
+    {
+        DWORD dwProtect[2];
+        VirtualProtect((size_t*)i, sizeof(size_t), PAGE_EXECUTE_READWRITE, &dwProtect[0]);
+
+        auto ptr = *(size_t*)i;
+
+        if (ptr == Kernel32Data[eGetStartupInfoA][ProcAddress])
+        {
+            Kernel32Data[eGetStartupInfoA][IATPtr] = i;
+            *(size_t*)i = (size_t)CustomGetStartupInfoA;
+        }
+        else if (ptr == Kernel32Data[eGetStartupInfoW][ProcAddress])
+        {
+            Kernel32Data[eGetStartupInfoW][IATPtr] = i;
+            *(size_t*)i = (size_t)CustomGetStartupInfoW;
+        }
+        else if (ptr == Kernel32Data[eGetModuleHandleA][ProcAddress])
+        {
+            Kernel32Data[eGetModuleHandleA][IATPtr] = i;
+            *(size_t*)i = (size_t)CustomGetModuleHandleA;
+        }
+        else if (ptr == Kernel32Data[eGetModuleHandleW][ProcAddress])
+        {
+            Kernel32Data[eGetModuleHandleW][IATPtr] = i;
+            *(size_t*)i = (size_t)CustomGetModuleHandleW;
+        }
+        else if (ptr == Kernel32Data[eGetProcAddress][ProcAddress])
+        {
+            Kernel32Data[eGetProcAddress][IATPtr] = i;
+            *(size_t*)i = (size_t)CustomGetProcAddress;
+        }
+
+        VirtualProtect((size_t*)i, sizeof(size_t), dwProtect[0], &dwProtect[1]);
     }
 }
 
