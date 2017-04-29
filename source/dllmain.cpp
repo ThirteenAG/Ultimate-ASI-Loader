@@ -16,6 +16,8 @@ enum Kernel32ExportsNames
     eGetModuleHandleW,
     eGetProcAddress,
     eGetShortPathNameA,
+    eFindNextFileA,
+    eFindNextFileW,
 
     Kernel32ExportsNamesCount
 };
@@ -342,6 +344,18 @@ DWORD WINAPI CustomGetShortPathNameA(LPCSTR lpszLongPath, LPSTR lpszShortPath, D
     return GetShortPathNameA(lpszLongPath, lpszShortPath, cchBuffer);
 }
 
+BOOL WINAPI CustomFindNextFileA(HANDLE hFindFile, LPWIN32_FIND_DATAA lpFindFileData)
+{
+    LoadPluginsAndRestoreIAT(eFindNextFileA);
+    return FindNextFileA(hFindFile, lpFindFileData);
+}
+
+BOOL WINAPI CustomFindNextFileW(HANDLE hFindFile, LPWIN32_FIND_DATAW lpFindFileData)
+{
+    LoadPluginsAndRestoreIAT(eFindNextFileW);
+    return FindNextFileW(hFindFile, lpFindFileData);
+}
+
 void HookKernel32IAT()
 {
     auto hExecutableInstance = (size_t)GetModuleHandle(NULL);
@@ -374,6 +388,8 @@ void HookKernel32IAT()
     Kernel32Data[eGetModuleHandleW] [ProcAddress] = (size_t)GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "GetModuleHandleW");
     Kernel32Data[eGetProcAddress]   [ProcAddress] = (size_t)GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "GetProcAddress");
     Kernel32Data[eGetShortPathNameA][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "GetShortPathNameA");
+    Kernel32Data[eFindNextFileA]    [ProcAddress] = (size_t)GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "FindNextFileA");
+    Kernel32Data[eFindNextFileW]    [ProcAddress] = (size_t)GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "FindNextFileW");
 
     for (auto i = start; i < end; i += sizeof(size_t))
     {
@@ -411,6 +427,16 @@ void HookKernel32IAT()
         {
             Kernel32Data[eGetShortPathNameA][IATPtr] = i;
             *(size_t*)i = (size_t)CustomGetShortPathNameA;
+        }
+        else if (ptr == Kernel32Data[eFindNextFileA][ProcAddress])
+        {
+            Kernel32Data[eFindNextFileA][IATPtr] = i;
+            *(size_t*)i = (size_t)CustomFindNextFileA;
+        }
+        else if (ptr == Kernel32Data[eFindNextFileW][ProcAddress])
+        {
+            Kernel32Data[eFindNextFileW][IATPtr] = i;
+            *(size_t*)i = (size_t)CustomFindNextFileW;
         }
 
         VirtualProtect((size_t*)i, sizeof(size_t), dwProtect[0], &dwProtect[1]);
