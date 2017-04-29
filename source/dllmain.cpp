@@ -15,6 +15,8 @@ enum Kernel32ExportsNames
     eGetModuleHandleA,
     eGetModuleHandleW,
     eGetProcAddress,
+    eGetShortPathNameA,
+
     Kernel32ExportsNamesCount
 };
 
@@ -22,6 +24,7 @@ enum Kernel32ExportsData
 {
     IATPtr,
     ProcAddress,
+
     Kernel32ExportsDataCount
 };
 
@@ -81,7 +84,7 @@ void LoadOriginalLibrary()
     }
     else if (_stricmp(SelfName + 1, "d3d8.dll") == NULL) {
         d3d8.LoadOriginalLibrary(LoadLibrary(szSystemPath));
-        if (GetPrivateProfileInt("globalsets", "used3d8to9", TRUE, iniPath))
+        if (GetPrivateProfileInt("globalsets", "used3d8to9", FALSE, iniPath))
             d3d8.Direct3DCreate8 = (FARPROC)Direct3DCreate8;
     }
     else if (_stricmp(SelfName + 1, "d3d9.dll") == NULL) {
@@ -333,13 +336,19 @@ FARPROC WINAPI CustomGetProcAddress(HMODULE hModule, LPCSTR lpProcName)
     return GetProcAddress(hModule, lpProcName);
 }
 
+DWORD WINAPI CustomGetShortPathNameA(LPCSTR lpszLongPath, LPSTR lpszShortPath, DWORD cchBuffer)
+{
+    LoadPluginsAndRestoreIAT(eGetShortPathNameA);
+    return GetShortPathNameA(lpszLongPath, lpszShortPath, cchBuffer);
+}
+
 void HookKernel32IAT()
 {
     auto hExecutableInstance = (size_t)GetModuleHandle(NULL);
 
-    IMAGE_NT_HEADERS*			ntHeader = (IMAGE_NT_HEADERS*)(hExecutableInstance + ((IMAGE_DOS_HEADER*)hExecutableInstance)->e_lfanew);
-    IMAGE_IMPORT_DESCRIPTOR*	pImports = (IMAGE_IMPORT_DESCRIPTOR*)(hExecutableInstance + ntHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress);
-    size_t	                	nNumImports = ntHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].Size / sizeof(IMAGE_IMPORT_DESCRIPTOR) - 1;
+    IMAGE_NT_HEADERS*           ntHeader = (IMAGE_NT_HEADERS*)(hExecutableInstance + ((IMAGE_DOS_HEADER*)hExecutableInstance)->e_lfanew);
+    IMAGE_IMPORT_DESCRIPTOR*    pImports = (IMAGE_IMPORT_DESCRIPTOR*)(hExecutableInstance + ntHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress);
+    size_t                      nNumImports = ntHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].Size / sizeof(IMAGE_IMPORT_DESCRIPTOR) - 1;
 
     size_t start = 0;
     size_t end = 0;
@@ -347,26 +356,24 @@ void HookKernel32IAT()
     // Find kernel32.dll
     for (size_t i = 0; i < nNumImports; i++)
     {
-        if (!_stricmp((const char*)(hExecutableInstance + pImports->Name), "KERNEL32.DLL"))
-        {
-            start = hExecutableInstance + pImports->FirstThunk;
-        }
-        else
-        {
-            if ((end <= start) || end > (hExecutableInstance + pImports->FirstThunk))
-                end = hExecutableInstance + pImports->FirstThunk;
-        }
-        pImports++;
+        if (!_stricmp((const char*)(hExecutableInstance + (pImports + i)->Name), "KERNEL32.DLL"))
+            start = hExecutableInstance + (pImports + i)->FirstThunk;
     }
 
-    if (end == 0)
-        end = start + 0x100;
+    for (size_t i = 0; i < nNumImports; i++)
+    {
+        if (hExecutableInstance + (pImports + i)->FirstThunk > start && !(end && hExecutableInstance + (pImports + i)->FirstThunk > end))
+            end = hExecutableInstance + (pImports + i)->FirstThunk;
+    }
 
-    Kernel32Data[eGetStartupInfoA] [ProcAddress] = (size_t)GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "GetStartupInfoA");
-    Kernel32Data[eGetStartupInfoW] [ProcAddress] = (size_t)GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "GetStartupInfoW");
-    Kernel32Data[eGetModuleHandleA][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "GetModuleHandleA");
-    Kernel32Data[eGetModuleHandleW][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "GetModuleHandleW");
-    Kernel32Data[eGetProcAddress]  [ProcAddress] = (size_t)GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "GetProcAddress");
+    if (!end) { end = start + 0x100; }
+
+    Kernel32Data[eGetStartupInfoA]  [ProcAddress] = (size_t)GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "GetStartupInfoA");
+    Kernel32Data[eGetStartupInfoW]  [ProcAddress] = (size_t)GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "GetStartupInfoW");
+    Kernel32Data[eGetModuleHandleA] [ProcAddress] = (size_t)GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "GetModuleHandleA");
+    Kernel32Data[eGetModuleHandleW] [ProcAddress] = (size_t)GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "GetModuleHandleW");
+    Kernel32Data[eGetProcAddress]   [ProcAddress] = (size_t)GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "GetProcAddress");
+    Kernel32Data[eGetShortPathNameA][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "GetShortPathNameA");
 
     for (auto i = start; i < end; i += sizeof(size_t))
     {
@@ -399,6 +406,11 @@ void HookKernel32IAT()
         {
             Kernel32Data[eGetProcAddress][IATPtr] = i;
             *(size_t*)i = (size_t)CustomGetProcAddress;
+        }
+        else if (ptr == Kernel32Data[eGetShortPathNameA][ProcAddress])
+        {
+            Kernel32Data[eGetShortPathNameA][IATPtr] = i;
+            *(size_t*)i = (size_t)CustomGetShortPathNameA;
         }
 
         VirtualProtect((size_t*)i, sizeof(size_t), dwProtect[0], &dwProtect[1]);
