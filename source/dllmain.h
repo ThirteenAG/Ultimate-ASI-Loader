@@ -109,30 +109,6 @@ struct dinput8_dll
     }
 } dinput8;
 
-struct dinput_dll
-{
-    HMODULE dll;
-    FARPROC DirectInputCreateA;
-    FARPROC DirectInputCreateEx;
-    FARPROC DirectInputCreateW;
-    FARPROC DllCanUnloadNow;
-    FARPROC DllGetClassObject;
-    FARPROC DllRegisterServer;
-    FARPROC DllUnregisterServer;
-
-    void LoadOriginalLibrary(HMODULE module)
-    {
-        dll = module;
-        DirectInputCreateA = GetProcAddress(dll, "DirectInputCreateA");
-        DirectInputCreateEx = GetProcAddress(dll, "DirectInputCreateEx");
-        DirectInputCreateW = GetProcAddress(dll, "DirectInputCreateW");
-        DllCanUnloadNow = GetProcAddress(dll, "DllCanUnloadNow");
-        DllGetClassObject = GetProcAddress(dll, "DllGetClassObject");
-        DllRegisterServer = GetProcAddress(dll, "DllRegisterServer");
-        DllUnregisterServer = GetProcAddress(dll, "DllUnregisterServer");
-    }
-} dinput;
-
 struct dsound_dll
 {
     HMODULE dll;
@@ -168,6 +144,30 @@ struct dsound_dll
 } dsound;
 
 #if !X64
+struct dinput_dll
+{
+    HMODULE dll;
+    FARPROC DirectInputCreateA;
+    FARPROC DirectInputCreateEx;
+    FARPROC DirectInputCreateW;
+    FARPROC DllCanUnloadNow;
+    FARPROC DllGetClassObject;
+    FARPROC DllRegisterServer;
+    FARPROC DllUnregisterServer;
+
+    void LoadOriginalLibrary(HMODULE module)
+    {
+        dll = module;
+        DirectInputCreateA = GetProcAddress(dll, "DirectInputCreateA");
+        DirectInputCreateEx = GetProcAddress(dll, "DirectInputCreateEx");
+        DirectInputCreateW = GetProcAddress(dll, "DirectInputCreateW");
+        DllCanUnloadNow = GetProcAddress(dll, "DllCanUnloadNow");
+        DllGetClassObject = GetProcAddress(dll, "DllGetClassObject");
+        DllRegisterServer = GetProcAddress(dll, "DllRegisterServer");
+        DllUnregisterServer = GetProcAddress(dll, "DllUnregisterServer");
+    }
+} dinput;
+
 struct d3d8_dll
 {
     HMODULE dll;
