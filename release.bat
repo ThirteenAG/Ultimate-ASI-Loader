@@ -1,5 +1,8 @@
 7za a -tzip ".\bin\Ultimate-ASI-Loader.zip" ".\bin\x86\Release\dinput8.dll"
 7za a -tzip ".\bin\Ultimate-ASI-Loader_x64.zip" ".\bin\x64\Release\dinput8.dll"
+
+type nul >"bin\place both files in RESIDENT EVIL 7 biohazard Demo folder"
+7za a -tzip ".\bin\RE7Demo.InfiniteAmmo.zip" ".\bin\x64\Release\dinput8.dll" ".\bin\x64\Release\scripts\RE7Demo.InfiniteAmmo.asi" ".\bin\place both files in RESIDENT EVIL 7 biohazard Demo folder"
 EXIT
 
 7-Zip Extra
