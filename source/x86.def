@@ -43,6 +43,16 @@ DllGetClassObject = _DllGetClassObject PRIVATE
 DllRegisterServer = _DllRegisterServer PRIVATE
 DllUnregisterServer = _DllUnregisterServer PRIVATE
 
+LIBRARY "dinput"
+EXPORTS
+DirectInputCreateA = _DirectInputCreateA
+DirectInputCreateEx = _DirectInputCreateEx
+DirectInputCreateW = _DirectInputCreateW
+DllCanUnloadNow = _DllCanUnloadNow PRIVATE
+DllGetClassObject = _DllGetClassObject PRIVATE
+DllRegisterServer = _DllRegisterServer PRIVATE
+DllUnregisterServer = _DllUnregisterServer PRIVATE
+
 LIBRARY "dsound"
 EXPORTS
 DirectSoundCaptureCreate = _DirectSoundCaptureCreate
@@ -357,6 +367,56 @@ acmStreamPrepareHeader = _acmStreamPrepareHeader
 acmStreamReset = _acmStreamReset
 acmStreamSize = _acmStreamSize
 acmStreamUnprepareHeader = _acmStreamUnprepareHeader
+
+LIBRARY "msvfw32"
+EXPORTS
+DrawDibBegin = _DrawDibBegin
+DrawDibChangePalette = _DrawDibChangePalette
+DrawDibClose = _DrawDibClose
+DrawDibDraw = _DrawDibDraw
+DrawDibEnd = _DrawDibEnd
+DrawDibGetBuffer = _DrawDibGetBuffer
+DrawDibGetPalette = _DrawDibGetPalette
+DrawDibOpen = _DrawDibOpen
+DrawDibProfileDisplay = _DrawDibProfileDisplay
+DrawDibRealize = _DrawDibRealize
+DrawDibSetPalette = _DrawDibSetPalette
+DrawDibStart = _DrawDibStart
+DrawDibStop = _DrawDibStop
+DrawDibTime = _DrawDibTime
+GetOpenFileNamePreview = _GetOpenFileNamePreview
+GetOpenFileNamePreviewA = _GetOpenFileNamePreviewA
+GetOpenFileNamePreviewW = _GetOpenFileNamePreviewW
+GetSaveFileNamePreviewA = _GetSaveFileNamePreviewA
+GetSaveFileNamePreviewW = _GetSaveFileNamePreviewW
+ICClose = _ICClose
+ICCompress = _ICCompress
+ICCompressorChoose = _ICCompressorChoose
+ICCompressorFree = _ICCompressorFree
+ICDecompress = _ICDecompress
+ICDraw = _ICDraw
+ICDrawBegin = _ICDrawBegin
+ICGetDisplayFormat = _ICGetDisplayFormat
+ICGetInfo = _ICGetInfo
+ICImageCompress = _ICImageCompress
+ICImageDecompress = _ICImageDecompress
+ICInfo = _ICInfo
+ICInstall = _ICInstall
+ICLocate = _ICLocate
+ICMThunk32 = _ICMThunk32
+ICOpen = _ICOpen
+ICOpenFunction = _ICOpenFunction
+ICRemove = _ICRemove
+ICSendMessage = _ICSendMessage
+ICSeqCompressFrame = _ICSeqCompressFrame
+ICSeqCompressFrameEnd = _ICSeqCompressFrameEnd
+ICSeqCompressFrameStart = _ICSeqCompressFrameStart
+MCIWndCreate = _MCIWndCreate
+MCIWndCreateA = _MCIWndCreateA
+MCIWndCreateW = _MCIWndCreateW
+MCIWndRegisterClass = _MCIWndRegisterClass
+StretchDIB = _StretchDIB
+VideoForWindowsVersion = _VideoForWindowsVersion
 
 LIBRARY "xlive"
 EXPORTS

@@ -4,21 +4,23 @@ Ultimate ASI Loader
 DESCRIPTION
 ------------------------
 This is a DLL file which adds ASI plugin loading functionality to any game, which uses any of the following libraries:
-* vorbisFile.dll
 * d3d8.dll
 * d3d9.dll
 * d3d11.dll
-* winmmbase.dll
-* msacm32.dll
+* ddraw.dll
+* dinput.dll
 * dinput8.dll (x86 and x64)
 * dsound.dll (x86 and x64)
-* ddraw.dll
+* msacm32.dll
+* msvfw32.dll
+* vorbisFile.dll
+* winmmbase.dll
 * xlive.dll
 
 
 INSTALLATION
 ------------------------
-In order to install it, you just need to place DLL into game directory. Usually it works as dinput8.dll, but if it's not, there is a possibility to rename it to d3d8.dll, d3d9.dll, d3d11.dll, winmmbase.dll, dinput8.dll, dsound.dll, ddraw.dll, vorbisFile.dll, xlive.dll.
+In order to install it, you just need to place DLL into game directory. Usually it works as dinput8.dll, but if it's not, there is a possibility to rename it(see the list of supported names above).
 
 
 USAGE

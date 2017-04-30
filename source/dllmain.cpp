@@ -5,7 +5,7 @@ extern "C" Direct3D8 *WINAPI Direct3DCreate8(UINT SDKVersion);
 #endif
 
 HMODULE hm;
-bool bLoadedPluginsYet;
+bool bLoadedPluginsYet, bOriginalLibraryLoaded;
 char iniPath[MAX_PATH];
 
 enum Kernel32ExportsNames
@@ -18,6 +18,9 @@ enum Kernel32ExportsNames
     eGetShortPathNameA,
     eFindNextFileA,
     eFindNextFileW,
+    eLoadLibraryA,
+    eLoadLibraryW,
+    eFreeLibrary,
 
     Kernel32ExportsNamesCount
 };
@@ -40,6 +43,8 @@ size_t Kernel32Data[Kernel32ExportsNamesCount][Kernel32ExportsDataCount];
 
 void LoadOriginalLibrary()
 {
+    bOriginalLibraryLoaded = true;
+
     char SelfPath[MAX_PATH];
     char szSystemPath[MAX_PATH];
     GetModuleFileName(hm, SelfPath, MAX_PATH);
@@ -101,6 +106,12 @@ void LoadOriginalLibrary()
     else if (_stricmp(SelfName + 1, "msacm32.dll") == NULL) {
         msacm32.LoadOriginalLibrary(LoadLibrary(szSystemPath));
     }
+    else if (_stricmp(SelfName + 1, "dinput.dll") == NULL) {
+        dinput.LoadOriginalLibrary(LoadLibrary(szSystemPath));
+    }
+    else if (_stricmp(SelfName + 1, "msvfw32.dll") == NULL) {
+        msvfw32.LoadOriginalLibrary(LoadLibrary(szSystemPath));
+    }
     else if (_stricmp(SelfName + 1, "xlive.dll") == NULL) {
         // Unprotect image - make .text and .rdata section writeable
         // get load address of the exe
@@ -124,7 +135,7 @@ void LoadOriginalLibrary()
     }
     else
     {
-        MessageBox(0, "This library isn't supported. Try to rename it to d3d8.dll, d3d9.dll, d3d11.dll, winmmbase.dll, msacm32.dll, dinput8.dll, dsound.dll, vorbisFile.dll, xlive.dll or ddraw.dll.", "ASI Loader", MB_ICONERROR);
+        MessageBox(0, "This library isn't supported. Try to rename it to d3d8.dll, d3d9.dll, d3d11.dll, winmmbase.dll, msacm32.dll, dinput.dll, dinput8.dll, dsound.dll, vorbisFile.dll, msvfw32.dll, xlive.dll or ddraw.dll.", "ASI Loader", MB_ICONERROR);
         ExitProcess(0);
     }
 #else
@@ -288,7 +299,8 @@ void LoadEverything()
 {
     if (!bLoadedPluginsYet)
     {
-        LoadOriginalLibrary();
+        if (!bOriginalLibraryLoaded)
+            LoadOriginalLibrary();
 #if !X64
         Direct3D8DisableMaximizedWindowedModeShim();
 #endif
@@ -297,63 +309,93 @@ void LoadEverything()
     }
 }
 
-void LoadPluginsAndRestoreIAT(Kernel32ExportsNames e)
+void LoadPluginsAndRestoreIAT()
 {
     LoadEverything();
 
-    auto ptr = (size_t*)Kernel32Data[e][IATPtr];
-    DWORD dwProtect[2];
-    VirtualProtect(ptr, sizeof(size_t), PAGE_EXECUTE_READWRITE, &dwProtect[0]);
-    *ptr = Kernel32Data[e][ProcAddress];
-    VirtualProtect(ptr, sizeof(size_t), dwProtect[0], &dwProtect[1]);
+    for (size_t i = 0; i < Kernel32ExportsNamesCount; i++)
+    {
+        if (Kernel32Data[i][IATPtr] && Kernel32Data[i][ProcAddress])
+        {
+            auto ptr = (size_t*)Kernel32Data[i][IATPtr];
+            DWORD dwProtect[2];
+            VirtualProtect(ptr, sizeof(size_t), PAGE_EXECUTE_READWRITE, &dwProtect[0]);
+            *ptr = Kernel32Data[i][ProcAddress];
+            VirtualProtect(ptr, sizeof(size_t), dwProtect[0], &dwProtect[1]);
+        }
+    }
 }
 
 void WINAPI CustomGetStartupInfoA(LPSTARTUPINFOA lpStartupInfo)
 {
-    LoadPluginsAndRestoreIAT(eGetStartupInfoA);
+    LoadPluginsAndRestoreIAT();
     return GetStartupInfoA(lpStartupInfo);
 }
 
 void WINAPI CustomGetStartupInfoW(LPSTARTUPINFOW lpStartupInfo)
 {
-    LoadPluginsAndRestoreIAT(eGetStartupInfoW);
+    LoadPluginsAndRestoreIAT();
     return GetStartupInfoW(lpStartupInfo);
 }
 
 HMODULE WINAPI CustomGetModuleHandleA(LPCSTR lpModuleName)
 {
-    LoadPluginsAndRestoreIAT(eGetModuleHandleA);
+    LoadPluginsAndRestoreIAT();
     return GetModuleHandleA(lpModuleName);
 }
 
 HMODULE WINAPI CustomGetModuleHandleW(LPCWSTR lpModuleName)
 {
-    LoadPluginsAndRestoreIAT(eGetModuleHandleW);
+    LoadPluginsAndRestoreIAT();
     return GetModuleHandleW(lpModuleName);
 }
 
 FARPROC WINAPI CustomGetProcAddress(HMODULE hModule, LPCSTR lpProcName)
 {
-    LoadPluginsAndRestoreIAT(eGetProcAddress);
+    LoadPluginsAndRestoreIAT();
     return GetProcAddress(hModule, lpProcName);
 }
 
 DWORD WINAPI CustomGetShortPathNameA(LPCSTR lpszLongPath, LPSTR lpszShortPath, DWORD cchBuffer)
 {
-    LoadPluginsAndRestoreIAT(eGetShortPathNameA);
+    LoadPluginsAndRestoreIAT();
     return GetShortPathNameA(lpszLongPath, lpszShortPath, cchBuffer);
 }
 
 BOOL WINAPI CustomFindNextFileA(HANDLE hFindFile, LPWIN32_FIND_DATAA lpFindFileData)
 {
-    LoadPluginsAndRestoreIAT(eFindNextFileA);
+    LoadPluginsAndRestoreIAT();
     return FindNextFileA(hFindFile, lpFindFileData);
 }
 
 BOOL WINAPI CustomFindNextFileW(HANDLE hFindFile, LPWIN32_FIND_DATAW lpFindFileData)
 {
-    LoadPluginsAndRestoreIAT(eFindNextFileW);
+    LoadPluginsAndRestoreIAT();
     return FindNextFileW(hFindFile, lpFindFileData);
+}
+
+HMODULE WINAPI CustomLoadLibraryA(LPCSTR lpLibFileName)
+{
+    if (!bOriginalLibraryLoaded)
+        LoadOriginalLibrary();
+
+    return LoadLibraryA(lpLibFileName);
+}
+
+HMODULE WINAPI CustomLoadLibraryW(LPCWSTR lpLibFileName)
+{
+    if (!bOriginalLibraryLoaded)
+        LoadOriginalLibrary();
+
+    return LoadLibraryW(lpLibFileName);
+}
+
+BOOL WINAPI CustomFreeLibrary(HMODULE hLibModule)
+{
+    if (hLibModule != hm)
+        return FreeLibrary(hLibModule);
+    else
+        return !NULL;
 }
 
 void HookKernel32IAT()
@@ -390,6 +432,9 @@ void HookKernel32IAT()
     Kernel32Data[eGetShortPathNameA][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "GetShortPathNameA");
     Kernel32Data[eFindNextFileA]    [ProcAddress] = (size_t)GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "FindNextFileA");
     Kernel32Data[eFindNextFileW]    [ProcAddress] = (size_t)GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "FindNextFileW");
+    Kernel32Data[eLoadLibraryA]     [ProcAddress] = (size_t)GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "LoadLibraryA");
+    Kernel32Data[eLoadLibraryW]     [ProcAddress] = (size_t)GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "LoadLibraryW");
+    Kernel32Data[eFreeLibrary]      [ProcAddress] = (size_t)GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "FreeLibrary");
 
     for (auto i = start; i < end; i += sizeof(size_t))
     {
@@ -437,6 +482,21 @@ void HookKernel32IAT()
         {
             Kernel32Data[eFindNextFileW][IATPtr] = i;
             *(size_t*)i = (size_t)CustomFindNextFileW;
+        }
+        else if (ptr == Kernel32Data[eLoadLibraryA][ProcAddress])
+        {
+            Kernel32Data[eLoadLibraryA][IATPtr] = i;
+            *(size_t*)i = (size_t)CustomLoadLibraryA;
+        }
+        else if (ptr == Kernel32Data[eLoadLibraryW][ProcAddress])
+        {
+            Kernel32Data[eLoadLibraryW][IATPtr] = i;
+            *(size_t*)i = (size_t)CustomLoadLibraryW;
+        }
+        else if (ptr == Kernel32Data[eFreeLibrary][ProcAddress])
+        {
+            Kernel32Data[eFreeLibrary][IATPtr] = i;
+            *(size_t*)i = (size_t)CustomFreeLibrary;
         }
 
         VirtualProtect((size_t*)i, sizeof(size_t), dwProtect[0], &dwProtect[1]);
