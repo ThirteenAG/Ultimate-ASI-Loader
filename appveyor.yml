@@ -28,6 +28,8 @@ artifacts:
   name: Ultimate-ASI-Loader.zip
 - path: bin\Ultimate-ASI-Loader_x64.zip
   name: Ultimate-ASI-Loader_x64.zip
+- path: bin\RE7Demo.InfiniteAmmo.zip
+  name: RE7Demo.InfiniteAmmo.zip
 deploy:
 - provider: GitHub
   tag: v$(appveyor_build_version)
