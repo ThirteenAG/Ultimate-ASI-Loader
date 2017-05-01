@@ -419,7 +419,7 @@ void HookKernel32IAT()
 
     auto PatchIAT = [&nNumImports, &hExecutableInstance, &pImports](size_t start, size_t end = 0)
     {
-        for (size_t i = 0; i <= nNumImports; i++)
+        for (size_t i = 0; i < nNumImports; i++)
         {
             if (hExecutableInstance + (pImports + i)->FirstThunk > start && !(end && hExecutableInstance + (pImports + i)->FirstThunk > end))
                 end = hExecutableInstance + (pImports + i)->FirstThunk;
@@ -494,11 +494,26 @@ void HookKernel32IAT()
         }
     };
 
-    // Find kernel32.dll
-    for (size_t i = 0; i <= nNumImports; i++)
+    static auto getSection = [](const PIMAGE_NT_HEADERS nt_headers, unsigned section) -> PIMAGE_SECTION_HEADER
     {
-        if (!_stricmp((const char*)(hExecutableInstance + (pImports + i)->Name), "KERNEL32.DLL"))
-            PatchIAT(hExecutableInstance + (pImports + i)->FirstThunk);
+        return reinterpret_cast<PIMAGE_SECTION_HEADER>(
+            (UCHAR*)nt_headers->OptionalHeader.DataDirectory +
+            nt_headers->OptionalHeader.NumberOfRvaAndSizes * sizeof(IMAGE_DATA_DIRECTORY) +
+            section * sizeof(IMAGE_SECTION_HEADER));
+    };
+ 
+    auto sec = getSection(ntHeader, ntHeader->FileHeader.NumberOfSections - 1);
+    auto secSize = max(sec->SizeOfRawData, sec->Misc.VirtualSize);
+    auto hExecutableInstance_end = hExecutableInstance + max(sec->PointerToRawData, sec->VirtualAddress) + secSize;
+    
+    // Find kernel32.dll
+    for (size_t i = 0; i < nNumImports; i++)
+    {
+        if ((size_t)(hExecutableInstance + (pImports + i)->Name) < hExecutableInstance_end)
+        {
+            if (!_stricmp((const char*)(hExecutableInstance + (pImports + i)->Name), "KERNEL32.DLL"))
+                PatchIAT(hExecutableInstance + (pImports + i)->FirstThunk);
+        }
     }
 }
 
