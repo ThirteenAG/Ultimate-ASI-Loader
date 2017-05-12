@@ -417,7 +417,7 @@ void HookKernel32IAT()
     Kernel32Data[eLoadLibraryW]     [ProcAddress] = (size_t)GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "LoadLibraryW");
     Kernel32Data[eFreeLibrary]      [ProcAddress] = (size_t)GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "FreeLibrary");
 
-    auto PatchIAT = [&nNumImports, &hExecutableInstance, &pImports](size_t start, size_t end = 0)
+    auto PatchIAT = [&nNumImports, &hExecutableInstance, &pImports](size_t start, size_t end, size_t exe_end)
     {
         for (size_t i = 0; i < nNumImports; i++)
         {
@@ -426,6 +426,11 @@ void HookKernel32IAT()
         }
 
         if (!end) { end = start + 0x100; }
+        if (end > exe_end) //for very broken exes
+        { 
+            start = hExecutableInstance;
+            end = exe_end; 
+        }
 
         for (auto i = start; i < end; i += sizeof(size_t))
         {
@@ -512,7 +517,7 @@ void HookKernel32IAT()
         if ((size_t)(hExecutableInstance + (pImports + i)->Name) < hExecutableInstance_end)
         {
             if (!_stricmp((const char*)(hExecutableInstance + (pImports + i)->Name), "KERNEL32.DLL"))
-                PatchIAT(hExecutableInstance + (pImports + i)->FirstThunk);
+                PatchIAT(hExecutableInstance + (pImports + i)->FirstThunk, 0, hExecutableInstance_end);
         }
     }
 }
