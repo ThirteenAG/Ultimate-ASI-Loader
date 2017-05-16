@@ -214,7 +214,7 @@ void LoadPlugins()
 
     char selfPath[MAX_PATH];
     GetModuleFileName(hm, selfPath, MAX_PATH);
-    *strrchr(iniPath, '\\') = '\0';
+    *strrchr(selfPath, '\\') = '\0';
     SetCurrentDirectory(selfPath);
 
 #if !X64
@@ -281,12 +281,12 @@ void LoadPlugins()
         if (!nWantsToLoadFromScriptsOnly)
             FindFiles(&fd);
 
-        SetCurrentDirectory(oldDir);
+        SetCurrentDirectory(selfPath);
 
         if (SetCurrentDirectory("scripts\\"))
             FindFiles(&fd);
 
-        SetCurrentDirectory(oldDir);
+        SetCurrentDirectory(selfPath);
 
         if (SetCurrentDirectory("plugins\\"))
             FindFiles(&fd);
@@ -544,6 +544,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID /*lpReserved*/)
 {
     if (reason == DLL_PROCESS_ATTACH)
     {
+        MessageBox(0,0,0,0);
         hm = hModule;
         Init();
     }
