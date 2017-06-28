@@ -510,6 +510,10 @@ void HookKernel32IAT()
     auto sec = getSection(ntHeader, ntHeader->FileHeader.NumberOfSections - 1);
     auto secSize = max(sec->SizeOfRawData, sec->Misc.VirtualSize);
     auto hExecutableInstance_end = hExecutableInstance + max(sec->PointerToRawData, sec->VirtualAddress) + secSize;
+
+    char SelfPath[MAX_PATH];
+    GetModuleFileName(hm, SelfPath, MAX_PATH);
+    auto SelfName = strrchr(SelfPath, '\\') + 1;
     
     // Find kernel32.dll
     for (size_t i = 0; i < nNumImports; i++)
@@ -518,6 +522,79 @@ void HookKernel32IAT()
         {
             if (!_stricmp((const char*)(hExecutableInstance + (pImports + i)->Name), "KERNEL32.DLL"))
                 PatchIAT(hExecutableInstance + (pImports + i)->FirstThunk, 0, hExecutableInstance_end);
+
+            //Checking for ordinals
+            if (!_stricmp((const char*)(hExecutableInstance + (pImports + i)->Name), SelfName))
+            {
+                PIMAGE_THUNK_DATA thunk = (PIMAGE_THUNK_DATA)(hExecutableInstance + (pImports + i)->OriginalFirstThunk);
+                size_t j = 0;
+                while (thunk->u1.Function)
+                {
+                    if (thunk->u1.Ordinal & IMAGE_ORDINAL_FLAG)
+                    {
+                        PIMAGE_IMPORT_BY_NAME import = (PIMAGE_IMPORT_BY_NAME)(hExecutableInstance + thunk->u1.AddressOfData);
+                        void** p = (void**)(hExecutableInstance + (pImports + i)->FirstThunk);
+                        if (!_stricmp(SelfName, "DSOUND.DLL"))
+                        {
+                            const enum edsound
+                            {
+                                DirectSoundCaptureCreate = 6,
+                                DirectSoundCaptureCreate8 = 12,
+                                DirectSoundCaptureEnumerateA = 7,
+                                DirectSoundCaptureEnumerateW = 8,
+                                DirectSoundCreate = 1,
+                                DirectSoundCreate8 = 11,
+                                DirectSoundEnumerateA = 2,
+                                DirectSoundEnumerateW = 3,
+                                DirectSoundFullDuplexCreate = 10,
+                                GetDeviceID = 9
+                            };
+
+                            switch (IMAGE_ORDINAL(thunk->u1.Ordinal))
+                            {
+                            case edsound::DirectSoundCaptureCreate:
+                                p[j] = _DirectSoundCaptureCreate;
+                                break;
+                            case edsound::DirectSoundCaptureCreate8:
+                                p[j] = _DirectSoundCaptureCreate8;
+                                break;
+                            case edsound::DirectSoundCaptureEnumerateA:
+                                p[j] = _DirectSoundCaptureEnumerateA;
+                                break;
+                            case edsound::DirectSoundCaptureEnumerateW:
+                                p[j] = _DirectSoundCaptureEnumerateW;
+                                break;
+                            case edsound::DirectSoundCreate:
+                                p[j] = _DirectSoundCreate;
+                                break;
+                            case edsound::DirectSoundCreate8:
+                                p[j] = _DirectSoundCreate8;
+                                break;
+                            case edsound::DirectSoundEnumerateA:
+                                p[j] = _DirectSoundEnumerateA;
+                                break;
+                            case edsound::DirectSoundEnumerateW:
+                                p[j] = _DirectSoundEnumerateW;
+                                break;
+                            case edsound::DirectSoundFullDuplexCreate:
+                                p[j] = _DirectSoundFullDuplexCreate;
+                                break;
+                            case edsound::GetDeviceID:
+                                p[j] = _GetDeviceID;
+                                break;
+                            default:
+                                break;
+                            }
+                        }
+                        else if (!_stricmp(SelfName, "DINPUT8.DLL"))
+                        {
+                            if ((IMAGE_ORDINAL(thunk->u1.Ordinal)) == 1)
+                                p[j] = _DirectInput8Create;
+                        }
+                    }
+                    ++thunk;
+                }
+            }
         }
     }
 }
