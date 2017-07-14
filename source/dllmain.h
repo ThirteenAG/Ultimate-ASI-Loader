@@ -1,6 +1,7 @@
 #pragma once
 #include <windows.h>
 #include <Shlobj.h>
+#include <stdio.h>
 #if X64
 #include <dsound.h>
 #endif
