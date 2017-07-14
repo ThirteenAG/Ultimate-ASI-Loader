@@ -194,13 +194,42 @@ void Direct3D8DisableMaximizedWindowedModeShim()
 
 void FindFiles(WIN32_FIND_DATA* fd)
 {
+    char dir[MAX_PATH] = { 0 };
+    GetCurrentDirectory(MAX_PATH, dir);
+
     HANDLE asiFile = FindFirstFile("*.asi", fd);
     if (asiFile != INVALID_HANDLE_VALUE)
     {
         do {
             if (!(fd->dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
             {
-                LoadLibrary(fd->cFileName);
+                auto pos = strlen(fd->cFileName);
+
+                if (fd->cFileName[pos - 4] == '.' &&
+                   (fd->cFileName[pos - 3] == 'a' || fd->cFileName[pos - 3] == 'A') &&
+                   (fd->cFileName[pos - 2] == 's' || fd->cFileName[pos - 2] == 'S') &&
+                   (fd->cFileName[pos - 1] == 'i' || fd->cFileName[pos - 1] == 'I'))
+                {
+                    char path[MAX_PATH] = { 0 };
+                    strcat(path, dir);
+                    strcat(path, "\\");
+                    strcat(path, fd->cFileName);
+
+                    auto h = LoadLibrary(path);
+                    SetCurrentDirectory(dir); //in case asi switched it
+
+                    if (h == NULL)
+                    {
+                        char msg[200] = { 0 }; char err[15];
+                        strcat(msg, "Unable to load ");
+                        strcat(msg, fd->cFileName);
+                        strcat(msg, ". Error: ");
+                        sprintf(err, "%d", GetLastError());
+                        strcat(msg, err);
+
+                        MessageBox(0, msg, "ASI Loader", MB_ICONERROR);
+                    }
+                }
             }
         } while (FindNextFile(asiFile, fd));
         FindClose(asiFile);
