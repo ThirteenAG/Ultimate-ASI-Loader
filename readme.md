@@ -34,10 +34,10 @@ ASI loader have built-in wndmode.dll, which can be loaded, if you create empty w
 
 D3D8TO9
 ------------------------
-Some mods, like ![skygfx](https://github.com/aap/skygfx_vc) require ![d3d8to9](https://github.com/crosire/d3d8to9). It is also a part of ASI loader, so in order to use it, create global.ini inside scripts folder with the following content:
+Some mods, like [SkyGfx](https://github.com/aap/skygfx_vc) require [d3d8to9](https://github.com/crosire/d3d8to9). It is also a part of ASI loader, so in order to use it, create global.ini inside scripts folder with the following content:
 ```
 [GlobalSets]
 UseD3D8to9=1
 ```
 
-![See example of global.ini here](https://github.com/ThirteenAG/Ultimate-ASI-Loader/blob/master/data/scripts/global.ini).
+[See example of global.ini here](https://github.com/ThirteenAG/Ultimate-ASI-Loader/blob/master/data/scripts/global.ini).
