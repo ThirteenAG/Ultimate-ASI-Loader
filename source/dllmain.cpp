@@ -565,6 +565,9 @@ void HookKernel32IAT()
                         void** p = (void**)(hExecutableInstance + (pImports + i)->FirstThunk);
                         if (!_stricmp(SelfName, "DSOUND.DLL"))
                         {
+                            DWORD Protect;
+                            VirtualProtect(&p[j], 4, PAGE_EXECUTE_READWRITE, &Protect);
+
                             const enum edsound
                             {
                                 DirectSoundCaptureCreate = 6,
@@ -617,6 +620,9 @@ void HookKernel32IAT()
                         }
                         else if (!_stricmp(SelfName, "DINPUT8.DLL"))
                         {
+                            DWORD Protect;
+                            VirtualProtect(&p[j], 4, PAGE_EXECUTE_READWRITE, &Protect);
+
                             if ((IMAGE_ORDINAL(thunk->u1.Ordinal)) == 1)
                                 p[j] = _DirectInput8Create;
                         }
