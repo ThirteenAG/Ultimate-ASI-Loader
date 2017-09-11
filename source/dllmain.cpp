@@ -21,6 +21,9 @@ enum Kernel32ExportsNames
     eLoadLibraryA,
     eLoadLibraryW,
     eFreeLibrary,
+    eCreateEventA,
+    eCreateEventW,
+    eGetSystemInfo,
 
     Kernel32ExportsNamesCount
 };
@@ -427,6 +430,24 @@ BOOL WINAPI CustomFreeLibrary(HMODULE hLibModule)
         return !NULL;
 }
 
+HANDLE WINAPI CustomCreateEventA(LPSECURITY_ATTRIBUTES lpEventAttributes, BOOL bManualReset, BOOL bInitialState, LPCTSTR lpName)
+{
+    LoadPluginsAndRestoreIAT();
+    return CreateEventA(lpEventAttributes, bManualReset, bInitialState, lpName);
+}
+
+HANDLE WINAPI CustomCreateEventW(LPSECURITY_ATTRIBUTES lpEventAttributes, BOOL bManualReset, BOOL bInitialState, LPCWSTR lpName)
+{
+    LoadPluginsAndRestoreIAT();
+    return CreateEventW(lpEventAttributes, bManualReset, bInitialState, lpName);
+}
+
+void WINAPI CustomGetSystemInfo(LPSYSTEM_INFO lpSystemInfo)
+{
+    LoadPluginsAndRestoreIAT();
+    return GetSystemInfo(lpSystemInfo);
+}
+
 void HookKernel32IAT()
 {
     auto hExecutableInstance = (size_t)GetModuleHandle(NULL);
@@ -445,6 +466,9 @@ void HookKernel32IAT()
     Kernel32Data[eLoadLibraryA]     [ProcAddress] = (size_t)GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "LoadLibraryA");
     Kernel32Data[eLoadLibraryW]     [ProcAddress] = (size_t)GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "LoadLibraryW");
     Kernel32Data[eFreeLibrary]      [ProcAddress] = (size_t)GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "FreeLibrary");
+    Kernel32Data[eCreateEventA]     [ProcAddress] = (size_t)GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "CreateEventA");
+    Kernel32Data[eCreateEventW]     [ProcAddress] = (size_t)GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "CreateEventW");
+    Kernel32Data[eGetSystemInfo]    [ProcAddress] = (size_t)GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "GetSystemInfo");
 
     auto PatchIAT = [&nNumImports, &hExecutableInstance, &pImports](size_t start, size_t end, size_t exe_end)
     {
@@ -522,6 +546,21 @@ void HookKernel32IAT()
             {
                 Kernel32Data[eFreeLibrary][IATPtr] = i;
                 *(size_t*)i = (size_t)CustomFreeLibrary;
+            }
+            else if (ptr == Kernel32Data[eCreateEventA][ProcAddress])
+            {
+                Kernel32Data[eCreateEventA][IATPtr] = i;
+                *(size_t*)i = (size_t)CustomCreateEventA;
+            }
+            else if (ptr == Kernel32Data[eCreateEventW][ProcAddress])
+            {
+                Kernel32Data[eCreateEventW][IATPtr] = i;
+                *(size_t*)i = (size_t)CustomCreateEventW;
+            }
+            else if (ptr == Kernel32Data[eGetSystemInfo][ProcAddress])
+            {
+                Kernel32Data[eGetSystemInfo][IATPtr] = i;
+                *(size_t*)i = (size_t)CustomGetSystemInfo;
             }
 
             VirtualProtect((size_t*)i, sizeof(size_t), dwProtect[0], &dwProtect[1]);
