@@ -223,14 +223,17 @@ void FindFiles(WIN32_FIND_DATA* fd)
 
                     if (h == NULL)
                     {
-                        char msg[200] = { 0 }; char err[15];
-                        strcat(msg, "Unable to load ");
-                        strcat(msg, fd->cFileName);
-                        strcat(msg, ". Error: ");
-                        sprintf(err, "%d", GetLastError());
-                        strcat(msg, err);
-
-                        MessageBox(0, msg, "ASI Loader", MB_ICONERROR);
+                        auto e = GetLastError();
+                        if (e != ERROR_DLL_INIT_FAILED) // in case dllmain returns false
+                        {
+                            char msg[200] = { 0 }; char err[15];
+                            strcat(msg, "Unable to load ");
+                            strcat(msg, fd->cFileName);
+                            strcat(msg, ". Error: ");
+                            sprintf(err, "%d", e);
+                            strcat(msg, err);
+                            MessageBox(0, msg, "ASI Loader", MB_ICONERROR);
+                        }
                     }
                 }
             }
