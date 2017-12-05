@@ -235,6 +235,15 @@ void FindFiles(WIN32_FIND_DATA* fd)
                             MessageBox(0, msg, "ASI Loader", MB_ICONERROR);
                         }
                     }
+                    else
+                    {
+                        auto procedure = (void(*)())GetProcAddress(h, "InitializeASI");
+
+                        if (procedure != NULL)
+                        {
+                            procedure();
+                        }
+                    }
                 }
             }
         } while (FindNextFile(asiFile, fd));
