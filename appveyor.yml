@@ -23,6 +23,10 @@ artifacts:
   name: Ultimate-ASI-Loader_x64.zip
 - path: bin\RE7Demo.InfiniteAmmo.zip
   name: RE7Demo.InfiniteAmmo.zip
+- path: bin\x86\Release\scripts\MessageBox.asi
+  name: MessageBox.asi
+- path: bin\x86\Release\scripts\ExeUnprotect.asi
+  name: ExeUnprotect.asi
 deploy:
 - provider: GitHub
   tag: v$(appveyor_build_version)

@@ -61,6 +61,26 @@ project "MessageBox"
       defines { "NDEBUG" }
       optimize "On"
       flags { "StaticRuntime" }
+	  
+project "ExeUnprotect"
+   kind "SharedLib"
+   language "C++"
+   targetdir "bin/x86/%{cfg.buildcfg}/scripts"
+   targetextension ".asi"
+   
+   files { "source/demo_plugins/ExeUnprotect.cpp" }
+   files { "source/resources/Versioninfo.rc" }
+
+   characterset ("MBCS")
+   
+   filter "configurations:Debug"
+      defines { "DEBUG" }
+      symbols "On"
+
+   filter "configurations:Release"
+      defines { "NDEBUG" }
+      optimize "On"
+      flags { "StaticRuntime" }
       
       
 -- x64
