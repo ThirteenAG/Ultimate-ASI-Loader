@@ -2,6 +2,7 @@
 #include <windows.h>
 #include <Shlobj.h>
 #include <stdio.h>
+#include <ModuleList\ModuleList.hpp>
 #if X64
 #include <dsound.h>
 #endif

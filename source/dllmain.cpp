@@ -586,14 +586,16 @@ void HookKernel32IAT()
             nt_headers->OptionalHeader.NumberOfRvaAndSizes * sizeof(IMAGE_DATA_DIRECTORY) +
             section * sizeof(IMAGE_SECTION_HEADER));
     };
- 
-    auto sec = getSection(ntHeader, ntHeader->FileHeader.NumberOfSections - 1);
-    auto secSize = max(sec->SizeOfRawData, sec->Misc.VirtualSize);
-    auto hExecutableInstance_end = hExecutableInstance + max(sec->PointerToRawData, sec->VirtualAddress) + secSize;
 
-    char SelfPath[MAX_PATH];
-    GetModuleFileName(hm, SelfPath, MAX_PATH);
-    auto SelfName = strrchr(SelfPath, '\\') + 1;
+    static auto getSectionEnd = [](IMAGE_NT_HEADERS* ntHeader, size_t inst) -> auto
+    {
+        auto sec = getSection(ntHeader, ntHeader->FileHeader.NumberOfSections - 1);
+        auto secSize = max(sec->SizeOfRawData, sec->Misc.VirtualSize);
+        auto end = inst + max(sec->PointerToRawData, sec->VirtualAddress) + secSize;
+        return end;
+    };
+
+    auto hExecutableInstance_end = getSectionEnd(ntHeader, hExecutableInstance);
     
     // Find kernel32.dll
     for (size_t i = 0; i < nNumImports; i++)
@@ -602,86 +604,111 @@ void HookKernel32IAT()
         {
             if (!_stricmp((const char*)(hExecutableInstance + (pImports + i)->Name), "KERNEL32.DLL"))
                 PatchIAT(hExecutableInstance + (pImports + i)->FirstThunk, 0, hExecutableInstance_end);
+        }
+    }
 
-            //Checking for ordinals
-            if (!_stricmp((const char*)(hExecutableInstance + (pImports + i)->Name), SelfName))
+    // Fixing ordinals
+    char SelfPath[MAX_PATH];
+    GetModuleFileName(hm, SelfPath, MAX_PATH);
+    auto SelfName = strrchr(SelfPath, '\\') + 1;
+
+    static auto PatchOrdinals = [&SelfName](size_t hInstance)
+    {
+        IMAGE_NT_HEADERS*           ntHeader = (IMAGE_NT_HEADERS*)(hInstance + ((IMAGE_DOS_HEADER*)hInstance)->e_lfanew);
+        IMAGE_IMPORT_DESCRIPTOR*    pImports = (IMAGE_IMPORT_DESCRIPTOR*)(hInstance + ntHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress);
+        size_t                      nNumImports = ntHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].Size / sizeof(IMAGE_IMPORT_DESCRIPTOR) - 1;
+
+        for (size_t i = 0; i < nNumImports; i++)
+        {
+            if ((size_t)(hInstance + (pImports + i)->Name) < getSectionEnd(ntHeader, (size_t)hInstance))
             {
-                PIMAGE_THUNK_DATA thunk = (PIMAGE_THUNK_DATA)(hExecutableInstance + (pImports + i)->OriginalFirstThunk);
-                size_t j = 0;
-                while (thunk->u1.Function)
+                if (!_stricmp((const char*)(hInstance + (pImports + i)->Name), SelfName))
                 {
-                    if (thunk->u1.Ordinal & IMAGE_ORDINAL_FLAG)
+                    PIMAGE_THUNK_DATA thunk = (PIMAGE_THUNK_DATA)(hInstance + (pImports + i)->OriginalFirstThunk);
+                    size_t j = 0;
+                    while (thunk->u1.Function)
                     {
-                        PIMAGE_IMPORT_BY_NAME import = (PIMAGE_IMPORT_BY_NAME)(hExecutableInstance + thunk->u1.AddressOfData);
-                        void** p = (void**)(hExecutableInstance + (pImports + i)->FirstThunk);
-                        if (!_stricmp(SelfName, "DSOUND.DLL"))
+                        if (thunk->u1.Ordinal & IMAGE_ORDINAL_FLAG)
                         {
-                            DWORD Protect;
-                            VirtualProtect(&p[j], 4, PAGE_EXECUTE_READWRITE, &Protect);
-
-                            const enum edsound
+                            PIMAGE_IMPORT_BY_NAME import = (PIMAGE_IMPORT_BY_NAME)(hInstance + thunk->u1.AddressOfData);
+                            void** p = (void**)(hInstance + (pImports + i)->FirstThunk);
+                            if (!_stricmp(SelfName, "DSOUND.DLL"))
                             {
-                                DirectSoundCaptureCreate = 6,
-                                DirectSoundCaptureCreate8 = 12,
-                                DirectSoundCaptureEnumerateA = 7,
-                                DirectSoundCaptureEnumerateW = 8,
-                                DirectSoundCreate = 1,
-                                DirectSoundCreate8 = 11,
-                                DirectSoundEnumerateA = 2,
-                                DirectSoundEnumerateW = 3,
-                                DirectSoundFullDuplexCreate = 10,
-                                GetDeviceID = 9
-                            };
+                                DWORD Protect;
+                                VirtualProtect(&p[j], 4, PAGE_EXECUTE_READWRITE, &Protect);
 
-                            switch (IMAGE_ORDINAL(thunk->u1.Ordinal))
+                                const enum edsound
+                                {
+                                    DirectSoundCaptureCreate = 6,
+                                    DirectSoundCaptureCreate8 = 12,
+                                    DirectSoundCaptureEnumerateA = 7,
+                                    DirectSoundCaptureEnumerateW = 8,
+                                    DirectSoundCreate = 1,
+                                    DirectSoundCreate8 = 11,
+                                    DirectSoundEnumerateA = 2,
+                                    DirectSoundEnumerateW = 3,
+                                    DirectSoundFullDuplexCreate = 10,
+                                    GetDeviceID = 9
+                                };
+
+                                switch (IMAGE_ORDINAL(thunk->u1.Ordinal))
+                                {
+                                case edsound::DirectSoundCaptureCreate:
+                                    p[j] = _DirectSoundCaptureCreate;
+                                    break;
+                                case edsound::DirectSoundCaptureCreate8:
+                                    p[j] = _DirectSoundCaptureCreate8;
+                                    break;
+                                case edsound::DirectSoundCaptureEnumerateA:
+                                    p[j] = _DirectSoundCaptureEnumerateA;
+                                    break;
+                                case edsound::DirectSoundCaptureEnumerateW:
+                                    p[j] = _DirectSoundCaptureEnumerateW;
+                                    break;
+                                case edsound::DirectSoundCreate:
+                                    p[j] = _DirectSoundCreate;
+                                    break;
+                                case edsound::DirectSoundCreate8:
+                                    p[j] = _DirectSoundCreate8;
+                                    break;
+                                case edsound::DirectSoundEnumerateA:
+                                    p[j] = _DirectSoundEnumerateA;
+                                    break;
+                                case edsound::DirectSoundEnumerateW:
+                                    p[j] = _DirectSoundEnumerateW;
+                                    break;
+                                case edsound::DirectSoundFullDuplexCreate:
+                                    p[j] = _DirectSoundFullDuplexCreate;
+                                    break;
+                                case edsound::GetDeviceID:
+                                    p[j] = _GetDeviceID;
+                                    break;
+                                default:
+                                    break;
+                                }
+                            }
+                            else if (!_stricmp(SelfName, "DINPUT8.DLL"))
                             {
-                            case edsound::DirectSoundCaptureCreate:
-                                p[j] = _DirectSoundCaptureCreate;
-                                break;
-                            case edsound::DirectSoundCaptureCreate8:
-                                p[j] = _DirectSoundCaptureCreate8;
-                                break;
-                            case edsound::DirectSoundCaptureEnumerateA:
-                                p[j] = _DirectSoundCaptureEnumerateA;
-                                break;
-                            case edsound::DirectSoundCaptureEnumerateW:
-                                p[j] = _DirectSoundCaptureEnumerateW;
-                                break;
-                            case edsound::DirectSoundCreate:
-                                p[j] = _DirectSoundCreate;
-                                break;
-                            case edsound::DirectSoundCreate8:
-                                p[j] = _DirectSoundCreate8;
-                                break;
-                            case edsound::DirectSoundEnumerateA:
-                                p[j] = _DirectSoundEnumerateA;
-                                break;
-                            case edsound::DirectSoundEnumerateW:
-                                p[j] = _DirectSoundEnumerateW;
-                                break;
-                            case edsound::DirectSoundFullDuplexCreate:
-                                p[j] = _DirectSoundFullDuplexCreate;
-                                break;
-                            case edsound::GetDeviceID:
-                                p[j] = _GetDeviceID;
-                                break;
-                            default:
-                                break;
+                                DWORD Protect;
+                                VirtualProtect(&p[j], 4, PAGE_EXECUTE_READWRITE, &Protect);
+
+                                if ((IMAGE_ORDINAL(thunk->u1.Ordinal)) == 1)
+                                    p[j] = _DirectInput8Create;
                             }
                         }
-                        else if (!_stricmp(SelfName, "DINPUT8.DLL"))
-                        {
-                            DWORD Protect;
-                            VirtualProtect(&p[j], 4, PAGE_EXECUTE_READWRITE, &Protect);
-
-                            if ((IMAGE_ORDINAL(thunk->u1.Ordinal)) == 1)
-                                p[j] = _DirectInput8Create;
-                        }
+                        ++thunk;
                     }
-                    ++thunk;
                 }
             }
         }
+    };
+
+    ModuleList dlls;
+    dlls.Enumerate();
+    for (auto& e : dlls.m_moduleList)
+    {
+        if (std::get<2>(e) == true)
+            PatchOrdinals((size_t)std::get<0>(e));
     }
 }
 

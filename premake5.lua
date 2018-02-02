@@ -26,6 +26,7 @@ project "Ultimate-ASI-Loader-x86"
    files { "source/resources/*.rc" }
    files { "external/d3d8to9/source/*.h", "external/d3d8to9/source/*.cpp" }
    files { "external/MemoryModule/*.h", "external/MemoryModule/*.c" }
+   files { "external/ModuleList/*.hpp" }
 
    local dxsdk = os.getenv "DXSDK_DIR" or "Error: DXSDK_DIR not set!"
    includedirs { dxsdk .. "/include" }
@@ -61,7 +62,7 @@ project "MessageBox"
       defines { "NDEBUG" }
       optimize "On"
       flags { "StaticRuntime" }
-	  
+      
 project "ExeUnprotect"
    kind "SharedLib"
    language "C++"
