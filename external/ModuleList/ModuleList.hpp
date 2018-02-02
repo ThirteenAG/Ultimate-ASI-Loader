@@ -5,6 +5,34 @@
 #include <cassert>
 #include <tuple>
 
+std::wstring GetModuleFileNameW(HMODULE hModule)
+{
+	static constexpr auto INITIAL_BUFFER_SIZE = MAX_PATH;
+	static constexpr auto MAX_ITERATIONS = 7;
+	std::wstring ret;
+	auto bufferSize = INITIAL_BUFFER_SIZE;
+	for (size_t iterations = 0; iterations < MAX_ITERATIONS; ++iterations)
+	{
+		ret.resize(bufferSize);
+		auto charsReturned = GetModuleFileNameW(hModule, &ret[0], bufferSize);
+		if (charsReturned < ret.length())
+		{
+			ret.resize(charsReturned);
+			return ret;
+		}
+		else
+		{
+			bufferSize *= 2;
+		}
+	}
+	return L"";
+}
+
+auto starts_with = [](const std::wstring &big_str, const std::wstring &small_str) -> auto
+{
+	return big_str.compare(0, small_str.length(), small_str) == 0;
+};
+
 // Stores a list of loaded modules with their names, WITHOUT extension
 class ModuleList
 {
@@ -115,58 +143,29 @@ public:
 private:
 	void EnumerateInternal( HMODULE* modules, size_t numModules )
 	{
-		size_t moduleNameLength = MAX_PATH;
-		wchar_t* moduleName = static_cast<wchar_t*>( malloc( moduleNameLength * sizeof(moduleName[0]) ) );
-		if ( moduleName != nullptr )
+		m_moduleList.reserve(numModules);
+		for (size_t i = 0; i < numModules; i++)
 		{
-			m_moduleList.reserve( numModules );
-			for ( size_t i = 0; i < numModules; i++ )
+			// Obtain module name, with resizing if necessary
+			auto moduleName = GetModuleFileNameW(*modules);
+
+			if (!moduleName.empty())
 			{
-				// Obtain module name, with resizing if necessary
-				DWORD size;
-				while ( size = GetModuleFileNameW( *modules, moduleName, moduleNameLength ), size == moduleNameLength )
+				const wchar_t* nameBegin = wcsrchr(moduleName.c_str(), '\\') + 1;
+				const wchar_t* dotPos = wcsrchr(nameBegin, '.');
+				bool isLocal = starts_with(std::wstring(moduleName), GetModuleFileNameW(NULL).substr(0, GetModuleFileNameW(NULL).find_last_of(L"/\\")));
+
+				if (dotPos != nullptr)
 				{
-					wchar_t* newName = static_cast<wchar_t*>( realloc( moduleName, 2 * moduleNameLength * sizeof(moduleName[0]) ) );
-					if ( newName != nullptr )
-					{
-						moduleName = newName;
-						moduleNameLength *= 2;
-					}
-					else
-					{
-						size = 0;
-						break;
-					}
+					m_moduleList.emplace_back(*modules, std::wstring(nameBegin, std::distance(nameBegin, dotPos)), isLocal);
 				}
-
-				if ( size != 0 )
+				else
 				{
-					const wchar_t* nameBegin = wcsrchr( moduleName, '\\' ) + 1;
-					const wchar_t* dotPos = wcsrchr( nameBegin, '.' );
-
-					wchar_t* exeName = static_cast<wchar_t*>(malloc(moduleNameLength * sizeof(moduleName[0])));
-					GetModuleFileNameW(NULL, exeName, moduleNameLength);
-					
-					static auto starts_with = [](const std::wstring &big_str, const std::wstring &small_str) -> bool
-					{
-						return big_str.compare(0, small_str.length(), small_str) == 0;
-					};
-
-					bool isLocal = starts_with(std::wstring(moduleName), std::wstring(exeName, std::wstring(exeName).find_last_of(L"/\\")));
-
-					if ( dotPos != nullptr )
-					{
-						m_moduleList.emplace_back( *modules, std::wstring( nameBegin, std::distance( nameBegin, dotPos ) ), isLocal );
-					}
-					else
-					{
-						m_moduleList.emplace_back( *modules, nameBegin, isLocal );
-					}
+					m_moduleList.emplace_back(*modules, nameBegin, isLocal);
 				}
-				modules++;
 			}
 
-			free( moduleName );
+			modules++;
 		}
 	}
 
