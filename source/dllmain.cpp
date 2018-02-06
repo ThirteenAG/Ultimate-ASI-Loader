@@ -1,4 +1,5 @@
 #include "dllmain.h"
+
 #if !X64
 #include <d3d8to9\source\d3d8to9.hpp>
 extern "C" Direct3D8 *WINAPI Direct3DCreate8(UINT SDKVersion);
@@ -6,7 +7,63 @@ extern "C" Direct3D8 *WINAPI Direct3DCreate8(UINT SDKVersion);
 
 HMODULE hm;
 bool bLoadedPluginsYet, bOriginalLibraryLoaded;
-char iniPath[MAX_PATH];
+std::wstring iniPath;
+
+template <typename T, typename V>
+bool iequals(const T& s1, const V& s2)
+{
+    T str1(s1); T str2(s2);
+    std::transform(str1.begin(), str1.end(), str1.begin(), ::tolower);
+    std::transform(str2.begin(), str2.end(), str2.begin(), ::tolower);
+    return (str1 == str2);
+}
+
+template <typename T>
+std::wstring to_wstring(T cstr)
+{
+    std::string str = cstr;
+    auto charsReturned = MultiByteToWideChar(CP_UTF8, 0, &str[0], (int)str.size(), NULL, 0);
+    std::wstring wstrTo(charsReturned, 0);
+    MultiByteToWideChar(CP_UTF8, 0, &str[0], (int)str.size(), &wstrTo[0], charsReturned);
+    return wstrTo;
+}
+
+std::wstring SHGetKnownFolderPath(REFKNOWNFOLDERID rfid, DWORD dwFlags, HANDLE hToken)
+{
+    WCHAR* szSystemPath = nullptr;
+    HRESULT result = SHGetKnownFolderPath(rfid, dwFlags, hToken, &szSystemPath);
+    std::wstring r = szSystemPath;
+    CoTaskMemFree(szSystemPath);
+    return r;
+};
+
+HMODULE LoadLibraryW(std::wstring lpLibFileName)
+{
+    return LoadLibraryW(lpLibFileName.c_str());
+}
+
+std::wstring GetCurrentDirectoryW()
+{
+    static constexpr auto INITIAL_BUFFER_SIZE = MAX_PATH;
+    static constexpr auto MAX_ITERATIONS = 7;
+    std::wstring ret;
+    auto bufferSize = INITIAL_BUFFER_SIZE;
+    for (size_t iterations = 0; iterations < MAX_ITERATIONS; ++iterations)
+    {
+        ret.resize(bufferSize);
+        auto charsReturned = GetCurrentDirectoryW(bufferSize, &ret[0]);
+        if (charsReturned < ret.length())
+        {
+            ret.resize(charsReturned);
+            return ret;
+        }
+        else
+        {
+            bufferSize *= 2;
+        }
+    }
+    return L"";
+}
 
 enum Kernel32ExportsNames
 {
@@ -48,15 +105,11 @@ void LoadOriginalLibrary()
 {
     bOriginalLibraryLoaded = true;
 
-    char SelfPath[MAX_PATH];
-    char szSystemPath[MAX_PATH];
-    GetModuleFileName(hm, SelfPath, MAX_PATH);
-    auto SelfName = strrchr(SelfPath, '\\');
-    SHGetFolderPath(NULL, CSIDL_SYSTEM, NULL, 0, szSystemPath);
-    strcat_s(szSystemPath, SelfName);
+    auto szSelfName = GetModuleFileNameW(hm).substr(GetModuleFileNameW(hm).find_last_of(L"/\\") + 1);
+    auto szSystemPath = SHGetKnownFolderPath(FOLDERID_System, 0, nullptr) + L'\\' + szSelfName;
 
 #if !X64
-    if (_stricmp(SelfName + 1, "vorbisFile.dll") == NULL)
+    if (iequals(szSelfName, L"vorbisFile.dll"))
     {
         HRSRC hResource = FindResource(hm, MAKEINTRESOURCE(IDR_VBHKD), RT_RCDATA);
         if (hResource)
@@ -83,39 +136,39 @@ void LoadOriginalLibrary()
             }
         }
     }
-    else if (_stricmp(SelfName + 1, "dsound.dll") == NULL) {
-        dsound.LoadOriginalLibrary(LoadLibrary(szSystemPath));
+    else if (iequals(szSelfName, L"dsound.dll")) {
+        dsound.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
     }
-    else if (_stricmp(SelfName + 1, "dinput8.dll") == NULL) {
-        dinput8.LoadOriginalLibrary(LoadLibrary(szSystemPath));
+    else if (iequals(szSelfName, L"dinput8.dll")) {
+        dinput8.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
     }
-    else if (_stricmp(SelfName + 1, "ddraw.dll") == NULL) {
-        ddraw.LoadOriginalLibrary(LoadLibrary(szSystemPath));
+    else if (iequals(szSelfName, L"ddraw.dll")) {
+        ddraw.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
     }
-    else if (_stricmp(SelfName + 1, "d3d8.dll") == NULL) {
-        d3d8.LoadOriginalLibrary(LoadLibrary(szSystemPath));
-        if (GetPrivateProfileInt("globalsets", "used3d8to9", FALSE, iniPath))
+    else if (iequals(szSelfName, L"d3d8.dll")) {
+        d3d8.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
+        if (GetPrivateProfileIntW(L"globalsets", L"used3d8to9", FALSE, iniPath.c_str()))
             d3d8.Direct3DCreate8 = (FARPROC)Direct3DCreate8;
     }
-    else if (_stricmp(SelfName + 1, "d3d9.dll") == NULL) {
-        d3d9.LoadOriginalLibrary(LoadLibrary(szSystemPath));
+    else if (iequals(szSelfName, L"d3d9.dll")) {
+        d3d9.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
     }
-    else if (_stricmp(SelfName + 1, "d3d11.dll") == NULL) {
-        d3d11.LoadOriginalLibrary(LoadLibrary(szSystemPath));
+    else if (iequals(szSelfName, L"d3d11.dll")) {
+        d3d11.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
     }
-    else if (_stricmp(SelfName + 1, "winmmbase.dll") == NULL) {
-        winmmbase.LoadOriginalLibrary(LoadLibrary(szSystemPath));
+    else if (iequals(szSelfName, L"winmmbase.dll")) {
+        winmmbase.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
     }
-    else if (_stricmp(SelfName + 1, "msacm32.dll") == NULL) {
-        msacm32.LoadOriginalLibrary(LoadLibrary(szSystemPath));
+    else if (iequals(szSelfName, L"msacm32.dll")) {
+        msacm32.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
     }
-    else if (_stricmp(SelfName + 1, "dinput.dll") == NULL) {
-        dinput.LoadOriginalLibrary(LoadLibrary(szSystemPath));
+    else if (iequals(szSelfName, L"dinput.dll")) {
+        dinput.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
     }
-    else if (_stricmp(SelfName + 1, "msvfw32.dll") == NULL) {
-        msvfw32.LoadOriginalLibrary(LoadLibrary(szSystemPath));
+    else if (iequals(szSelfName, L"msvfw32.dll")) {
+        msvfw32.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
     }
-    else if (_stricmp(SelfName + 1, "xlive.dll") == NULL) {
+    else if (iequals(szSelfName, L"xlive.dll")) {
         // Unprotect image - make .text and .rdata section writeable
         // get load address of the exe
         size_t dwLoadOffset = (size_t)GetModuleHandle(NULL);
@@ -142,11 +195,11 @@ void LoadOriginalLibrary()
         ExitProcess(0);
     }
 #else
-        if (_stricmp(SelfName + 1, "dsound.dll") == NULL) {
-            dsound.LoadOriginalLibrary(LoadLibrary(szSystemPath));
+        if (iequals(szSelfName, L"dsound.dll")) {
+            dsound.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
         }
-        else if (_stricmp(SelfName + 1, "dinput8.dll") == NULL) {
-            dinput8.LoadOriginalLibrary(LoadLibrary(szSystemPath));
+        else if (iequals(szSelfName, L"dinput8.dll")) {
+            dinput8.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
         }
         else
         {
@@ -159,7 +212,7 @@ void LoadOriginalLibrary()
 #if !X64
 void Direct3D8DisableMaximizedWindowedModeShim()
 {
-    auto nDirect3D8DisableMaximizedWindowedModeShim = GetPrivateProfileInt("globalsets", "Direct3D8DisableMaximizedWindowedModeShim", FALSE, iniPath);
+    auto nDirect3D8DisableMaximizedWindowedModeShim = GetPrivateProfileIntW(L"globalsets", L"Direct3D8DisableMaximizedWindowedModeShim", FALSE, iniPath.c_str());
     if (nDirect3D8DisableMaximizedWindowedModeShim)
     {
         HMODULE pd3d8 = NULL;
@@ -169,13 +222,10 @@ void Direct3D8DisableMaximizedWindowedModeShim()
         }
         else
         {
-            pd3d8 = LoadLibrary("d3d8.dll");
+            pd3d8 = LoadLibraryW(L"d3d8.dll");
             if (!pd3d8)
             {
-                TCHAR szSystemPath[MAX_PATH];
-                SHGetFolderPath(NULL, CSIDL_SYSTEM, NULL, 0, szSystemPath);
-                strcat_s(szSystemPath, "\\d3d8.dll");
-                pd3d8 = LoadLibrary(szSystemPath);
+                pd3d8 = LoadLibraryW(SHGetKnownFolderPath(FOLDERID_System, 0, nullptr) + L'\\' + L"d3d8.dll");
             }
         }
 
@@ -195,44 +245,34 @@ void Direct3D8DisableMaximizedWindowedModeShim()
 }
 #endif
 
-void FindFiles(WIN32_FIND_DATA* fd)
+void FindFiles(WIN32_FIND_DATAW* fd)
 {
-    char dir[MAX_PATH] = { 0 };
-    GetCurrentDirectory(MAX_PATH, dir);
+    auto dir = GetCurrentDirectoryW();
 
-    HANDLE asiFile = FindFirstFile("*.asi", fd);
+    HANDLE asiFile = FindFirstFileW(L"*.asi", fd);
     if (asiFile != INVALID_HANDLE_VALUE)
     {
         do {
             if (!(fd->dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
             {
-                auto pos = strlen(fd->cFileName);
+                auto pos = wcslen(fd->cFileName);
 
                 if (fd->cFileName[pos - 4] == '.' &&
                    (fd->cFileName[pos - 3] == 'a' || fd->cFileName[pos - 3] == 'A') &&
                    (fd->cFileName[pos - 2] == 's' || fd->cFileName[pos - 2] == 'S') &&
                    (fd->cFileName[pos - 1] == 'i' || fd->cFileName[pos - 1] == 'I'))
                 {
-                    char path[MAX_PATH] = { 0 };
-                    strcat(path, dir);
-                    strcat(path, "\\");
-                    strcat(path, fd->cFileName);
-
-                    auto h = LoadLibrary(path);
-                    SetCurrentDirectory(dir); //in case asi switched it
+                    auto path = dir + L'\\' + fd->cFileName;
+                    auto h = LoadLibraryW(path);
+                    SetCurrentDirectoryW(dir.c_str()); //in case asi switched it
 
                     if (h == NULL)
                     {
                         auto e = GetLastError();
                         if (e != ERROR_DLL_INIT_FAILED) // in case dllmain returns false
                         {
-                            char msg[200] = { 0 }; char err[15];
-                            strcat(msg, "Unable to load ");
-                            strcat(msg, fd->cFileName);
-                            strcat(msg, ". Error: ");
-                            sprintf(err, "%d", e);
-                            strcat(msg, err);
-                            MessageBox(0, msg, "ASI Loader", MB_ICONERROR);
+                            std::wstring msg = L"Unable to load " + std::wstring(fd->cFileName) + L". Error: " + std::to_wstring(e);
+                            MessageBoxW(0, msg.c_str(), L"ASI Loader", MB_ICONERROR);
                         }
                     }
                     else
@@ -246,24 +286,21 @@ void FindFiles(WIN32_FIND_DATA* fd)
                     }
                 }
             }
-        } while (FindNextFile(asiFile, fd));
+        } while (FindNextFileW(asiFile, fd));
         FindClose(asiFile);
     }
 }
 
 void LoadPlugins()
 {
-    char oldDir[MAX_PATH]; // store the current directory
-    GetCurrentDirectory(MAX_PATH, oldDir);
+    auto oldDir = GetCurrentDirectoryW(); // store the current directory
 
-    char selfPath[MAX_PATH];
-    GetModuleFileName(hm, selfPath, MAX_PATH);
-    *strrchr(selfPath, '\\') = '\0';
-    SetCurrentDirectory(selfPath);
+    auto szSelfPath = GetModuleFileNameW(hm).substr(0, GetModuleFileNameW(hm).find_last_of(L"/\\") + 1);
+    SetCurrentDirectoryW(szSelfPath.c_str());
 
 #if !X64
-    LoadLibrary(".\\modloader\\modupdater.asi");
-    LoadLibrary(".\\modloader\\modloader.asi");
+    LoadLibraryW(L".\\modloader\\modupdater.asi");
+    LoadLibraryW(L".\\modloader\\modloader.asi");
 
     std::fstream wndmode_ini;
     wndmode_ini.open("wndmode.ini", std::ios_base::out | std::ios_base::in | std::ios_base::binary);
@@ -316,27 +353,27 @@ void LoadPlugins()
     }
 #endif
 
-    auto nWantsToLoadPlugins = GetPrivateProfileInt("globalsets", "loadplugins", TRUE, iniPath);
-    auto nWantsToLoadFromScriptsOnly = GetPrivateProfileInt("globalsets", "loadfromscriptsonly", FALSE, iniPath);
+    auto nWantsToLoadPlugins = GetPrivateProfileIntW(L"globalsets", L"loadplugins", TRUE, iniPath.c_str());
+    auto nWantsToLoadFromScriptsOnly = GetPrivateProfileIntW(L"globalsets", L"loadfromscriptsonly", FALSE, iniPath.c_str());
 
     if (nWantsToLoadPlugins)
     {
-        WIN32_FIND_DATA fd;
+        WIN32_FIND_DATAW fd;
         if (!nWantsToLoadFromScriptsOnly)
             FindFiles(&fd);
 
-        SetCurrentDirectory(selfPath);
+        SetCurrentDirectoryW(szSelfPath.c_str());
 
-        if (SetCurrentDirectory("scripts\\"))
+        if (SetCurrentDirectoryW(L"scripts\\"))
             FindFiles(&fd);
 
-        SetCurrentDirectory(selfPath);
+        SetCurrentDirectoryW(szSelfPath.c_str());
 
-        if (SetCurrentDirectory("plugins\\"))
+        if (SetCurrentDirectoryW(L"plugins\\"))
             FindFiles(&fd);
     }
 
-    SetCurrentDirectory(oldDir); // Reset the current directory
+    SetCurrentDirectoryW(oldDir.c_str()); // Reset the current directory
 }
 
 void LoadEverything()
@@ -608,11 +645,9 @@ void HookKernel32IAT()
     }
 
     // Fixing ordinals
-    char SelfPath[MAX_PATH];
-    GetModuleFileName(hm, SelfPath, MAX_PATH);
-    auto SelfName = strrchr(SelfPath, '\\') + 1;
+    auto szSelfName = GetModuleFileNameW(hm).substr(GetModuleFileNameW(hm).find_last_of(L"/\\") + 1);
 
-    static auto PatchOrdinals = [&SelfName](size_t hInstance)
+    static auto PatchOrdinals = [&szSelfName](size_t hInstance)
     {
         IMAGE_NT_HEADERS*           ntHeader = (IMAGE_NT_HEADERS*)(hInstance + ((IMAGE_DOS_HEADER*)hInstance)->e_lfanew);
         IMAGE_IMPORT_DESCRIPTOR*    pImports = (IMAGE_IMPORT_DESCRIPTOR*)(hInstance + ntHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress);
@@ -622,7 +657,7 @@ void HookKernel32IAT()
         {
             if ((size_t)(hInstance + (pImports + i)->Name) < getSectionEnd(ntHeader, (size_t)hInstance))
             {
-                if (!_stricmp((const char*)(hInstance + (pImports + i)->Name), SelfName))
+                if (iequals(szSelfName, (to_wstring((const char*)(hInstance + (pImports + i)->Name)))))
                 {
                     PIMAGE_THUNK_DATA thunk = (PIMAGE_THUNK_DATA)(hInstance + (pImports + i)->OriginalFirstThunk);
                     size_t j = 0;
@@ -632,7 +667,7 @@ void HookKernel32IAT()
                         {
                             PIMAGE_IMPORT_BY_NAME import = (PIMAGE_IMPORT_BY_NAME)(hInstance + thunk->u1.AddressOfData);
                             void** p = (void**)(hInstance + (pImports + i)->FirstThunk);
-                            if (!_stricmp(SelfName, "DSOUND.DLL"))
+                            if (iequals(szSelfName, L"dsound.dll"))
                             {
                                 DWORD Protect;
                                 VirtualProtect(&p[j], 4, PAGE_EXECUTE_READWRITE, &Protect);
@@ -687,7 +722,7 @@ void HookKernel32IAT()
                                     break;
                                 }
                             }
-                            else if (!_stricmp(SelfName, "DINPUT8.DLL"))
+                            else if (iequals(szSelfName, L"dinput8.dll"))
                             {
                                 DWORD Protect;
                                 VirtualProtect(&p[j], 4, PAGE_EXECUTE_READWRITE, &Protect);
@@ -707,18 +742,18 @@ void HookKernel32IAT()
     dlls.Enumerate();
     for (auto& e : dlls.m_moduleList)
     {
-        if (std::get<2>(e) == true)
+        if (std::get<2>(e) == true) //if dll is in local folder
             PatchOrdinals((size_t)std::get<0>(e));
     }
 }
 
 void Init()
 {
-    GetModuleFileName(hm, iniPath, MAX_PATH);
-    *strrchr(iniPath, '\\') = '\0';
-    strcat_s(iniPath, "\\scripts\\global.ini");
+    iniPath = GetModuleFileNameW(hm);
+    iniPath.resize(iniPath.find_last_of(L"/\\"));
+    iniPath += L"\\scripts\\global.ini";
 
-    auto nForceEPHook = GetPrivateProfileInt("globalsets", "forceentrypointhook", TRUE, iniPath);
+    auto nForceEPHook = GetPrivateProfileIntW(L"globalsets", L"forceentrypointhook", TRUE, iniPath.c_str());
 
     if (GetModuleHandle(NULL) && nForceEPHook != FALSE)
     {

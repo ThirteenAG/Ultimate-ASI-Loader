@@ -1,6 +1,8 @@
 #pragma once
 #include <windows.h>
-#include <Shlobj.h>
+#include <cctype>
+#include <string>
+#include <shlobj.h>
 #include <stdio.h>
 #include <ModuleList\ModuleList.hpp>
 #if X64

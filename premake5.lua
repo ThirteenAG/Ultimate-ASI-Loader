@@ -3,6 +3,7 @@ workspace "Ultimate-ASI-Loader-x86"
    configurations { "Release", "Debug" }
    architecture "x86"
    location "build"
+   buildoptions {"-std:c++latest"}
    
    defines { "rsc_CompanyName=\"ThirteenAG\"" }
    defines { "rsc_LegalCopyright=\"MIT License\""} 
@@ -89,6 +90,7 @@ workspace "Ultimate-ASI-Loader-x64"
    configurations { "Release", "Debug" }
    architecture "x86_64"
    location "build"
+   buildoptions {"-std:c++latest"}
    
    defines { "rsc_CompanyName=\"ThirteenAG\"" }
    defines { "rsc_LegalCopyright=\"MIT License\""} 
