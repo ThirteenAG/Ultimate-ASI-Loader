@@ -4,7 +4,11 @@
 #include <string>
 #include <shlobj.h>
 #include <stdio.h>
+#include <functional>
+#include <set>
 #include <ModuleList\ModuleList.hpp>
+#include <intrin.h>  
+#pragma intrinsic(_ReturnAddress) 
 #if X64
 #include <dsound.h>
 #endif

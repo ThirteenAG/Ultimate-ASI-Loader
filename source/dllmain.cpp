@@ -65,6 +65,27 @@ std::wstring GetCurrentDirectoryW()
     return L"";
 }
 
+template<typename T, typename... Args>
+void GetSections(T& h, Args... args)
+{
+    std::set<std::string> s;
+    (s.insert(args), ...);
+    size_t dwLoadOffset = (size_t)GetModuleHandle(NULL);
+    BYTE* pImageBase = reinterpret_cast<BYTE *>(dwLoadOffset);
+    PIMAGE_DOS_HEADER   pDosHeader = reinterpret_cast<PIMAGE_DOS_HEADER>(dwLoadOffset);
+    PIMAGE_NT_HEADERS   pNtHeader = reinterpret_cast<PIMAGE_NT_HEADERS>(pImageBase + pDosHeader->e_lfanew);
+    PIMAGE_SECTION_HEADER pSection = IMAGE_FIRST_SECTION(pNtHeader);
+    for (int iSection = 0; iSection < pNtHeader->FileHeader.NumberOfSections; ++iSection, ++pSection)
+    {
+        auto pszSectionName = reinterpret_cast<char*>(pSection->Name);
+        if (s.find(pszSectionName) != s.end())
+        {
+            DWORD dwPhysSize = (pSection->Misc.VirtualSize + 4095) & ~4095;
+            h(pSection, dwLoadOffset, dwPhysSize);
+        }
+    }
+}
+
 enum Kernel32ExportsNames
 {
     eGetStartupInfoA,
@@ -170,24 +191,13 @@ void LoadOriginalLibrary()
     }
     else if (iequals(szSelfName, L"xlive.dll")) {
         // Unprotect image - make .text and .rdata section writeable
-        // get load address of the exe
-        size_t dwLoadOffset = (size_t)GetModuleHandle(NULL);
-        BYTE * pImageBase = reinterpret_cast<BYTE *>(dwLoadOffset);
-        PIMAGE_DOS_HEADER   pDosHeader = reinterpret_cast<PIMAGE_DOS_HEADER>(dwLoadOffset);
-        PIMAGE_NT_HEADERS   pNtHeader = reinterpret_cast<PIMAGE_NT_HEADERS>(pImageBase + pDosHeader->e_lfanew);
-        PIMAGE_SECTION_HEADER pSection = IMAGE_FIRST_SECTION(pNtHeader);
-
-        for (int iSection = 0; iSection < pNtHeader->FileHeader.NumberOfSections; ++iSection, ++pSection) {
-            char * pszSectionName = reinterpret_cast<char *>(pSection->Name);
-            if (!strcmp(pszSectionName, ".text") || !strcmp(pszSectionName, ".rdata")) {
-                DWORD dwPhysSize = (pSection->Misc.VirtualSize + 4095) & ~4095;
-                DWORD	oldProtect;
-                DWORD   newProtect = (pSection->Characteristics & IMAGE_SCN_MEM_EXECUTE) ? PAGE_EXECUTE_READWRITE : PAGE_READWRITE;
-                if (!VirtualProtect(reinterpret_cast <VOID *>(dwLoadOffset + pSection->VirtualAddress), dwPhysSize, newProtect, &oldProtect)) {
-                    ExitProcess(0);
-                }
+        GetSections([&](PIMAGE_SECTION_HEADER pSection, size_t dwLoadOffset, DWORD dwPhysSize) {
+            DWORD oldProtect = 0;
+            DWORD newProtect = (pSection->Characteristics & IMAGE_SCN_MEM_EXECUTE) ? PAGE_EXECUTE_READWRITE : PAGE_READWRITE;
+            if (!VirtualProtect(reinterpret_cast<VOID*>(dwLoadOffset + pSection->VirtualAddress), dwPhysSize, newProtect, &oldProtect)) {
+                ExitProcess(0);
             }
-        }
+        }, ".text", ".rdata");
     }
     else
     {
@@ -195,17 +205,17 @@ void LoadOriginalLibrary()
         ExitProcess(0);
     }
 #else
-        if (iequals(szSelfName, L"dsound.dll")) {
-            dsound.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
-        }
-        else if (iequals(szSelfName, L"dinput8.dll")) {
-            dinput8.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
-        }
-        else
-        {
-            MessageBox(0, "This library isn't supported. Try to rename it to dsound.dll or dinput8.dll.", "ASI Loader", MB_ICONERROR);
-            ExitProcess(0);
-        }
+    if (iequals(szSelfName, L"dsound.dll")) {
+        dsound.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
+    }
+    else if (iequals(szSelfName, L"dinput8.dll")) {
+        dinput8.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
+    }
+    else
+    {
+        MessageBox(0, "This library isn't supported. Try to rename it to dsound.dll or dinput8.dll.", "ASI Loader", MB_ICONERROR);
+        ExitProcess(0);
+    }
 #endif
 }
 
@@ -258,9 +268,9 @@ void FindFiles(WIN32_FIND_DATAW* fd)
                 auto pos = wcslen(fd->cFileName);
 
                 if (fd->cFileName[pos - 4] == '.' &&
-                   (fd->cFileName[pos - 3] == 'a' || fd->cFileName[pos - 3] == 'A') &&
-                   (fd->cFileName[pos - 2] == 's' || fd->cFileName[pos - 2] == 'S') &&
-                   (fd->cFileName[pos - 1] == 'i' || fd->cFileName[pos - 1] == 'I'))
+                    (fd->cFileName[pos - 3] == 'a' || fd->cFileName[pos - 3] == 'A') &&
+                    (fd->cFileName[pos - 2] == 's' || fd->cFileName[pos - 2] == 'S') &&
+                    (fd->cFileName[pos - 1] == 'i' || fd->cFileName[pos - 1] == 'I'))
                 {
                     auto path = dir + L'\\' + fd->cFileName;
                     auto h = LoadLibraryW(path);
@@ -390,8 +400,16 @@ void LoadEverything()
     }
 }
 
-void LoadPluginsAndRestoreIAT()
+void LoadPluginsAndRestoreIAT(uintptr_t retaddr)
 {
+    //steam drm check
+    GetSections([&](PIMAGE_SECTION_HEADER pSection, size_t dwLoadOffset, DWORD dwPhysSize) {
+        auto dwStart = static_cast<uintptr_t>(dwLoadOffset + pSection->VirtualAddress);
+        auto dwEnd = dwStart + dwPhysSize;
+        if (retaddr >= dwStart && retaddr <= dwEnd)
+            return;
+    }, ".bind");
+
     LoadEverything();
 
     for (size_t i = 0; i < Kernel32ExportsNamesCount; i++)
@@ -409,49 +427,49 @@ void LoadPluginsAndRestoreIAT()
 
 void WINAPI CustomGetStartupInfoA(LPSTARTUPINFOA lpStartupInfo)
 {
-    LoadPluginsAndRestoreIAT();
+    LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress());
     return GetStartupInfoA(lpStartupInfo);
 }
 
 void WINAPI CustomGetStartupInfoW(LPSTARTUPINFOW lpStartupInfo)
 {
-    LoadPluginsAndRestoreIAT();
+    LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress());
     return GetStartupInfoW(lpStartupInfo);
 }
 
 HMODULE WINAPI CustomGetModuleHandleA(LPCSTR lpModuleName)
 {
-    LoadPluginsAndRestoreIAT();
+    LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress());
     return GetModuleHandleA(lpModuleName);
 }
 
 HMODULE WINAPI CustomGetModuleHandleW(LPCWSTR lpModuleName)
 {
-    LoadPluginsAndRestoreIAT();
+    LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress());
     return GetModuleHandleW(lpModuleName);
 }
 
 FARPROC WINAPI CustomGetProcAddress(HMODULE hModule, LPCSTR lpProcName)
 {
-    LoadPluginsAndRestoreIAT();
+    LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress());
     return GetProcAddress(hModule, lpProcName);
 }
 
 DWORD WINAPI CustomGetShortPathNameA(LPCSTR lpszLongPath, LPSTR lpszShortPath, DWORD cchBuffer)
 {
-    LoadPluginsAndRestoreIAT();
+    LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress());
     return GetShortPathNameA(lpszLongPath, lpszShortPath, cchBuffer);
 }
 
 BOOL WINAPI CustomFindNextFileA(HANDLE hFindFile, LPWIN32_FIND_DATAA lpFindFileData)
 {
-    LoadPluginsAndRestoreIAT();
+    LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress());
     return FindNextFileA(hFindFile, lpFindFileData);
 }
 
 BOOL WINAPI CustomFindNextFileW(HANDLE hFindFile, LPWIN32_FIND_DATAW lpFindFileData)
 {
-    LoadPluginsAndRestoreIAT();
+    LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress());
     return FindNextFileW(hFindFile, lpFindFileData);
 }
 
@@ -481,19 +499,19 @@ BOOL WINAPI CustomFreeLibrary(HMODULE hLibModule)
 
 HANDLE WINAPI CustomCreateEventA(LPSECURITY_ATTRIBUTES lpEventAttributes, BOOL bManualReset, BOOL bInitialState, LPCTSTR lpName)
 {
-    LoadPluginsAndRestoreIAT();
+    LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress());
     return CreateEventA(lpEventAttributes, bManualReset, bInitialState, lpName);
 }
 
 HANDLE WINAPI CustomCreateEventW(LPSECURITY_ATTRIBUTES lpEventAttributes, BOOL bManualReset, BOOL bInitialState, LPCWSTR lpName)
 {
-    LoadPluginsAndRestoreIAT();
+    LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress());
     return CreateEventW(lpEventAttributes, bManualReset, bInitialState, lpName);
 }
 
 void WINAPI CustomGetSystemInfo(LPSYSTEM_INFO lpSystemInfo)
 {
-    LoadPluginsAndRestoreIAT();
+    LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress());
     return GetSystemInfo(lpSystemInfo);
 }
 
@@ -504,20 +522,20 @@ void HookKernel32IAT()
     IMAGE_IMPORT_DESCRIPTOR*    pImports = (IMAGE_IMPORT_DESCRIPTOR*)(hExecutableInstance + ntHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress);
     size_t                      nNumImports = ntHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].Size / sizeof(IMAGE_IMPORT_DESCRIPTOR) - 1;
 
-    Kernel32Data[eGetStartupInfoA]  [ProcAddress] = (size_t)GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "GetStartupInfoA");
-    Kernel32Data[eGetStartupInfoW]  [ProcAddress] = (size_t)GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "GetStartupInfoW");
-    Kernel32Data[eGetModuleHandleA] [ProcAddress] = (size_t)GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "GetModuleHandleA");
-    Kernel32Data[eGetModuleHandleW] [ProcAddress] = (size_t)GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "GetModuleHandleW");
-    Kernel32Data[eGetProcAddress]   [ProcAddress] = (size_t)GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "GetProcAddress");
+    Kernel32Data[eGetStartupInfoA][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "GetStartupInfoA");
+    Kernel32Data[eGetStartupInfoW][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "GetStartupInfoW");
+    Kernel32Data[eGetModuleHandleA][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "GetModuleHandleA");
+    Kernel32Data[eGetModuleHandleW][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "GetModuleHandleW");
+    Kernel32Data[eGetProcAddress][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "GetProcAddress");
     Kernel32Data[eGetShortPathNameA][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "GetShortPathNameA");
-    Kernel32Data[eFindNextFileA]    [ProcAddress] = (size_t)GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "FindNextFileA");
-    Kernel32Data[eFindNextFileW]    [ProcAddress] = (size_t)GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "FindNextFileW");
-    Kernel32Data[eLoadLibraryA]     [ProcAddress] = (size_t)GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "LoadLibraryA");
-    Kernel32Data[eLoadLibraryW]     [ProcAddress] = (size_t)GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "LoadLibraryW");
-    Kernel32Data[eFreeLibrary]      [ProcAddress] = (size_t)GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "FreeLibrary");
-    Kernel32Data[eCreateEventA]     [ProcAddress] = (size_t)GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "CreateEventA");
-    Kernel32Data[eCreateEventW]     [ProcAddress] = (size_t)GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "CreateEventW");
-    Kernel32Data[eGetSystemInfo]    [ProcAddress] = (size_t)GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "GetSystemInfo");
+    Kernel32Data[eFindNextFileA][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "FindNextFileA");
+    Kernel32Data[eFindNextFileW][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "FindNextFileW");
+    Kernel32Data[eLoadLibraryA][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "LoadLibraryA");
+    Kernel32Data[eLoadLibraryW][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "LoadLibraryW");
+    Kernel32Data[eFreeLibrary][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "FreeLibrary");
+    Kernel32Data[eCreateEventA][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "CreateEventA");
+    Kernel32Data[eCreateEventW][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "CreateEventW");
+    Kernel32Data[eGetSystemInfo][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "GetSystemInfo");
 
     auto PatchIAT = [&nNumImports, &hExecutableInstance, &pImports](size_t start, size_t end, size_t exe_end)
     {
@@ -529,9 +547,9 @@ void HookKernel32IAT()
 
         if (!end) { end = start + 0x100; }
         if (end > exe_end) //for very broken exes
-        { 
+        {
             start = hExecutableInstance;
-            end = exe_end; 
+            end = exe_end;
         }
 
         for (auto i = start; i < end; i += sizeof(size_t))
@@ -633,7 +651,7 @@ void HookKernel32IAT()
     };
 
     auto hExecutableInstance_end = getSectionEnd(ntHeader, hExecutableInstance);
-    
+
     // Find kernel32.dll
     for (size_t i = 0; i < nNumImports; i++)
     {
