@@ -33,7 +33,7 @@ project "Ultimate-ASI-Loader-x86"
    includedirs { dxsdk .. "/include" }
    libdirs { dxsdk .. "/lib/x86" }
    
-   characterset ("MBCS")
+   characterset ("UNICODE")
    
    filter "configurations:Debug"
       defines { "DEBUG" }
@@ -53,7 +53,7 @@ project "MessageBox"
    files { "source/demo_plugins/MessageBox.cpp" }
    files { "source/resources/Versioninfo.rc" }
 
-   characterset ("MBCS")
+   characterset ("UNICODE")
    
    filter "configurations:Debug"
       defines { "DEBUG" }
@@ -73,7 +73,7 @@ project "ExeUnprotect"
    files { "source/demo_plugins/ExeUnprotect.cpp" }
    files { "source/resources/Versioninfo.rc" }
 
-   characterset ("MBCS")
+   characterset ("UNICODE")
    
    filter "configurations:Debug"
       defines { "DEBUG" }
@@ -115,7 +115,7 @@ project "Ultimate-ASI-Loader-x64"
    files { "source/x64.def" }
    files { "source/resources/Versioninfo.rc" }
    
-   characterset ("MBCS")
+   characterset ("UNICODE")
    
    filter "configurations:Debug"
       defines { "DEBUG" }
@@ -135,7 +135,7 @@ project "RE7Demo.InfiniteAmmo"
    files { "source/demo_plugins/RE7Demo.InfiniteAmmo.cpp" }
    files { "source/resources/Versioninfo.rc" }
 
-   characterset ("MBCS")
+   characterset ("UNICODE")
    
    filter "configurations:Debug"
       defines { "DEBUG" }
