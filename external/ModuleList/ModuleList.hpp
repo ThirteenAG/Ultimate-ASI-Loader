@@ -37,9 +37,16 @@ auto starts_with = [](const std::wstring &big_str, const std::wstring &small_str
 class ModuleList
 {
 public:
+	enum class SearchLocation
+	{
+		All,
+		LocalOnly,
+		SystemOnly,
+	};
+
 	// Initializes module list
 	// Needs to be called before any calls to Get or GetAll
-	void Enumerate()
+	void Enumerate( SearchLocation location = SearchLocation::All )
 	{
 		constexpr size_t INITIAL_SIZE = sizeof(HMODULE) * 256;
 		HMODULE* modules = static_cast<HMODULE*>(malloc( INITIAL_SIZE ));
@@ -77,13 +84,13 @@ public:
 
 							if ( pEnumProcessModules( currentProcess, modules, cbNeeded, &cbNeeded ) != 0 )
 							{
-								EnumerateInternal( modules, cbNeeded / sizeof(HMODULE) );
+								EnumerateInternal( modules, location, cbNeeded / sizeof(HMODULE) );
 							}
 						}
 					}
 					else
 					{
-						EnumerateInternal( modules, cbNeeded / sizeof(HMODULE) );
+						EnumerateInternal( modules, location, cbNeeded / sizeof(HMODULE) );
 					}
 				}
 			}
@@ -98,10 +105,10 @@ public:
 	}
 
 	// Recreates module list
-	void ReEnumerate()
+	void ReEnumerate( SearchLocation location = SearchLocation::All )
 	{
 		Clear();
-		Enumerate();
+		Enumerate( location );
 	}
 
 	// Clears module list
@@ -141,8 +148,10 @@ public:
 	}
 
 private:
-	void EnumerateInternal( HMODULE* modules, size_t numModules )
+	void EnumerateInternal( HMODULE* modules, SearchLocation location, size_t numModules )
 	{
+		const auto exeModulePath = GetModuleFileNameW(NULL).substr(0, GetModuleFileNameW(NULL).find_last_of(L"/\\"));
+
 		m_moduleList.reserve(numModules);
 		for (size_t i = 0; i < numModules; i++)
 		{
@@ -153,15 +162,18 @@ private:
 			{
 				const wchar_t* nameBegin = wcsrchr(moduleName.c_str(), '\\') + 1;
 				const wchar_t* dotPos = wcsrchr(nameBegin, '.');
-				bool isLocal = starts_with(std::wstring(moduleName), GetModuleFileNameW(NULL).substr(0, GetModuleFileNameW(NULL).find_last_of(L"/\\")));
+				bool isLocal = starts_with(std::wstring(moduleName), exeModulePath);
 
-				if (dotPos != nullptr)
+				if ( (isLocal && location != SearchLocation::SystemOnly) || (!isLocal && location != SearchLocation::LocalOnly) )
 				{
-					m_moduleList.emplace_back(*modules, std::wstring(nameBegin, std::distance(nameBegin, dotPos)), isLocal);
-				}
-				else
-				{
-					m_moduleList.emplace_back(*modules, nameBegin, isLocal);
+					if (dotPos != nullptr)
+					{
+						m_moduleList.emplace_back(*modules, std::wstring(nameBegin, dotPos), isLocal);
+					}
+					else
+					{
+						m_moduleList.emplace_back(*modules, nameBegin, isLocal);
+					}
 				}
 			}
 

@@ -782,8 +782,7 @@ void Init()
 		if (nFindModule)
 		{
 			ModuleList dlls;
-			dlls.Enumerate();
-			dlls.m_moduleList.erase(std::remove_if(dlls.m_moduleList.begin(), dlls.m_moduleList.end(), [](const auto& e) { return std::get<2>(e) == false; }), dlls.m_moduleList.end());
+			dlls.Enumerate( ModuleList::SearchLocation::LocalOnly );
 			auto ual = std::find_if(dlls.m_moduleList.begin(), dlls.m_moduleList.end(), [](auto const& it)
 			{
 				return std::get<HMODULE>(it) == hm;
