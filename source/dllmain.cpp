@@ -7,7 +7,7 @@ extern "C" Direct3D8 *WINAPI Direct3DCreate8(UINT SDKVersion);
 
 HMODULE hm;
 bool bLoadedPluginsYet, bOriginalLibraryLoaded;
-std::wstring iniPath;
+std::vector<std::wstring> iniPaths;
 
 template <typename T, typename V>
 bool iequals(const T& s1, const V& s2)
@@ -63,6 +63,21 @@ std::wstring GetCurrentDirectoryW()
 		}
 	}
 	return L"";
+}
+
+UINT GetPrivateProfileIntW( LPCWSTR lpAppName, LPCWSTR lpKeyName, INT nDefault, const std::vector<std::wstring>& fileNames )
+{
+	for ( const auto& file : fileNames )
+	{
+		nDefault = GetPrivateProfileIntW( lpAppName, lpKeyName, nDefault, file.c_str() );
+	}
+	return nDefault;
+}
+
+std::wstring GetSelfName()
+{
+	const std::wstring moduleFileName = GetModuleFileNameW(hm);
+	return moduleFileName.substr(moduleFileName.find_last_of(L"/\\") + 1);
 }
 
 template<typename T, typename... Args>
@@ -126,7 +141,7 @@ void LoadOriginalLibrary()
 {
 	bOriginalLibraryLoaded = true;
 
-	auto szSelfName = GetModuleFileNameW(hm).substr(GetModuleFileNameW(hm).find_last_of(L"/\\") + 1);
+	auto szSelfName = GetSelfName();
 	auto szSystemPath = SHGetKnownFolderPath(FOLDERID_System, 0, nullptr) + L'\\' + szSelfName;
 
 #if !X64
@@ -168,7 +183,7 @@ void LoadOriginalLibrary()
 	}
 	else if (iequals(szSelfName, L"d3d8.dll")) {
 		d3d8.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
-		if (GetPrivateProfileIntW(L"globalsets", L"used3d8to9", FALSE, iniPath.c_str()))
+		if (GetPrivateProfileIntW(L"globalsets", L"used3d8to9", FALSE, iniPaths))
 			d3d8.Direct3DCreate8 = (FARPROC)Direct3DCreate8;
 	}
 	else if (iequals(szSelfName, L"d3d9.dll")) {
@@ -189,6 +204,9 @@ void LoadOriginalLibrary()
 	else if (iequals(szSelfName, L"msvfw32.dll")) {
 		msvfw32.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
 	}
+	else if (iequals(szSelfName, L"wininet.dll")) {
+		wininet.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
+	}
 	else if (iequals(szSelfName, L"xlive.dll")) {
 		// Unprotect image - make .text and .rdata section writeable
 		GetSections([&](PIMAGE_SECTION_HEADER pSection, size_t dwLoadOffset, DWORD dwPhysSize) {
@@ -201,7 +219,7 @@ void LoadOriginalLibrary()
 	}
 	else
 	{
-		MessageBox(0, TEXT("This library isn't supported. Try to rename it to d3d8.dll, d3d9.dll, d3d11.dll, winmmbase.dll, msacm32.dll, dinput.dll, dinput8.dll, dsound.dll, vorbisFile.dll, msvfw32.dll, xlive.dll or ddraw.dll."), TEXT("ASI Loader"), MB_ICONERROR);
+		MessageBox(0, TEXT("This library isn't supported. Try to rename it to d3d8.dll, d3d9.dll, d3d11.dll, winmmbase.dll, wininet.dll, msacm32.dll, dinput.dll, dinput8.dll, dsound.dll, vorbisFile.dll, msvfw32.dll, xlive.dll or ddraw.dll."), TEXT("ASI Loader"), MB_ICONERROR);
 		ExitProcess(0);
 	}
 #else
@@ -211,9 +229,12 @@ void LoadOriginalLibrary()
 	else if (iequals(szSelfName, L"dinput8.dll")) {
 		dinput8.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
 	}
+	else if (iequals(szSelfName, L"wininet.dll")) {
+		wininet.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
+	}
 	else
 	{
-		MessageBox(0, TEXT("This library isn't supported. Try to rename it to dsound.dll or dinput8.dll."), TEXT("ASI Loader"), MB_ICONERROR);
+		MessageBox(0, TEXT("This library isn't supported. Try to rename it to dsound.dll, dinput8.dll or wininet.dll."), TEXT("ASI Loader"), MB_ICONERROR);
 		ExitProcess(0);
 	}
 #endif
@@ -222,7 +243,7 @@ void LoadOriginalLibrary()
 #if !X64
 void Direct3D8DisableMaximizedWindowedModeShim()
 {
-	auto nDirect3D8DisableMaximizedWindowedModeShim = GetPrivateProfileIntW(L"globalsets", L"Direct3D8DisableMaximizedWindowedModeShim", FALSE, iniPath.c_str());
+	auto nDirect3D8DisableMaximizedWindowedModeShim = GetPrivateProfileIntW(L"globalsets", L"Direct3D8DisableMaximizedWindowedModeShim", FALSE, iniPaths);
 	if (nDirect3D8DisableMaximizedWindowedModeShim)
 	{
 		HMODULE pd3d8 = NULL;
@@ -363,8 +384,8 @@ void LoadPlugins()
 	}
 #endif
 
-	auto nWantsToLoadPlugins = GetPrivateProfileIntW(L"globalsets", L"loadplugins", TRUE, iniPath.c_str());
-	auto nWantsToLoadFromScriptsOnly = GetPrivateProfileIntW(L"globalsets", L"loadfromscriptsonly", FALSE, iniPath.c_str());
+	auto nWantsToLoadPlugins = GetPrivateProfileIntW(L"globalsets", L"loadplugins", TRUE, iniPaths);
+	auto nWantsToLoadFromScriptsOnly = GetPrivateProfileIntW(L"globalsets", L"loadfromscriptsonly", FALSE, iniPaths);
 
 	if (nWantsToLoadPlugins)
 	{
@@ -400,8 +421,12 @@ void LoadEverything()
 	}
 }
 
+static bool restoredOnce = false;
 void LoadPluginsAndRestoreIAT(uintptr_t retaddr)
 {
+	if ( restoredOnce ) return;
+	restoredOnce = true;
+
 	//steam drm check
 	GetSections([&](PIMAGE_SECTION_HEADER pSection, size_t dwLoadOffset, DWORD dwPhysSize) {
 		auto dwStart = static_cast<uintptr_t>(dwLoadOffset + pSection->VirtualAddress);
@@ -515,29 +540,32 @@ void WINAPI CustomGetSystemInfo(LPSYSTEM_INFO lpSystemInfo)
 	return GetSystemInfo(lpSystemInfo);
 }
 
-void HookKernel32IAT(HMODULE mod)
+void HookKernel32IAT(HMODULE mod, bool exe)
 {
 	auto hExecutableInstance = (size_t)mod;
 	IMAGE_NT_HEADERS*           ntHeader = (IMAGE_NT_HEADERS*)(hExecutableInstance + ((IMAGE_DOS_HEADER*)hExecutableInstance)->e_lfanew);
 	IMAGE_IMPORT_DESCRIPTOR*    pImports = (IMAGE_IMPORT_DESCRIPTOR*)(hExecutableInstance + ntHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress);
 	size_t                      nNumImports = ntHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].Size / sizeof(IMAGE_IMPORT_DESCRIPTOR) - 1;
 
-	Kernel32Data[eGetStartupInfoA][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "GetStartupInfoA");
-	Kernel32Data[eGetStartupInfoW][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "GetStartupInfoW");
-	Kernel32Data[eGetModuleHandleA][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "GetModuleHandleA");
-	Kernel32Data[eGetModuleHandleW][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "GetModuleHandleW");
-	Kernel32Data[eGetProcAddress][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "GetProcAddress");
-	Kernel32Data[eGetShortPathNameA][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "GetShortPathNameA");
-	Kernel32Data[eFindNextFileA][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "FindNextFileA");
-	Kernel32Data[eFindNextFileW][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "FindNextFileW");
-	Kernel32Data[eLoadLibraryA][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "LoadLibraryA");
-	Kernel32Data[eLoadLibraryW][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "LoadLibraryW");
-	Kernel32Data[eFreeLibrary][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "FreeLibrary");
-	Kernel32Data[eCreateEventA][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "CreateEventA");
-	Kernel32Data[eCreateEventW][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "CreateEventW");
-	Kernel32Data[eGetSystemInfo][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "GetSystemInfo");
+	if ( exe )
+	{
+		Kernel32Data[eGetStartupInfoA][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "GetStartupInfoA");
+		Kernel32Data[eGetStartupInfoW][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "GetStartupInfoW");
+		Kernel32Data[eGetModuleHandleA][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "GetModuleHandleA");
+		Kernel32Data[eGetModuleHandleW][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "GetModuleHandleW");
+		Kernel32Data[eGetProcAddress][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "GetProcAddress");
+		Kernel32Data[eGetShortPathNameA][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "GetShortPathNameA");
+		Kernel32Data[eFindNextFileA][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "FindNextFileA");
+		Kernel32Data[eFindNextFileW][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "FindNextFileW");
+		Kernel32Data[eLoadLibraryA][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "LoadLibraryA");
+		Kernel32Data[eLoadLibraryW][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "LoadLibraryW");
+		Kernel32Data[eFreeLibrary][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "FreeLibrary");
+		Kernel32Data[eCreateEventA][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "CreateEventA");
+		Kernel32Data[eCreateEventW][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "CreateEventW");
+		Kernel32Data[eGetSystemInfo][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "GetSystemInfo");
+	}
 
-	auto PatchIAT = [&nNumImports, &hExecutableInstance, &pImports](size_t start, size_t end, size_t exe_end)
+	auto PatchIAT = [&nNumImports, &hExecutableInstance, &pImports, exe](size_t start, size_t end, size_t exe_end)
 	{
 		for (size_t i = 0; i < nNumImports; i++)
 		{
@@ -561,72 +589,72 @@ void HookKernel32IAT(HMODULE mod)
 
 			if (ptr == Kernel32Data[eGetStartupInfoA][ProcAddress])
 			{
-				Kernel32Data[eGetStartupInfoA][IATPtr] = i;
+				if ( exe ) Kernel32Data[eGetStartupInfoA][IATPtr] = i;
 				*(size_t*)i = (size_t)CustomGetStartupInfoA;
 			}
 			else if (ptr == Kernel32Data[eGetStartupInfoW][ProcAddress])
 			{
-				Kernel32Data[eGetStartupInfoW][IATPtr] = i;
+				if ( exe ) Kernel32Data[eGetStartupInfoW][IATPtr] = i;
 				*(size_t*)i = (size_t)CustomGetStartupInfoW;
 			}
 			else if (ptr == Kernel32Data[eGetModuleHandleA][ProcAddress])
 			{
-				Kernel32Data[eGetModuleHandleA][IATPtr] = i;
+				if ( exe ) Kernel32Data[eGetModuleHandleA][IATPtr] = i;
 				*(size_t*)i = (size_t)CustomGetModuleHandleA;
 			}
 			else if (ptr == Kernel32Data[eGetModuleHandleW][ProcAddress])
 			{
-				Kernel32Data[eGetModuleHandleW][IATPtr] = i;
+				if ( exe ) Kernel32Data[eGetModuleHandleW][IATPtr] = i;
 				*(size_t*)i = (size_t)CustomGetModuleHandleW;
 			}
 			else if (ptr == Kernel32Data[eGetProcAddress][ProcAddress])
 			{
-				Kernel32Data[eGetProcAddress][IATPtr] = i;
+				if ( exe ) Kernel32Data[eGetProcAddress][IATPtr] = i;
 				*(size_t*)i = (size_t)CustomGetProcAddress;
 			}
 			else if (ptr == Kernel32Data[eGetShortPathNameA][ProcAddress])
 			{
-				Kernel32Data[eGetShortPathNameA][IATPtr] = i;
+				if ( exe ) Kernel32Data[eGetShortPathNameA][IATPtr] = i;
 				*(size_t*)i = (size_t)CustomGetShortPathNameA;
 			}
 			else if (ptr == Kernel32Data[eFindNextFileA][ProcAddress])
 			{
-				Kernel32Data[eFindNextFileA][IATPtr] = i;
+				if ( exe ) Kernel32Data[eFindNextFileA][IATPtr] = i;
 				*(size_t*)i = (size_t)CustomFindNextFileA;
 			}
 			else if (ptr == Kernel32Data[eFindNextFileW][ProcAddress])
 			{
-				Kernel32Data[eFindNextFileW][IATPtr] = i;
+				if ( exe ) Kernel32Data[eFindNextFileW][IATPtr] = i;
 				*(size_t*)i = (size_t)CustomFindNextFileW;
 			}
 			else if (ptr == Kernel32Data[eLoadLibraryA][ProcAddress])
 			{
-				Kernel32Data[eLoadLibraryA][IATPtr] = i;
+				if ( exe ) Kernel32Data[eLoadLibraryA][IATPtr] = i;
 				*(size_t*)i = (size_t)CustomLoadLibraryA;
 			}
 			else if (ptr == Kernel32Data[eLoadLibraryW][ProcAddress])
 			{
-				Kernel32Data[eLoadLibraryW][IATPtr] = i;
+				if ( exe ) Kernel32Data[eLoadLibraryW][IATPtr] = i;
 				*(size_t*)i = (size_t)CustomLoadLibraryW;
 			}
 			else if (ptr == Kernel32Data[eFreeLibrary][ProcAddress])
 			{
-				Kernel32Data[eFreeLibrary][IATPtr] = i;
+				if ( exe ) Kernel32Data[eFreeLibrary][IATPtr] = i;
 				*(size_t*)i = (size_t)CustomFreeLibrary;
 			}
 			else if (ptr == Kernel32Data[eCreateEventA][ProcAddress])
 			{
-				Kernel32Data[eCreateEventA][IATPtr] = i;
+				if ( exe ) Kernel32Data[eCreateEventA][IATPtr] = i;
 				*(size_t*)i = (size_t)CustomCreateEventA;
 			}
 			else if (ptr == Kernel32Data[eCreateEventW][ProcAddress])
 			{
-				Kernel32Data[eCreateEventW][IATPtr] = i;
+				if ( exe ) Kernel32Data[eCreateEventW][IATPtr] = i;
 				*(size_t*)i = (size_t)CustomCreateEventW;
 			}
 			else if (ptr == Kernel32Data[eGetSystemInfo][ProcAddress])
 			{
-				Kernel32Data[eGetSystemInfo][IATPtr] = i;
+				if ( exe ) Kernel32Data[eGetSystemInfo][IATPtr] = i;
 				*(size_t*)i = (size_t)CustomGetSystemInfo;
 			}
 
@@ -663,7 +691,7 @@ void HookKernel32IAT(HMODULE mod)
 	}
 
 	// Fixing ordinals
-	auto szSelfName = GetModuleFileNameW(hm).substr(GetModuleFileNameW(hm).find_last_of(L"/\\") + 1);
+	auto szSelfName = GetSelfName();
 
 	static auto PatchOrdinals = [&szSelfName](size_t hInstance)
 	{
@@ -757,33 +785,35 @@ void HookKernel32IAT(HMODULE mod)
 	};
 
 	ModuleList dlls;
-	dlls.Enumerate();
+	dlls.Enumerate( ModuleList::SearchLocation::LocalOnly );
 	for (auto& e : dlls.m_moduleList)
 	{
-		if (std::get<2>(e) == true) //if dll is in local folder
-			PatchOrdinals((size_t)std::get<0>(e));
+		PatchOrdinals((size_t)std::get<HMODULE>(e));
 	}
 }
 
 void Init()
 {
-	iniPath = GetModuleFileNameW(hm);
-	iniPath.resize(iniPath.find_last_of(L"/\\"));
-	iniPath += L"\\scripts\\global.ini";
+	std::wstring modulePath = GetModuleFileNameW(hm);
+	modulePath.resize(modulePath.find_last_of(L"/\\") + 1);
+	iniPaths.emplace_back( modulePath + L"global.ini" );
+	iniPaths.emplace_back( modulePath + L"scripts\\global.ini" );
+	iniPaths.emplace_back( modulePath + L"plugins\\global.ini" );
 
-	auto nForceEPHook = GetPrivateProfileInt(TEXT("globalsets"), TEXT("forceentrypointhook"), TRUE, iniPath.c_str());
-	auto nDontLoadFromDllMain = GetPrivateProfileInt(TEXT("globalsets"), TEXT("dontloadfromdllmain"), TRUE, iniPath.c_str());
-	auto nFindModule = GetPrivateProfileInt(TEXT("globalsets"), TEXT("findmodule"), FALSE, iniPath.c_str());
-
-	HMODULE m = GetModuleHandle(NULL);
+	auto nForceEPHook = GetPrivateProfileInt(TEXT("globalsets"), TEXT("forceentrypointhook"), TRUE, iniPaths);
+	auto nDontLoadFromDllMain = GetPrivateProfileInt(TEXT("globalsets"), TEXT("dontloadfromdllmain"), TRUE, iniPaths);
+	auto nFindModule = GetPrivateProfileInt(TEXT("globalsets"), TEXT("findmodule"), FALSE, iniPaths);
 
 	if (nForceEPHook != FALSE || nDontLoadFromDllMain != FALSE)
 	{
+		HMODULE mainModule = GetModuleHandle(NULL);
+		HookKernel32IAT(mainModule, true);
+
+		HMODULE m = mainModule;
 		if (nFindModule)
 		{
 			ModuleList dlls;
-			dlls.Enumerate();
-			dlls.m_moduleList.erase(std::remove_if(dlls.m_moduleList.begin(), dlls.m_moduleList.end(), [](const auto& e) { return std::get<2>(e) == false; }), dlls.m_moduleList.end());
+			dlls.Enumerate( ModuleList::SearchLocation::LocalOnly );
 			auto ual = std::find_if(dlls.m_moduleList.begin(), dlls.m_moduleList.end(), [](auto const& it)
 			{
 				return std::get<HMODULE>(it) == hm;
@@ -795,7 +825,10 @@ void Init()
 			}
 		}
 
-		HookKernel32IAT(m);
+		if ( m != mainModule )
+		{
+			HookKernel32IAT(m, false);
+		}
 	}
 	else
 	{
