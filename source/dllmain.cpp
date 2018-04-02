@@ -7,7 +7,7 @@ extern "C" Direct3D8 *WINAPI Direct3DCreate8(UINT SDKVersion);
 
 HMODULE hm;
 bool bLoadedPluginsYet, bOriginalLibraryLoaded;
-std::wstring iniPath;
+std::vector<std::wstring> iniPaths;
 
 template <typename T, typename V>
 bool iequals(const T& s1, const V& s2)
@@ -63,6 +63,21 @@ std::wstring GetCurrentDirectoryW()
 		}
 	}
 	return L"";
+}
+
+UINT GetPrivateProfileIntW( LPCWSTR lpAppName, LPCWSTR lpKeyName, INT nDefault, const std::vector<std::wstring>& fileNames )
+{
+	for ( const auto& file : fileNames )
+	{
+		nDefault = GetPrivateProfileIntW( lpAppName, lpKeyName, nDefault, file.c_str() );
+	}
+	return nDefault;
+}
+
+std::wstring GetSelfName()
+{
+	const std::wstring moduleFileName = GetModuleFileNameW(hm);
+	return moduleFileName.substr(moduleFileName.find_last_of(L"/\\") + 1);
 }
 
 template<typename T, typename... Args>
@@ -126,7 +141,7 @@ void LoadOriginalLibrary()
 {
 	bOriginalLibraryLoaded = true;
 
-	auto szSelfName = GetModuleFileNameW(hm).substr(GetModuleFileNameW(hm).find_last_of(L"/\\") + 1);
+	auto szSelfName = GetSelfName();
 	auto szSystemPath = SHGetKnownFolderPath(FOLDERID_System, 0, nullptr) + L'\\' + szSelfName;
 
 #if !X64
@@ -168,7 +183,7 @@ void LoadOriginalLibrary()
 	}
 	else if (iequals(szSelfName, L"d3d8.dll")) {
 		d3d8.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
-		if (GetPrivateProfileIntW(L"globalsets", L"used3d8to9", FALSE, iniPath.c_str()))
+		if (GetPrivateProfileIntW(L"globalsets", L"used3d8to9", FALSE, iniPaths))
 			d3d8.Direct3DCreate8 = (FARPROC)Direct3DCreate8;
 	}
 	else if (iequals(szSelfName, L"d3d9.dll")) {
@@ -222,7 +237,7 @@ void LoadOriginalLibrary()
 #if !X64
 void Direct3D8DisableMaximizedWindowedModeShim()
 {
-	auto nDirect3D8DisableMaximizedWindowedModeShim = GetPrivateProfileIntW(L"globalsets", L"Direct3D8DisableMaximizedWindowedModeShim", FALSE, iniPath.c_str());
+	auto nDirect3D8DisableMaximizedWindowedModeShim = GetPrivateProfileIntW(L"globalsets", L"Direct3D8DisableMaximizedWindowedModeShim", FALSE, iniPaths);
 	if (nDirect3D8DisableMaximizedWindowedModeShim)
 	{
 		HMODULE pd3d8 = NULL;
@@ -363,8 +378,8 @@ void LoadPlugins()
 	}
 #endif
 
-	auto nWantsToLoadPlugins = GetPrivateProfileIntW(L"globalsets", L"loadplugins", TRUE, iniPath.c_str());
-	auto nWantsToLoadFromScriptsOnly = GetPrivateProfileIntW(L"globalsets", L"loadfromscriptsonly", FALSE, iniPath.c_str());
+	auto nWantsToLoadPlugins = GetPrivateProfileIntW(L"globalsets", L"loadplugins", TRUE, iniPaths);
+	auto nWantsToLoadFromScriptsOnly = GetPrivateProfileIntW(L"globalsets", L"loadfromscriptsonly", FALSE, iniPaths);
 
 	if (nWantsToLoadPlugins)
 	{
@@ -670,7 +685,7 @@ void HookKernel32IAT(HMODULE mod, bool exe)
 	}
 
 	// Fixing ordinals
-	auto szSelfName = GetModuleFileNameW(hm).substr(GetModuleFileNameW(hm).find_last_of(L"/\\") + 1);
+	auto szSelfName = GetSelfName();
 
 	static auto PatchOrdinals = [&szSelfName](size_t hInstance)
 	{
@@ -773,13 +788,15 @@ void HookKernel32IAT(HMODULE mod, bool exe)
 
 void Init()
 {
-	iniPath = GetModuleFileNameW(hm);
-	iniPath.resize(iniPath.find_last_of(L"/\\"));
-	iniPath += L"\\scripts\\global.ini";
+	std::wstring modulePath = GetModuleFileNameW(hm);
+	modulePath.resize(modulePath.find_last_of(L"/\\") + 1);
+	iniPaths.emplace_back( modulePath + L"global.ini" );
+	iniPaths.emplace_back( modulePath + L"scripts\\global.ini" );
+	iniPaths.emplace_back( modulePath + L"plugins\\global.ini" );
 
-	auto nForceEPHook = GetPrivateProfileInt(TEXT("globalsets"), TEXT("forceentrypointhook"), TRUE, iniPath.c_str());
-	auto nDontLoadFromDllMain = GetPrivateProfileInt(TEXT("globalsets"), TEXT("dontloadfromdllmain"), TRUE, iniPath.c_str());
-	auto nFindModule = GetPrivateProfileInt(TEXT("globalsets"), TEXT("findmodule"), FALSE, iniPath.c_str());
+	auto nForceEPHook = GetPrivateProfileInt(TEXT("globalsets"), TEXT("forceentrypointhook"), TRUE, iniPaths);
+	auto nDontLoadFromDllMain = GetPrivateProfileInt(TEXT("globalsets"), TEXT("dontloadfromdllmain"), TRUE, iniPaths);
+	auto nFindModule = GetPrivateProfileInt(TEXT("globalsets"), TEXT("findmodule"), FALSE, iniPaths);
 
 	if (nForceEPHook != FALSE || nDontLoadFromDllMain != FALSE)
 	{
