@@ -151,6 +151,28 @@ struct dsound_dll
     }
 } dsound;
 
+struct wininet_dll
+{
+	HMODULE dll;
+	FARPROC HttpQueryInfoA;
+	FARPROC InternetCloseHandle;
+	FARPROC InternetOpenA;
+	FARPROC InternetOpenUrlA;
+	FARPROC InternetReadFile;
+	FARPROC InternetSetStatusCallback;
+
+	void LoadOriginalLibrary(HMODULE module)
+	{
+		dll = module;
+		HttpQueryInfoA = GetProcAddress(dll, "HttpQueryInfoA");
+		InternetCloseHandle = GetProcAddress(dll, "InternetCloseHandle");
+		InternetOpenA = GetProcAddress(dll, "InternetOpenA");
+		InternetOpenUrlA = GetProcAddress(dll, "InternetOpenUrlA");
+		InternetReadFile = GetProcAddress(dll, "InternetReadFile");
+		InternetSetStatusCallback = GetProcAddress(dll, "InternetSetStatusCallback");
+	}
+} wininet;
+
 #if !X64
 struct dinput_dll
 {
@@ -1342,6 +1364,13 @@ __declspec(naked) void _MCIWndCreateW() { _asm { jmp[msvfw32.MCIWndCreateW] } }
 __declspec(naked) void _MCIWndRegisterClass() { _asm { jmp[msvfw32.MCIWndRegisterClass] } }
 __declspec(naked) void _StretchDIB() { _asm { jmp[msvfw32.StretchDIB] } }
 __declspec(naked) void _VideoForWindowsVersion() { _asm { jmp[msvfw32.VideoForWindowsVersion] } }
+
+__declspec(naked) void _HttpQueryInfoA() { _asm { jmp[wininet.HttpQueryInfoA] } }
+__declspec(naked) void _InternetCloseHandle() { _asm { jmp[wininet.InternetCloseHandle] } }
+__declspec(naked) void _InternetOpenA() { _asm { jmp[wininet.InternetOpenA] } }
+__declspec(naked) void _InternetOpenUrlA() { _asm { jmp[wininet.InternetOpenUrlA] } }
+__declspec(naked) void _InternetReadFile() { _asm { jmp[wininet.InternetReadFile] } }
+__declspec(naked) void _InternetSetStatusCallback() { _asm { jmp[wininet.InternetSetStatusCallback] } }
 #endif
 
 #if X64
@@ -1409,6 +1438,13 @@ void _DllGetClassObject()
     else
         (fn_DllGetClassObject)dsound.DllGetClassObject();
 }
+
+void _HttpQueryInfoA() { wininet.HttpQueryInfoA(); }
+void _InternetCloseHandle() { wininet.InternetCloseHandle(); }
+void _InternetOpenA() { wininet.InternetOpenA(); }
+void _InternetOpenUrlA() { wininet.InternetOpenUrlA(); }
+void _InternetReadFile() { wininet.InternetReadFile(); }
+void _InternetSetStatusCallback() { wininet.InternetSetStatusCallback(); }
 
 #pragma runtime_checks( "", restore )
 #endif

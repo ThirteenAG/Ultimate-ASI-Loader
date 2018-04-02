@@ -20,3 +20,12 @@ DirectSoundFullDuplexCreate = _DirectSoundFullDuplexCreate
 DllCanUnloadNow = _DllCanUnloadNow PRIVATE
 DllGetClassObject = _DllGetClassObject PRIVATE
 GetDeviceID = _GetDeviceID
+
+LIBRARY "wininet"
+EXPORTS
+HttpQueryInfoA = _HttpQueryInfoA
+InternetCloseHandle = _InternetCloseHandle
+InternetOpenA = _InternetOpenA
+InternetOpenUrlA = _InternetOpenUrlA
+InternetReadFile = _InternetReadFile
+InternetSetStatusCallback = _InternetSetStatusCallback

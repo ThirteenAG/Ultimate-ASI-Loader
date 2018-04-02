@@ -204,6 +204,9 @@ void LoadOriginalLibrary()
 	else if (iequals(szSelfName, L"msvfw32.dll")) {
 		msvfw32.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
 	}
+	else if (iequals(szSelfName, L"wininet.dll")) {
+		wininet.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
+	}
 	else if (iequals(szSelfName, L"xlive.dll")) {
 		// Unprotect image - make .text and .rdata section writeable
 		GetSections([&](PIMAGE_SECTION_HEADER pSection, size_t dwLoadOffset, DWORD dwPhysSize) {
@@ -225,6 +228,9 @@ void LoadOriginalLibrary()
 	}
 	else if (iequals(szSelfName, L"dinput8.dll")) {
 		dinput8.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
+	}
+	else if (iequals(szSelfName, L"wininet.dll")) {
+		wininet.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
 	}
 	else
 	{

@@ -418,6 +418,15 @@ MCIWndRegisterClass = _MCIWndRegisterClass
 StretchDIB = _StretchDIB
 VideoForWindowsVersion = _VideoForWindowsVersion
 
+LIBRARY "wininet"
+EXPORTS
+HttpQueryInfoA = _HttpQueryInfoA
+InternetCloseHandle = _InternetCloseHandle
+InternetOpenA = _InternetOpenA
+InternetOpenUrlA = _InternetOpenUrlA
+InternetReadFile = _InternetReadFile
+InternetSetStatusCallback = _InternetSetStatusCallback
+
 LIBRARY "xlive"
 EXPORTS
 _XWSAStartup@8 @1
