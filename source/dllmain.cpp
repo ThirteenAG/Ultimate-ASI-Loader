@@ -219,7 +219,7 @@ void LoadOriginalLibrary()
 	}
 	else
 	{
-		MessageBox(0, TEXT("This library isn't supported. Try to rename it to d3d8.dll, d3d9.dll, d3d11.dll, winmmbase.dll, msacm32.dll, dinput.dll, dinput8.dll, dsound.dll, vorbisFile.dll, msvfw32.dll, xlive.dll or ddraw.dll."), TEXT("ASI Loader"), MB_ICONERROR);
+		MessageBox(0, TEXT("This library isn't supported. Try to rename it to d3d8.dll, d3d9.dll, d3d11.dll, winmmbase.dll, wininet.dll, msacm32.dll, dinput.dll, dinput8.dll, dsound.dll, vorbisFile.dll, msvfw32.dll, xlive.dll or ddraw.dll."), TEXT("ASI Loader"), MB_ICONERROR);
 		ExitProcess(0);
 	}
 #else
@@ -234,7 +234,7 @@ void LoadOriginalLibrary()
 	}
 	else
 	{
-		MessageBox(0, TEXT("This library isn't supported. Try to rename it to dsound.dll or dinput8.dll."), TEXT("ASI Loader"), MB_ICONERROR);
+		MessageBox(0, TEXT("This library isn't supported. Try to rename it to dsound.dll, dinput8.dll or wininet.dll."), TEXT("ASI Loader"), MB_ICONERROR);
 		ExitProcess(0);
 	}
 #endif
