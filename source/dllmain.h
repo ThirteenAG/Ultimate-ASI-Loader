@@ -9,6 +9,23 @@
 #include <ModuleList\ModuleList.hpp>
 #include <intrin.h>  
 #pragma intrinsic(_ReturnAddress) 
+
+struct shared
+{
+	FARPROC DllCanUnloadNow;
+	FARPROC DllGetClassObject;
+	FARPROC DllRegisterServer;
+	FARPROC DllUnregisterServer;
+
+	void LoadOriginalLibrary(HMODULE dll)
+	{
+		DllCanUnloadNow = GetProcAddress(dll, "DllCanUnloadNow");
+		DllGetClassObject = GetProcAddress(dll, "DllGetClassObject");
+		DllRegisterServer = GetProcAddress(dll, "DllRegisterServer");
+		DllUnregisterServer = GetProcAddress(dll, "DllUnregisterServer");
+	}
+} shared;
+
 #if X64
 #include <dsound.h>
 #endif
@@ -101,19 +118,12 @@ struct dinput8_dll
 {
     HMODULE dll;
     FARPROC DirectInput8Create;
-    FARPROC DllCanUnloadNow;
-    FARPROC DllGetClassObject;
-    FARPROC DllRegisterServer;
-    FARPROC DllUnregisterServer;
 
     void LoadOriginalLibrary(HMODULE module)
     {
         dll = module;
+		shared.LoadOriginalLibrary(dll);
         DirectInput8Create = GetProcAddress(dll, "DirectInput8Create");
-        DllCanUnloadNow = GetProcAddress(dll, "DllCanUnloadNow");
-        DllGetClassObject = GetProcAddress(dll, "DllGetClassObject");
-        DllRegisterServer = GetProcAddress(dll, "DllRegisterServer");
-        DllUnregisterServer = GetProcAddress(dll, "DllUnregisterServer");
     }
 } dinput8;
 
@@ -129,13 +139,12 @@ struct dsound_dll
     FARPROC DirectSoundEnumerateA;
     FARPROC DirectSoundEnumerateW;
     FARPROC DirectSoundFullDuplexCreate;
-    FARPROC DllCanUnloadNow;
-    FARPROC DllGetClassObject;
     FARPROC GetDeviceID;
 
     void LoadOriginalLibrary(HMODULE module)
     {
         dll = module;
+		shared.LoadOriginalLibrary(dll);
         DirectSoundCaptureCreate = GetProcAddress(dll, "DirectSoundCaptureCreate");
         DirectSoundCaptureCreate8 = GetProcAddress(dll, "DirectSoundCaptureCreate8");
         DirectSoundCaptureEnumerateA = GetProcAddress(dll, "DirectSoundCaptureEnumerateA");
@@ -145,8 +154,6 @@ struct dsound_dll
         DirectSoundEnumerateA = GetProcAddress(dll, "DirectSoundEnumerateA");
         DirectSoundEnumerateW = GetProcAddress(dll, "DirectSoundEnumerateW");
         DirectSoundFullDuplexCreate = GetProcAddress(dll, "DirectSoundFullDuplexCreate");
-        DllCanUnloadNow = GetProcAddress(dll, "DllCanUnloadNow");
-        DllGetClassObject = GetProcAddress(dll, "DllGetClassObject");
         GetDeviceID = GetProcAddress(dll, "GetDeviceID");
     }
 } dsound;
@@ -192,11 +199,7 @@ struct wininet_dll
 	FARPROC DeleteWpadCacheForNetworks;
 	FARPROC DetectAutoProxyUrl;
 	FARPROC DispatchAPICall;
-	FARPROC DllCanUnloadNow;
-	FARPROC DllGetClassObject;
 	FARPROC DllInstall;
-	FARPROC DllRegisterServer;
-	FARPROC DllUnregisterServer;
 	FARPROC FindCloseUrlCache;
 	FARPROC FindFirstUrlCacheContainerA;
 	FARPROC FindFirstUrlCacheContainerW;
@@ -455,6 +458,7 @@ struct wininet_dll
 	void LoadOriginalLibrary(HMODULE module)
 	{
 		dll = module;
+		shared.LoadOriginalLibrary(dll);
 		AppCacheCheckManifest = GetProcAddress(dll, "AppCacheCheckManifest");
 		AppCacheCloseHandle = GetProcAddress(dll, "AppCacheCloseHandle");
 		AppCacheCreateAndCommitFile = GetProcAddress(dll, "AppCacheCreateAndCommitFile");
@@ -493,11 +497,7 @@ struct wininet_dll
 		DeleteWpadCacheForNetworks = GetProcAddress(dll, "DeleteWpadCacheForNetworks");
 		DetectAutoProxyUrl = GetProcAddress(dll, "DetectAutoProxyUrl");
 		DispatchAPICall = GetProcAddress(dll, "DispatchAPICall");
-		DllCanUnloadNow = GetProcAddress(dll, "DllCanUnloadNow");
-		DllGetClassObject = GetProcAddress(dll, "DllGetClassObject");
 		DllInstall = GetProcAddress(dll, "DllInstall");
-		DllRegisterServer = GetProcAddress(dll, "DllRegisterServer");
-		DllUnregisterServer = GetProcAddress(dll, "DllUnregisterServer");
 		FindCloseUrlCache = GetProcAddress(dll, "FindCloseUrlCache");
 		FindFirstUrlCacheContainerA = GetProcAddress(dll, "FindFirstUrlCacheContainerA");
 		FindFirstUrlCacheContainerW = GetProcAddress(dll, "FindFirstUrlCacheContainerW");
@@ -762,21 +762,14 @@ struct dinput_dll
     FARPROC DirectInputCreateA;
     FARPROC DirectInputCreateEx;
     FARPROC DirectInputCreateW;
-    FARPROC DllCanUnloadNow;
-    FARPROC DllGetClassObject;
-    FARPROC DllRegisterServer;
-    FARPROC DllUnregisterServer;
 
     void LoadOriginalLibrary(HMODULE module)
     {
         dll = module;
+		shared.LoadOriginalLibrary(dll);
         DirectInputCreateA = GetProcAddress(dll, "DirectInputCreateA");
         DirectInputCreateEx = GetProcAddress(dll, "DirectInputCreateEx");
         DirectInputCreateW = GetProcAddress(dll, "DirectInputCreateW");
-        DllCanUnloadNow = GetProcAddress(dll, "DllCanUnloadNow");
-        DllGetClassObject = GetProcAddress(dll, "DllGetClassObject");
-        DllRegisterServer = GetProcAddress(dll, "DllRegisterServer");
-        DllUnregisterServer = GetProcAddress(dll, "DllUnregisterServer");
     }
 } dinput;
 
@@ -792,6 +785,7 @@ struct d3d8_dll
     void LoadOriginalLibrary(HMODULE module)
     {
         dll = module;
+		shared.LoadOriginalLibrary(dll);
         DebugSetMute = GetProcAddress(dll, "DebugSetMute");
         Direct3D8EnableMaximizedWindowedModeShim = GetProcAddress(dll, "Direct3D8EnableMaximizedWindowedModeShim");
         Direct3DCreate8 = GetProcAddress(dll, "Direct3DCreate8");
@@ -822,6 +816,7 @@ struct d3d9_dll
     void LoadOriginalLibrary(HMODULE module)
     {
         dll = module;
+		shared.LoadOriginalLibrary(dll);
         D3DPERF_BeginEvent = GetProcAddress(dll, "D3DPERF_BeginEvent");
         D3DPERF_EndEvent = GetProcAddress(dll, "D3DPERF_EndEvent");
         D3DPERF_GetStatus = GetProcAddress(dll, "D3DPERF_GetStatus");
@@ -894,6 +889,7 @@ struct d3d11_dll
     void LoadOriginalLibrary(HMODULE module)
     {
         dll = module;
+		shared.LoadOriginalLibrary(dll);
         D3D11CoreCreateDevice = GetProcAddress(dll, "D3D11CoreCreateDevice");
         D3D11CoreCreateLayeredDevice = GetProcAddress(dll, "D3D11CoreCreateLayeredDevice");
         D3D11CoreGetLayeredDeviceSize = GetProcAddress(dll, "D3D11CoreGetLayeredDeviceSize");
@@ -961,8 +957,6 @@ struct ddraw_dll
     FARPROC DirectDrawEnumerateExA;
     FARPROC DirectDrawEnumerateExW;
     FARPROC DirectDrawEnumerateW;
-    FARPROC DllCanUnloadNow;
-    FARPROC DllGetClassObject;
     FARPROC GetDDSurfaceLocal;
     FARPROC GetOLEThunkData;
     FARPROC GetSurfaceFromDC;
@@ -973,6 +967,7 @@ struct ddraw_dll
     void LoadOriginalLibrary(HMODULE module)
     {
         dll = module;
+		shared.LoadOriginalLibrary(dll);
         AcquireDDThreadLock = GetProcAddress(dll, "AcquireDDThreadLock");
         CompleteCreateSysmemSurface = GetProcAddress(dll, "CompleteCreateSysmemSurface");
         D3DParseUnknownCommand = GetProcAddress(dll, "D3DParseUnknownCommand");
@@ -987,8 +982,6 @@ struct ddraw_dll
         DirectDrawEnumerateExA = GetProcAddress(dll, "DirectDrawEnumerateExA");
         DirectDrawEnumerateExW = GetProcAddress(dll, "DirectDrawEnumerateExW");
         DirectDrawEnumerateW = GetProcAddress(dll, "DirectDrawEnumerateW");
-        DllCanUnloadNow = GetProcAddress(dll, "DllCanUnloadNow");
-        DllGetClassObject = GetProcAddress(dll, "DllGetClassObject");
         GetDDSurfaceLocal = GetProcAddress(dll, "GetDDSurfaceLocal");
         GetOLEThunkData = GetProcAddress(dll, "GetOLEThunkData");
         GetSurfaceFromDC = GetProcAddress(dll, "GetSurfaceFromDC");
@@ -1156,6 +1149,7 @@ struct winmmbase_dll
     void LoadOriginalLibrary(HMODULE module)
     {
         dll = module;
+		shared.LoadOriginalLibrary(dll);
         CloseDriver = GetProcAddress(dll, "CloseDriver");
         DefDriverProc = GetProcAddress(dll, "DefDriverProc");
         DriverCallback = GetProcAddress(dll, "DriverCallback");
@@ -1359,6 +1353,7 @@ struct msacm32_dll
     void LoadOriginalLibrary(HMODULE module)
     {
         dll = module;
+		shared.LoadOriginalLibrary(dll);
         acmDriverAddA = GetProcAddress(dll, "acmDriverAddA");
         acmDriverAddW = GetProcAddress(dll, "acmDriverAddW");
         acmDriverClose = GetProcAddress(dll, "acmDriverClose");
@@ -1458,6 +1453,7 @@ struct msvfw32_dll
     void LoadOriginalLibrary(HMODULE module)
     {
         dll = module;
+		shared.LoadOriginalLibrary(dll);
         DrawDibBegin = GetProcAddress(dll, "DrawDibBegin");
         DrawDibChangePalette = GetProcAddress(dll, "DrawDibChangePalette");
         DrawDibClose = GetProcAddress(dll, "DrawDibClose");
@@ -1550,48 +1546,10 @@ __declspec(naked) void _DirectInputCreateA() { _asm { jmp[dinput.DirectInputCrea
 __declspec(naked) void _DirectInputCreateEx() { _asm { jmp[dinput.DirectInputCreateEx] } }
 __declspec(naked) void _DirectInputCreateW() { _asm { jmp[dinput.DirectInputCreateW] } }
 
-__declspec(naked) void _DllCanUnloadNow()
-{
-    if (dinput8.DllCanUnloadNow)
-        _asm { jmp[dinput8.DllCanUnloadNow] }
-    else if (dsound.DllCanUnloadNow)
-        _asm { jmp[dsound.DllCanUnloadNow] }
-    else if (ddraw.DllCanUnloadNow)
-        _asm { jmp[ddraw.DllCanUnloadNow] }
-	else if (wininet.DllCanUnloadNow)
-		_asm { jmp[wininet.DllCanUnloadNow] }
-}
-__declspec(naked) void _DllGetClassObject()
-{
-    if (dinput8.DllGetClassObject)
-        _asm { jmp[dinput8.DllGetClassObject] }
-    else if (dsound.DllGetClassObject)
-        _asm { jmp[dsound.DllGetClassObject] }
-    else if (ddraw.DllGetClassObject)
-        _asm { jmp[ddraw.DllGetClassObject] }
-	else if (wininet.DllGetClassObject)
-		_asm { jmp[wininet.DllGetClassObject] }
-}
-
-__declspec(naked) void _DllRegisterServer()
-{
-    if (dinput8.DllRegisterServer)
-        _asm { jmp[dinput8.DllRegisterServer] }
-    else if (dinput.DllRegisterServer)
-        _asm { jmp[dinput8.DllRegisterServer] }
-	else if (wininet.DllRegisterServer)
-		_asm { jmp[wininet.DllRegisterServer] }
-}
-
-__declspec(naked) void _DllUnregisterServer()
-{
-    if (dinput8.DllUnregisterServer)
-        _asm { jmp[dinput8.DllUnregisterServer] }
-    else if (dinput.DllUnregisterServer)
-        _asm { jmp[dinput8.DllUnregisterServer] }
-	else if (wininet.DllUnregisterServer)
-		_asm { jmp[wininet.DllUnregisterServer] }
-}
+__declspec(naked) void _DllCanUnloadNow() { _asm { jmp[shared.DllCanUnloadNow] } }
+__declspec(naked) void _DllGetClassObject() { _asm { jmp[shared.DllGetClassObject] } }
+__declspec(naked) void _DllRegisterServer() { _asm { jmp[shared.DllRegisterServer] } }
+__declspec(naked) void _DllUnregisterServer() { _asm { jmp[shared.DllUnregisterServer] } }
 
 __declspec(naked) void _DirectSoundCaptureCreate() { _asm { jmp[dsound.DirectSoundCaptureCreate] } }
 __declspec(naked) void _DirectSoundCaptureCreate8() { _asm { jmp[dsound.DirectSoundCaptureCreate8] } }
@@ -2289,40 +2247,10 @@ void _GetDeviceID() { (fn_GetDeviceID)dsound.GetDeviceID(); }
 typedef HRESULT(*fn_DirectInput8Create)(HINSTANCE hinst, DWORD dwVersion, REFIID riidltf, LPVOID * ppvOut, LPUNKNOWN punkOuter);
 void _DirectInput8Create() { (fn_DirectInput8Create)dinput8.DirectInput8Create(); }
 
-void _DllRegisterServer()
-{
-	if (dinput8.DllRegisterServer)
-		dinput8.DllRegisterServer();
-	else
-		wininet.DllRegisterServer();
-}
-
-void _DllUnregisterServer()
-{
-	if (dinput8.DllUnregisterServer)
-		dinput8.DllUnregisterServer();
-	else
-		wininet.DllUnregisterServer();
-}
-
-void _DllCanUnloadNow()
-{
-    if (dinput8.DllCanUnloadNow)
-        dinput8.DllCanUnloadNow();
-    else if (dsound.DllCanUnloadNow)
-        dsound.DllCanUnloadNow();
-	else
-		wininet.DllCanUnloadNow();
-}
-void _DllGetClassObject()
-{
-    if (dinput8.DllGetClassObject)
-        dinput8.DllGetClassObject();
-    else if (dsound.DllGetClassObject)
-        dsound.DllGetClassObject();
-	else
-		wininet.DllGetClassObject();
-}
+void _DllRegisterServer() { shared.DllRegisterServer(); }
+void _DllUnregisterServer() { shared.DllUnregisterServer(); }
+void _DllCanUnloadNow() { shared.DllCanUnloadNow(); }
+void _DllGetClassObject() { shared.DllGetClassObject(); }
 
 void _AppCacheCheckManifest() { wininet.AppCacheCheckManifest(); }
 void _AppCacheCloseHandle() { wininet.AppCacheCloseHandle(); }
