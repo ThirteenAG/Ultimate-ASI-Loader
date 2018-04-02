@@ -1345,6 +1345,12 @@ __declspec(naked) void _VideoForWindowsVersion() { _asm { jmp[msvfw32.VideoForWi
 #endif
 
 #if X64
+#pragma runtime_checks( "", off )
+
+#ifdef _DEBUG
+#pragma message ("You are compiling the code in Debug - be warned that wrappers for export functions may not have correct code generated")
+#endif
+
 typedef HRESULT(*fn_DirectSoundCaptureCreate)(LPGUID lpGUID, LPDIRECTSOUNDCAPTURE *lplpDSC, LPUNKNOWN pUnkOuter);
 void _DirectSoundCaptureCreate() { (fn_DirectSoundCaptureCreate)dsound.DirectSoundCaptureCreate(); }
 
@@ -1403,4 +1409,6 @@ void _DllGetClassObject()
     else
         (fn_DllGetClassObject)dsound.DllGetClassObject();
 }
+
+#pragma runtime_checks( "", restore )
 #endif
