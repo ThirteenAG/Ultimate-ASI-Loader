@@ -65,11 +65,11 @@ std::wstring GetCurrentDirectoryW()
 	return L"";
 }
 
-UINT GetPrivateProfileIntW( LPCWSTR lpAppName, LPCWSTR lpKeyName, INT nDefault, const std::vector<std::wstring>& fileNames )
+UINT GetPrivateProfileIntW(LPCWSTR lpAppName, LPCWSTR lpKeyName, INT nDefault, const std::vector<std::wstring>& fileNames)
 {
-	for ( const auto& file : fileNames )
+	for (const auto& file : fileNames)
 	{
-		nDefault = GetPrivateProfileIntW( lpAppName, lpKeyName, nDefault, file.c_str() );
+		nDefault = GetPrivateProfileIntW(lpAppName, lpKeyName, nDefault, file.c_str());
 	}
 	return nDefault;
 }
@@ -294,25 +294,29 @@ void FindFiles(WIN32_FIND_DATAW* fd)
 					(fd->cFileName[pos - 1] == 'i' || fd->cFileName[pos - 1] == 'I'))
 				{
 					auto path = dir + L'\\' + fd->cFileName;
-					auto h = LoadLibraryW(path);
-					SetCurrentDirectoryW(dir.c_str()); //in case asi switched it
 
-					if (h == NULL)
+					if (GetModuleHandle(path.c_str()) == NULL)
 					{
-						auto e = GetLastError();
-						if (e != ERROR_DLL_INIT_FAILED) // in case dllmain returns false
+						auto h = LoadLibraryW(path);
+						SetCurrentDirectoryW(dir.c_str()); //in case asi switched it
+
+						if (h == NULL)
 						{
-							std::wstring msg = L"Unable to load " + std::wstring(fd->cFileName) + L". Error: " + std::to_wstring(e);
-							MessageBoxW(0, msg.c_str(), L"ASI Loader", MB_ICONERROR);
+							auto e = GetLastError();
+							if (e != ERROR_DLL_INIT_FAILED) // in case dllmain returns false
+							{
+								std::wstring msg = L"Unable to load " + std::wstring(fd->cFileName) + L". Error: " + std::to_wstring(e);
+								MessageBoxW(0, msg.c_str(), L"ASI Loader", MB_ICONERROR);
+							}
 						}
-					}
-					else
-					{
-						auto procedure = (void(*)())GetProcAddress(h, "InitializeASI");
-
-						if (procedure != NULL)
+						else
 						{
-							procedure();
+							auto procedure = (void(*)())GetProcAddress(h, "InitializeASI");
+
+							if (procedure != NULL)
+							{
+								procedure();
+							}
 						}
 					}
 				}
@@ -424,7 +428,7 @@ void LoadEverything()
 static bool restoredOnce = false;
 void LoadPluginsAndRestoreIAT(uintptr_t retaddr)
 {
-	if ( restoredOnce ) return;
+	if (restoredOnce) return;
 	restoredOnce = true;
 
 	//steam drm check
@@ -547,7 +551,7 @@ void HookKernel32IAT(HMODULE mod, bool exe)
 	IMAGE_IMPORT_DESCRIPTOR*    pImports = (IMAGE_IMPORT_DESCRIPTOR*)(hExecutableInstance + ntHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress);
 	size_t                      nNumImports = ntHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].Size / sizeof(IMAGE_IMPORT_DESCRIPTOR) - 1;
 
-	if ( exe )
+	if (exe)
 	{
 		Kernel32Data[eGetStartupInfoA][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "GetStartupInfoA");
 		Kernel32Data[eGetStartupInfoW][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "GetStartupInfoW");
@@ -589,72 +593,72 @@ void HookKernel32IAT(HMODULE mod, bool exe)
 
 			if (ptr == Kernel32Data[eGetStartupInfoA][ProcAddress])
 			{
-				if ( exe ) Kernel32Data[eGetStartupInfoA][IATPtr] = i;
+				if (exe) Kernel32Data[eGetStartupInfoA][IATPtr] = i;
 				*(size_t*)i = (size_t)CustomGetStartupInfoA;
 			}
 			else if (ptr == Kernel32Data[eGetStartupInfoW][ProcAddress])
 			{
-				if ( exe ) Kernel32Data[eGetStartupInfoW][IATPtr] = i;
+				if (exe) Kernel32Data[eGetStartupInfoW][IATPtr] = i;
 				*(size_t*)i = (size_t)CustomGetStartupInfoW;
 			}
 			else if (ptr == Kernel32Data[eGetModuleHandleA][ProcAddress])
 			{
-				if ( exe ) Kernel32Data[eGetModuleHandleA][IATPtr] = i;
+				if (exe) Kernel32Data[eGetModuleHandleA][IATPtr] = i;
 				*(size_t*)i = (size_t)CustomGetModuleHandleA;
 			}
 			else if (ptr == Kernel32Data[eGetModuleHandleW][ProcAddress])
 			{
-				if ( exe ) Kernel32Data[eGetModuleHandleW][IATPtr] = i;
+				if (exe) Kernel32Data[eGetModuleHandleW][IATPtr] = i;
 				*(size_t*)i = (size_t)CustomGetModuleHandleW;
 			}
 			else if (ptr == Kernel32Data[eGetProcAddress][ProcAddress])
 			{
-				if ( exe ) Kernel32Data[eGetProcAddress][IATPtr] = i;
+				if (exe) Kernel32Data[eGetProcAddress][IATPtr] = i;
 				*(size_t*)i = (size_t)CustomGetProcAddress;
 			}
 			else if (ptr == Kernel32Data[eGetShortPathNameA][ProcAddress])
 			{
-				if ( exe ) Kernel32Data[eGetShortPathNameA][IATPtr] = i;
+				if (exe) Kernel32Data[eGetShortPathNameA][IATPtr] = i;
 				*(size_t*)i = (size_t)CustomGetShortPathNameA;
 			}
 			else if (ptr == Kernel32Data[eFindNextFileA][ProcAddress])
 			{
-				if ( exe ) Kernel32Data[eFindNextFileA][IATPtr] = i;
+				if (exe) Kernel32Data[eFindNextFileA][IATPtr] = i;
 				*(size_t*)i = (size_t)CustomFindNextFileA;
 			}
 			else if (ptr == Kernel32Data[eFindNextFileW][ProcAddress])
 			{
-				if ( exe ) Kernel32Data[eFindNextFileW][IATPtr] = i;
+				if (exe) Kernel32Data[eFindNextFileW][IATPtr] = i;
 				*(size_t*)i = (size_t)CustomFindNextFileW;
 			}
 			else if (ptr == Kernel32Data[eLoadLibraryA][ProcAddress])
 			{
-				if ( exe ) Kernel32Data[eLoadLibraryA][IATPtr] = i;
+				if (exe) Kernel32Data[eLoadLibraryA][IATPtr] = i;
 				*(size_t*)i = (size_t)CustomLoadLibraryA;
 			}
 			else if (ptr == Kernel32Data[eLoadLibraryW][ProcAddress])
 			{
-				if ( exe ) Kernel32Data[eLoadLibraryW][IATPtr] = i;
+				if (exe) Kernel32Data[eLoadLibraryW][IATPtr] = i;
 				*(size_t*)i = (size_t)CustomLoadLibraryW;
 			}
 			else if (ptr == Kernel32Data[eFreeLibrary][ProcAddress])
 			{
-				if ( exe ) Kernel32Data[eFreeLibrary][IATPtr] = i;
+				if (exe) Kernel32Data[eFreeLibrary][IATPtr] = i;
 				*(size_t*)i = (size_t)CustomFreeLibrary;
 			}
 			else if (ptr == Kernel32Data[eCreateEventA][ProcAddress])
 			{
-				if ( exe ) Kernel32Data[eCreateEventA][IATPtr] = i;
+				if (exe) Kernel32Data[eCreateEventA][IATPtr] = i;
 				*(size_t*)i = (size_t)CustomCreateEventA;
 			}
 			else if (ptr == Kernel32Data[eCreateEventW][ProcAddress])
 			{
-				if ( exe ) Kernel32Data[eCreateEventW][IATPtr] = i;
+				if (exe) Kernel32Data[eCreateEventW][IATPtr] = i;
 				*(size_t*)i = (size_t)CustomCreateEventW;
 			}
 			else if (ptr == Kernel32Data[eGetSystemInfo][ProcAddress])
 			{
-				if ( exe ) Kernel32Data[eGetSystemInfo][IATPtr] = i;
+				if (exe) Kernel32Data[eGetSystemInfo][IATPtr] = i;
 				*(size_t*)i = (size_t)CustomGetSystemInfo;
 			}
 
@@ -785,7 +789,7 @@ void HookKernel32IAT(HMODULE mod, bool exe)
 	};
 
 	ModuleList dlls;
-	dlls.Enumerate( ModuleList::SearchLocation::LocalOnly );
+	dlls.Enumerate(ModuleList::SearchLocation::LocalOnly);
 	for (auto& e : dlls.m_moduleList)
 	{
 		PatchOrdinals((size_t)std::get<HMODULE>(e));
@@ -796,9 +800,9 @@ void Init()
 {
 	std::wstring modulePath = GetModuleFileNameW(hm);
 	modulePath.resize(modulePath.find_last_of(L"/\\") + 1);
-	iniPaths.emplace_back( modulePath + L"global.ini" );
-	iniPaths.emplace_back( modulePath + L"scripts\\global.ini" );
-	iniPaths.emplace_back( modulePath + L"plugins\\global.ini" );
+	iniPaths.emplace_back(modulePath + L"global.ini");
+	iniPaths.emplace_back(modulePath + L"scripts\\global.ini");
+	iniPaths.emplace_back(modulePath + L"plugins\\global.ini");
 
 	auto nForceEPHook = GetPrivateProfileInt(TEXT("globalsets"), TEXT("forceentrypointhook"), TRUE, iniPaths);
 	auto nDontLoadFromDllMain = GetPrivateProfileInt(TEXT("globalsets"), TEXT("dontloadfromdllmain"), TRUE, iniPaths);
@@ -813,7 +817,7 @@ void Init()
 		if (nFindModule)
 		{
 			ModuleList dlls;
-			dlls.Enumerate( ModuleList::SearchLocation::LocalOnly );
+			dlls.Enumerate(ModuleList::SearchLocation::LocalOnly);
 			auto ual = std::find_if(dlls.m_moduleList.begin(), dlls.m_moduleList.end(), [](auto const& it)
 			{
 				return std::get<HMODULE>(it) == hm;
@@ -825,7 +829,7 @@ void Init()
 			}
 		}
 
-		if ( m != mainModule )
+		if (m != mainModule)
 		{
 			HookKernel32IAT(m, false);
 		}
