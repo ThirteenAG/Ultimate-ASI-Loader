@@ -13,8 +13,8 @@ bool iequals(std::wstring_view s1, std::wstring_view s2)
 {
 	std::wstring str1(std::move(s1)); 
 	std::wstring str2(std::move(s2));
-	std::transform(str1.begin(), str1.end(), str1.begin(), ::tolower);
-	std::transform(str2.begin(), str2.end(), str2.begin(), ::tolower);
+	std::transform(str1.begin(), str1.end(), str1.begin(), [](wchar_t c){ return ::towlower(c); });
+	std::transform(str2.begin(), str2.end(), str2.begin(), [](wchar_t c){ return ::towlower(c); });
 	return (str1 == str2);
 }
 
