@@ -9,19 +9,18 @@ HMODULE hm;
 bool bLoadedPluginsYet, bOriginalLibraryLoaded;
 std::vector<std::wstring> iniPaths;
 
-template <typename T, typename V>
-bool iequals(const T& s1, const V& s2)
+bool iequals(std::wstring_view s1, std::wstring_view s2)
 {
-	T str1(s1); T str2(s2);
+	std::wstring str1(std::move(s1)); 
+	std::wstring str2(std::move(s2));
 	std::transform(str1.begin(), str1.end(), str1.begin(), ::tolower);
 	std::transform(str2.begin(), str2.end(), str2.begin(), ::tolower);
 	return (str1 == str2);
 }
 
-template <typename T>
-std::wstring to_wstring(T cstr)
+std::wstring to_wstring(std::string_view cstr)
 {
-	std::string str = cstr;
+	std::string str(std::move(cstr));
 	auto charsReturned = MultiByteToWideChar(CP_UTF8, 0, &str[0], (int)str.size(), NULL, 0);
 	std::wstring wstrTo(charsReturned, 0);
 	MultiByteToWideChar(CP_UTF8, 0, &str[0], (int)str.size(), &wstrTo[0], charsReturned);
@@ -37,7 +36,7 @@ std::wstring SHGetKnownFolderPath(REFKNOWNFOLDERID rfid, DWORD dwFlags, HANDLE h
 	return r;
 };
 
-HMODULE LoadLibraryW(std::wstring lpLibFileName)
+HMODULE LoadLibraryW(const std::wstring& lpLibFileName)
 {
 	return LoadLibraryW(lpLibFileName.c_str());
 }
@@ -81,10 +80,9 @@ std::wstring GetSelfName()
 }
 
 template<typename T, typename... Args>
-void GetSections(T& h, Args... args)
+void GetSections(T&& h, Args... args)
 {
-	std::set<std::string> s;
-	(s.insert(args), ...);
+	const std::set< std::string_view, std::less<> > s = { args... };
 	size_t dwLoadOffset = (size_t)GetModuleHandle(NULL);
 	BYTE* pImageBase = reinterpret_cast<BYTE *>(dwLoadOffset);
 	PIMAGE_DOS_HEADER   pDosHeader = reinterpret_cast<PIMAGE_DOS_HEADER>(dwLoadOffset);
@@ -92,11 +90,11 @@ void GetSections(T& h, Args... args)
 	PIMAGE_SECTION_HEADER pSection = IMAGE_FIRST_SECTION(pNtHeader);
 	for (int iSection = 0; iSection < pNtHeader->FileHeader.NumberOfSections; ++iSection, ++pSection)
 	{
-		auto pszSectionName = reinterpret_cast<char*>(pSection->Name);
+		auto pszSectionName = reinterpret_cast<const char*>(pSection->Name);
 		if (s.find(pszSectionName) != s.end())
 		{
 			DWORD dwPhysSize = (pSection->Misc.VirtualSize + 4095) & ~4095;
-			h(pSection, dwLoadOffset, dwPhysSize);
+			std::forward<T>(h)(pSection, dwLoadOffset, dwPhysSize);
 		}
 	}
 }
@@ -209,7 +207,7 @@ void LoadOriginalLibrary()
 	}
 	else if (iequals(szSelfName, L"xlive.dll")) {
 		// Unprotect image - make .text and .rdata section writeable
-		GetSections([&](PIMAGE_SECTION_HEADER pSection, size_t dwLoadOffset, DWORD dwPhysSize) {
+		GetSections([](PIMAGE_SECTION_HEADER pSection, size_t dwLoadOffset, DWORD dwPhysSize) {
 			DWORD oldProtect = 0;
 			DWORD newProtect = (pSection->Characteristics & IMAGE_SCN_MEM_EXECUTE) ? PAGE_EXECUTE_READWRITE : PAGE_READWRITE;
 			if (!VirtualProtect(reinterpret_cast<VOID*>(dwLoadOffset + pSection->VirtualAddress), dwPhysSize, newProtect, &oldProtect)) {
