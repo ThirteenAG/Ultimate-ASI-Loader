@@ -29,9 +29,12 @@ std::wstring to_wstring(std::string_view cstr)
 
 std::wstring SHGetKnownFolderPath(REFKNOWNFOLDERID rfid, DWORD dwFlags, HANDLE hToken)
 {
+	std::wstring r;
 	WCHAR* szSystemPath = nullptr;
-	HRESULT result = SHGetKnownFolderPath(rfid, dwFlags, hToken, &szSystemPath);
-	std::wstring r = szSystemPath;
+	if (SUCCEEDED(SHGetKnownFolderPath(rfid, dwFlags, hToken, &szSystemPath)))
+	{
+		r = szSystemPath;
+	}
 	CoTaskMemFree(szSystemPath);
 	return r;
 };
