@@ -718,6 +718,26 @@ UrlCacheSetGlobalLimit = _UrlCacheSetGlobalLimit
 UrlCacheUpdateEntryExtraData = _UrlCacheUpdateEntryExtraData
 UrlZonesDetach = _UrlZonesDetach
 
+LIBRARY "version"
+EXPORTS
+GetFileVersionInfoA = _GetFileVersionInfoA
+GetFileVersionInfoByHandle = _GetFileVersionInfoByHandle
+GetFileVersionInfoExA = _GetFileVersionInfoExA
+GetFileVersionInfoExW = _GetFileVersionInfoExW
+GetFileVersionInfoSizeA = _GetFileVersionInfoSizeA
+GetFileVersionInfoSizeExA = _GetFileVersionInfoSizeExA
+GetFileVersionInfoSizeExW = _GetFileVersionInfoSizeExW
+GetFileVersionInfoSizeW = _GetFileVersionInfoSizeW
+GetFileVersionInfoW = _GetFileVersionInfoW
+VerFindFileA = _VerFindFileA
+VerFindFileW = _VerFindFileW
+VerInstallFileA = _VerInstallFileA
+VerInstallFileW = _VerInstallFileW
+VerLanguageNameA = _VerLanguageNameA
+VerLanguageNameW = _VerLanguageNameW
+VerQueryValueA = _VerQueryValueA
+VerQueryValueW = _VerQueryValueW
+
 LIBRARY "xlive"
 EXPORTS
 _XWSAStartup@8 @1
