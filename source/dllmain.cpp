@@ -6,7 +6,6 @@ extern "C" Direct3D8 *WINAPI Direct3DCreate8(UINT SDKVersion);
 #endif
 
 HMODULE hm;
-bool bLoadedPluginsYet, bOriginalLibraryLoaded;
 std::vector<std::wstring> iniPaths;
 
 bool iequals(std::wstring_view s1, std::wstring_view s2)
@@ -138,9 +137,10 @@ size_t Kernel32Data[Kernel32ExportsNamesCount][Kernel32ExportsDataCount];
 #define IDR_WNDWINI 104
 #endif
 
+static LONG OriginalLibraryLoaded = 0;
 void LoadOriginalLibrary()
 {
-	bOriginalLibraryLoaded = true;
+	if ( _InterlockedCompareExchange( &OriginalLibraryLoaded, 1, 0 ) != 0 ) return;
 
 	auto szSelfName = GetSelfName();
 	auto szSystemPath = SHGetKnownFolderPath(FOLDERID_System, 0, nullptr) + L'\\' + szSelfName;
@@ -418,25 +418,22 @@ void LoadPlugins()
 	SetCurrentDirectoryW(oldDir.c_str()); // Reset the current directory
 }
 
+static LONG LoadedPluginsYet = 0;
 void LoadEverything()
 {
-	if (!bLoadedPluginsYet)
-	{
-		if (!bOriginalLibraryLoaded)
-			LoadOriginalLibrary();
+	if ( _InterlockedCompareExchange( &LoadedPluginsYet, 1, 0 ) != 0 ) return;
+
+	LoadOriginalLibrary();
 #if !X64
-		Direct3D8DisableMaximizedWindowedModeShim();
+	Direct3D8DisableMaximizedWindowedModeShim();
 #endif
-		LoadPlugins();
-		bLoadedPluginsYet = true;
-	}
+	LoadPlugins();
 }
 
-static bool restoredOnce = false;
+static LONG RestoredOnce = 0;
 void LoadPluginsAndRestoreIAT(uintptr_t retaddr)
 {
-	if (restoredOnce) return;
-	restoredOnce = true;
+	if ( _InterlockedCompareExchange( &RestoredOnce, 1, 0 ) != 0 ) return;
 
 	//steam drm check
 	GetSections([&](PIMAGE_SECTION_HEADER pSection, size_t dwLoadOffset, DWORD dwPhysSize) {
@@ -511,16 +508,14 @@ BOOL WINAPI CustomFindNextFileW(HANDLE hFindFile, LPWIN32_FIND_DATAW lpFindFileD
 
 HMODULE WINAPI CustomLoadLibraryA(LPCSTR lpLibFileName)
 {
-	if (!bOriginalLibraryLoaded)
-		LoadOriginalLibrary();
+	LoadOriginalLibrary();
 
 	return LoadLibraryA(lpLibFileName);
 }
 
 HMODULE WINAPI CustomLoadLibraryW(LPCWSTR lpLibFileName)
 {
-	if (!bOriginalLibraryLoaded)
-		LoadOriginalLibrary();
+	LoadOriginalLibrary();
 
 	return LoadLibraryW(lpLibFileName);
 }
