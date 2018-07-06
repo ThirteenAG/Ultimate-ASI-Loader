@@ -433,15 +433,19 @@ void LoadEverything()
 static LONG RestoredOnce = 0;
 void LoadPluginsAndRestoreIAT(uintptr_t retaddr)
 {
-	if ( _InterlockedCompareExchange( &RestoredOnce, 1, 0 ) != 0 ) return;
+	bool calledFromBind = false;
 
 	//steam drm check
 	GetSections([&](PIMAGE_SECTION_HEADER pSection, size_t dwLoadOffset, DWORD dwPhysSize) {
 		auto dwStart = static_cast<uintptr_t>(dwLoadOffset + pSection->VirtualAddress);
 		auto dwEnd = dwStart + dwPhysSize;
 		if (retaddr >= dwStart && retaddr <= dwEnd)
-			return;
+			calledFromBind = true;
 	}, ".bind");
+
+	if ( calledFromBind ) return;
+
+	if ( _InterlockedCompareExchange( &RestoredOnce, 1, 0 ) != 0 ) return;
 
 	LoadEverything();
 
