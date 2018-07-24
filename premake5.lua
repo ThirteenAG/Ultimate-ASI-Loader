@@ -24,6 +24,7 @@ project "Ultimate-ASI-Loader-x86"
    
    files { "source/dllmain.h", "source/dllmain.cpp" }
    files { "source/x86.def" }
+   files { "source/xlive/xliveless.h", "source/xlive/xliveless.cpp", "source/xlive/xliveless.rc"}
    files { "source/resources/*.rc" }
    files { "external/d3d8to9/source/*.h", "external/d3d8to9/source/*.cpp" }
    files { "external/MemoryModule/*.h", "external/MemoryModule/*.c" }
