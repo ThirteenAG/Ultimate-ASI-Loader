@@ -135,6 +135,8 @@ size_t Kernel32Data[Kernel32ExportsNamesCount][Kernel32ExportsDataCount];
 #define IDR_VBHKD   101
 #define IDR_WNDMODE 103
 #define IDR_WNDWINI 104
+#define IDR_BINK18  105
+#define IDR_BINK19  106
 #endif
 
 static LONG OriginalLibraryLoaded = 0;
@@ -210,6 +212,66 @@ void LoadOriginalLibrary()
     }
     else if (iequals(szSelfName, L"version.dll")) {
         version.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
+    }
+    else if (iequals(szSelfName, L"binkw32.dll")) {
+        std::wstring path = GetModuleFileNameW(hm);
+        path = path.substr(0, path.find_last_of(L"/\\") + 1);
+
+        for (auto & p : std::filesystem::directory_iterator(path))
+        {
+            auto filename = p.path().wstring().substr(p.path().wstring().find_last_of(L"/\\") + 1);
+            if ((filename.find(L"binkw32") != std::wstring::npos && filename != szSelfName))
+            {
+                uint32_t dwDummy;
+                uint32_t versionInfoSize = GetFileVersionInfoSizeW(p.path().wstring().c_str(), (LPDWORD)&dwDummy);
+                std::vector<wchar_t> versionInfoVec(versionInfoSize);
+                GetFileVersionInfoW(p.path().wstring().c_str(), dwDummy, versionInfoSize, versionInfoVec.data());
+                std::wstring versionInfo(versionInfoVec.begin(), versionInfoVec.end());
+                if (versionInfo.find(L"RAD Video Tools") != std::wstring::npos || filename == L"binkw32Hooked.dll")
+                {
+                    binkw32.LoadOriginalLibrary(LoadLibraryW(p.path().wstring()), false);
+                    return;
+                }
+            }
+        }
+
+        SYSTEMTIME t = {};
+        ModuleList dlls;
+        dlls.Enumerate(ModuleList::SearchLocation::LocalOnly);
+        for (auto& e : dlls.m_moduleList)
+        {
+            auto hInstance = (size_t)std::get<HMODULE>(e);
+            IMAGE_NT_HEADERS* ntHeader = (IMAGE_NT_HEADERS*)(hInstance + ((IMAGE_DOS_HEADER*)hInstance)->e_lfanew);
+
+            SYSTEMTIME stUTC, stLocal;
+            LONGLONG ll;
+            FILETIME pft;
+            ll = Int32x32To64(ntHeader->FileHeader.TimeDateStamp, 10000000) + 116444736000000000;
+            pft.dwLowDateTime = (DWORD)ll;
+            pft.dwHighDateTime = ll >> 32;
+            FileTimeToSystemTime(&pft, &stUTC);
+            SystemTimeToTzSpecificLocalTime(NULL, &stUTC, &stLocal);
+            if (t.wYear == 0 || t.wYear > stLocal.wYear)
+                t = stLocal;
+        }
+
+        HRSRC hResource = FindResource(hm, MAKEINTRESOURCE((t.wYear <= 2007) ? IDR_BINK18 : IDR_BINK19), RT_RCDATA); //1.8x to 1.9a (11-04-2007)
+        if (hResource)
+        {
+            HGLOBAL hLoadedResource = LoadResource(hm, hResource);
+            if (hLoadedResource)
+            {
+                LPVOID pLockedResource = LockResource(hLoadedResource);
+                if (pLockedResource)
+                {
+                    size_t dwResourceSize = SizeofResource(hm, hResource);
+                    if (0 != dwResourceSize)
+                    {
+                        binkw32.LoadOriginalLibrary(MemoryLoadLibrary((const void*)pLockedResource, dwResourceSize), true);
+                    }
+                }
+            }
+        }
     }
     else if (iequals(szSelfName, L"xlive.dll")) {
         // Unprotect image - make .text and .rdata section writeable
