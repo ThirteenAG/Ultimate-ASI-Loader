@@ -132,11 +132,13 @@ enum Kernel32ExportsData
 size_t Kernel32Data[Kernel32ExportsNamesCount][Kernel32ExportsDataCount];
 
 #if !X64
-#define IDR_VORBISF 101
-#define IDR_WNDMODE 103
-#define IDR_WNDWINI 104
-#define IDR_BINKW18 105
-#define IDR_BINKW19 106
+#define IDR_VORBISF    101
+#define IDR_WNDMODE    103
+#define IDR_WNDWINI    104
+#define IDR_BINK00018X 105
+#define IDR_BINK00019U 106
+#define IDR_BINK00199W 107
+#define IDR_BINK01994I 108
 #endif
 
 static LONG OriginalLibraryLoaded = 0;
@@ -247,7 +249,7 @@ void LoadOriginalLibrary()
                     t = stLocal;
             }
 
-            HRSRC hResource = FindResource(hm, MAKEINTRESOURCE((t.wYear <= 2007) ? IDR_BINKW18 : IDR_BINKW19), RT_RCDATA); //1.8x to 1.9a (11-04-2007)
+            HRSRC hResource = FindResource(hm, MAKEINTRESOURCE((t.wYear <= 2007) ? IDR_BINK00018X : (t.wYear <= 2010) ? IDR_BINK00019U : (t.wYear <= 2012) ? IDR_BINK00199W : IDR_BINK01994I), RT_RCDATA);
             if (hResource)
             {
                 HGLOBAL hLoadedResource = LoadResource(hm, hResource);
