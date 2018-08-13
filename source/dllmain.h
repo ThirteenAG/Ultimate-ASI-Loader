@@ -10,7 +10,6 @@
 #include <ModuleList\ModuleList.hpp>
 #include <intrin.h>
 #pragma intrinsic(_ReturnAddress)
-#pragma comment(lib,"Version.lib")
 
 struct shared
 {
@@ -46,6 +45,7 @@ struct vorbisfile_dll
     FARPROC ov_clear;
     FARPROC ov_comment;
     FARPROC ov_crosslap;
+    FARPROC ov_fopen;
     FARPROC ov_halfrate;
     FARPROC ov_halfrate_p;
     FARPROC ov_info;
@@ -76,43 +76,53 @@ struct vorbisfile_dll
     FARPROC ov_time_tell;
     FARPROC ov_time_total;
 
-    void LoadOriginalLibrary(HMEMORYMODULE module)
+    void LoadOriginalLibrary(HMEMORYMODULE module, bool bIsMemory)
     {
         dll = module;
-        ov_bitrate = MemoryGetProcAddress(dll, "ov_bitrate");
-        ov_bitrate_instant = MemoryGetProcAddress(dll, "ov_bitrate_instant");
-        ov_clear = MemoryGetProcAddress(dll, "ov_clear");
-        ov_comment = MemoryGetProcAddress(dll, "ov_comment");
-        ov_crosslap = MemoryGetProcAddress(dll, "ov_crosslap");
-        ov_halfrate = MemoryGetProcAddress(dll, "ov_halfrate");
-        ov_halfrate_p = MemoryGetProcAddress(dll, "ov_halfrate_p");
-        ov_info = MemoryGetProcAddress(dll, "ov_info");
-        ov_open = MemoryGetProcAddress(dll, "ov_open");
-        ov_open_callbacks = MemoryGetProcAddress(dll, "ov_open_callbacks");
-        ov_pcm_seek = MemoryGetProcAddress(dll, "ov_pcm_seek");
-        ov_pcm_seek_lap = MemoryGetProcAddress(dll, "ov_pcm_seek_lap");
-        ov_pcm_seek_page = MemoryGetProcAddress(dll, "ov_pcm_seek_page");
-        ov_pcm_seek_page_lap = MemoryGetProcAddress(dll, "ov_pcm_seek_page_lap");
-        ov_pcm_tell = MemoryGetProcAddress(dll, "ov_pcm_tell");
-        ov_pcm_total = MemoryGetProcAddress(dll, "ov_pcm_total");
-        ov_raw_seek = MemoryGetProcAddress(dll, "ov_raw_seek");
-        ov_raw_seek_lap = MemoryGetProcAddress(dll, "ov_raw_seek_lap");
-        ov_raw_tell = MemoryGetProcAddress(dll, "ov_raw_tell");
-        ov_raw_total = MemoryGetProcAddress(dll, "ov_raw_total");
-        ov_read = MemoryGetProcAddress(dll, "ov_read");
-        ov_read_float = MemoryGetProcAddress(dll, "ov_read_float");
-        ov_seekable = MemoryGetProcAddress(dll, "ov_seekable");
-        ov_serialnumber = MemoryGetProcAddress(dll, "ov_serialnumber");
-        ov_streams = MemoryGetProcAddress(dll, "ov_streams");
-        ov_test = MemoryGetProcAddress(dll, "ov_test");
-        ov_test_callbacks = MemoryGetProcAddress(dll, "ov_test_callbacks");
-        ov_test_open = MemoryGetProcAddress(dll, "ov_test_open");
-        ov_time_seek = MemoryGetProcAddress(dll, "ov_time_seek");
-        ov_time_seek_lap = MemoryGetProcAddress(dll, "ov_time_seek_lap");
-        ov_time_seek_page = MemoryGetProcAddress(dll, "ov_time_seek_page");
-        ov_time_seek_page_lap = MemoryGetProcAddress(dll, "ov_time_seek_page_lap");
-        ov_time_tell = MemoryGetProcAddress(dll, "ov_time_tell");
-        ov_time_total = MemoryGetProcAddress(dll, "ov_time_total");
+
+        auto AutoGetProcAddress = [&bIsMemory](HMEMORYMODULE lib, LPCSTR s) -> FARPROC
+        {
+            if (bIsMemory)
+                return MemoryGetProcAddress(lib, s);
+            else
+                return GetProcAddress((HMODULE)lib, s);
+        };
+
+        ov_bitrate = AutoGetProcAddress(dll, "ov_bitrate");
+        ov_bitrate_instant = AutoGetProcAddress(dll, "ov_bitrate_instant");
+        ov_clear = AutoGetProcAddress(dll, "ov_clear");
+        ov_comment = AutoGetProcAddress(dll, "ov_comment");
+        ov_crosslap = AutoGetProcAddress(dll, "ov_crosslap");
+        ov_fopen = AutoGetProcAddress(dll, "ov_fopen");
+        ov_halfrate = AutoGetProcAddress(dll, "ov_halfrate");
+        ov_halfrate_p = AutoGetProcAddress(dll, "ov_halfrate_p");
+        ov_info = AutoGetProcAddress(dll, "ov_info");
+        ov_open = AutoGetProcAddress(dll, "ov_open");
+        ov_open_callbacks = AutoGetProcAddress(dll, "ov_open_callbacks");
+        ov_pcm_seek = AutoGetProcAddress(dll, "ov_pcm_seek");
+        ov_pcm_seek_lap = AutoGetProcAddress(dll, "ov_pcm_seek_lap");
+        ov_pcm_seek_page = AutoGetProcAddress(dll, "ov_pcm_seek_page");
+        ov_pcm_seek_page_lap = AutoGetProcAddress(dll, "ov_pcm_seek_page_lap");
+        ov_pcm_tell = AutoGetProcAddress(dll, "ov_pcm_tell");
+        ov_pcm_total = AutoGetProcAddress(dll, "ov_pcm_total");
+        ov_raw_seek = AutoGetProcAddress(dll, "ov_raw_seek");
+        ov_raw_seek_lap = AutoGetProcAddress(dll, "ov_raw_seek_lap");
+        ov_raw_tell = AutoGetProcAddress(dll, "ov_raw_tell");
+        ov_raw_total = AutoGetProcAddress(dll, "ov_raw_total");
+        ov_read = AutoGetProcAddress(dll, "ov_read");
+        ov_read_float = AutoGetProcAddress(dll, "ov_read_float");
+        ov_seekable = AutoGetProcAddress(dll, "ov_seekable");
+        ov_serialnumber = AutoGetProcAddress(dll, "ov_serialnumber");
+        ov_streams = AutoGetProcAddress(dll, "ov_streams");
+        ov_test = AutoGetProcAddress(dll, "ov_test");
+        ov_test_callbacks = AutoGetProcAddress(dll, "ov_test_callbacks");
+        ov_test_open = AutoGetProcAddress(dll, "ov_test_open");
+        ov_time_seek = AutoGetProcAddress(dll, "ov_time_seek");
+        ov_time_seek_lap = AutoGetProcAddress(dll, "ov_time_seek_lap");
+        ov_time_seek_page = AutoGetProcAddress(dll, "ov_time_seek_page");
+        ov_time_seek_page_lap = AutoGetProcAddress(dll, "ov_time_seek_page_lap");
+        ov_time_tell = AutoGetProcAddress(dll, "ov_time_tell");
+        ov_time_total = AutoGetProcAddress(dll, "ov_time_total");
     }
 } vorbisfile;
 #endif
@@ -1869,6 +1879,7 @@ __declspec(naked) void _ov_bitrate_instant() { _asm { jmp[vorbisfile.ov_bitrate_
 __declspec(naked) void _ov_clear() { _asm { jmp[vorbisfile.ov_clear] } }
 __declspec(naked) void _ov_comment() { _asm { jmp[vorbisfile.ov_comment] } }
 __declspec(naked) void _ov_crosslap() { _asm { jmp[vorbisfile.ov_crosslap] } }
+__declspec(naked) void _ov_fopen() { _asm { jmp[vorbisfile.ov_fopen] } }
 __declspec(naked) void _ov_halfrate() { _asm { jmp[vorbisfile.ov_halfrate] } }
 __declspec(naked) void _ov_halfrate_p() { _asm { jmp[vorbisfile.ov_halfrate_p] } }
 __declspec(naked) void _ov_info() { _asm { jmp[vorbisfile.ov_info] } }

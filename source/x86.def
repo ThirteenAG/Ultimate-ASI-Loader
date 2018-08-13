@@ -5,6 +5,7 @@ ov_bitrate_instant = _ov_bitrate_instant
 ov_clear = _ov_clear
 ov_comment = _ov_comment
 ov_crosslap = _ov_crosslap
+ov_fopen = _ov_fopen
 ov_halfrate = _ov_halfrate
 ov_halfrate_p = _ov_halfrate_p
 ov_info = _ov_info
