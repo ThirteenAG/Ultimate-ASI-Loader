@@ -14,11 +14,15 @@ This is a DLL file which adds ASI plugin loading functionality to any game, whic
 * msacm32.dll
 * msvfw32.dll
 * version.dll (x86 and x64)
-* vorbisFile.dll
 * wininet.dll (x86 and x64)
 * winmmbase.dll
 * xlive.dll
 
+* vorbisFile.dll
+* binkw32.dll
+
+With the last two, it is possible to load the original dll by renaming it to 'vorbisHooked.dll' or 'binkw32Hooked.dll'.
+Usually it is not required and you can simply replace the dll. Always make a backup before replacing any files.
 
 INSTALLATION
 ------------------------
