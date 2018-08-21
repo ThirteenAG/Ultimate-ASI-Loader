@@ -880,14 +880,15 @@ bool HookKernel32IAT(HMODULE mod, bool exe)
 void Init()
 {
     std::wstring modulePath = GetModuleFileNameW(hm);
-    std::wstring moduleName = modulePath.substr(modulePath.find_last_of(L"/\\") + 1, modulePath.size() - modulePath.rfind('.'));
+    std::wstring moduleName = modulePath.substr(modulePath.find_last_of(L"/\\") + 1);
+    moduleName.resize(moduleName.find_last_of(L'.'));
     modulePath.resize(modulePath.find_last_of(L"/\\") + 1);
     iniPaths.emplace_back(modulePath + moduleName + L".ini");
     iniPaths.emplace_back(modulePath + L"global.ini");
     iniPaths.emplace_back(modulePath + L"scripts\\global.ini");
     iniPaths.emplace_back(modulePath + L"plugins\\global.ini");
 
-    auto nForceEPHook = GetPrivateProfileInt(TEXT("globalsets"), TEXT("forceentrypointhook"), TRUE, iniPaths);
+    auto nForceEPHook = GetPrivateProfileInt(TEXT("globalsets"), TEXT("forceentrypointhook"), FALSE, iniPaths);
     auto nDontLoadFromDllMain = GetPrivateProfileInt(TEXT("globalsets"), TEXT("dontloadfromdllmain"), TRUE, iniPaths);
     auto nFindModule = GetPrivateProfileInt(TEXT("globalsets"), TEXT("findmodule"), FALSE, iniPaths);
 
