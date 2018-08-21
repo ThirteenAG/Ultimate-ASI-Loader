@@ -117,6 +117,8 @@ enum Kernel32ExportsNames
     eCreateEventA,
     eCreateEventW,
     eGetSystemInfo,
+    eInterlockedCompareExchange,
+    eSleep,
 
     Kernel32ExportsNamesCount
 };
@@ -608,6 +610,18 @@ void WINAPI CustomGetSystemInfo(LPSYSTEM_INFO lpSystemInfo)
     return GetSystemInfo(lpSystemInfo);
 }
 
+LONG WINAPI CustomInterlockedCompareExchange(LONG volatile* Destination, LONG ExChange, LONG Comperand)
+{
+    LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress());
+    return _InterlockedCompareExchange(Destination, ExChange, Comperand);
+}
+
+void WINAPI CustomSleep(DWORD dwMilliseconds)
+{
+    LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress());
+    return Sleep(dwMilliseconds);
+}
+
 bool HookKernel32IAT(HMODULE mod, bool exe)
 {
     auto hExecutableInstance = (size_t)mod;
@@ -631,6 +645,8 @@ bool HookKernel32IAT(HMODULE mod, bool exe)
         Kernel32Data[eCreateEventA][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "CreateEventA");
         Kernel32Data[eCreateEventW][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "CreateEventW");
         Kernel32Data[eGetSystemInfo][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "GetSystemInfo");
+        Kernel32Data[eInterlockedCompareExchange][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "InterlockedCompareExchange");
+        Kernel32Data[eSleep][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "Sleep");
     }
 
     uint32_t matchedImports = 0;
@@ -739,6 +755,18 @@ bool HookKernel32IAT(HMODULE mod, bool exe)
             {
                 if (exe) Kernel32Data[eGetSystemInfo][IATPtr] = i;
                 *(size_t*)i = (size_t)CustomGetSystemInfo;
+                matchedImports++;
+            }
+            else if (ptr == Kernel32Data[eInterlockedCompareExchange][ProcAddress])
+            {
+                if (exe) Kernel32Data[eInterlockedCompareExchange][IATPtr] = i;
+                *(size_t*)i = (size_t)CustomInterlockedCompareExchange;
+                matchedImports++;
+            }
+            else if (ptr == Kernel32Data[eSleep][ProcAddress])
+            {
+                if (exe) Kernel32Data[eSleep][IATPtr] = i;
+                *(size_t*)i = (size_t)CustomSleep;
                 matchedImports++;
             }
 
