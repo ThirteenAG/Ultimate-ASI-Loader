@@ -672,6 +672,8 @@ bool HookKernel32IAT(HMODULE mod, bool exe)
             VirtualProtect((size_t*)i, sizeof(size_t), PAGE_EXECUTE_READWRITE, &dwProtect[0]);
 
             auto ptr = *(size_t*)i;
+            if (!ptr)
+                continue;
 
             if (ptr == Kernel32Data[eGetStartupInfoA][ProcAddress])
             {
