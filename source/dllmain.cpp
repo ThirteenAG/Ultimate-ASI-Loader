@@ -207,8 +207,8 @@ void LoadOriginalLibrary()
     else if (iequals(szSelfName, L"d3d11.dll")) {
         d3d11.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
     }
-    else if (iequals(szSelfName, L"winmmbase.dll")) {
-        winmmbase.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
+    else if (iequals(szSelfName, L"winmm.dll")) {
+        winmm.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
     }
     else if (iequals(szSelfName, L"msacm32.dll")) {
         msacm32.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
@@ -282,7 +282,7 @@ void LoadOriginalLibrary()
     }
     else
     {
-        MessageBox(0, TEXT("This library isn't supported. Try to rename it to d3d8.dll, d3d9.dll, d3d11.dll, winmmbase.dll, wininet.dll, version.dll, \
+        MessageBox(0, TEXT("This library isn't supported. Try to rename it to d3d8.dll, d3d9.dll, d3d11.dll, winmm.dll, wininet.dll, version.dll, \
             msacm32.dll, dinput.dll, dinput8.dll, dsound.dll, vorbisFile.dll, msvfw32.dll, xlive.dll or ddraw.dll."), TEXT("ASI Loader"), MB_ICONERROR);
         ExitProcess(0);
     }

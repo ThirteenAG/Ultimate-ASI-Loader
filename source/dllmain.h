@@ -1048,6 +1048,7 @@ struct ddraw_dll
     }
 } ddraw;
 
+#undef PlaySound
 struct winmmbase_dll
 {
     HMODULE dll;
@@ -1056,14 +1057,23 @@ struct winmmbase_dll
     FARPROC DriverCallback;
     FARPROC DrvGetModuleHandle;
     FARPROC GetDriverModuleHandle;
+    FARPROC NotifyCallbackData;
     FARPROC OpenDriver;
+    FARPROC PlaySound;
+    FARPROC PlaySoundA;
+    FARPROC PlaySoundW;
     FARPROC SendDriverMessage;
+    FARPROC WOW32DriverCallback;
+    FARPROC WOW32ResolveMultiMediaHandle;
+    FARPROC WOWAppExit;
+    FARPROC aux32Message;
     FARPROC auxGetDevCapsA;
     FARPROC auxGetDevCapsW;
     FARPROC auxGetNumDevs;
     FARPROC auxGetVolume;
     FARPROC auxOutMessage;
     FARPROC auxSetVolume;
+    FARPROC joy32Message;
     FARPROC joyConfigChanged;
     FARPROC joyGetDevCapsA;
     FARPROC joyGetDevCapsW;
@@ -1074,6 +1084,28 @@ struct winmmbase_dll
     FARPROC joyReleaseCapture;
     FARPROC joySetCapture;
     FARPROC joySetThreshold;
+    FARPROC mci32Message;
+    FARPROC mciDriverNotify;
+    FARPROC mciDriverYield;
+    FARPROC mciExecute;
+    FARPROC mciFreeCommandResource;
+    FARPROC mciGetCreatorTask;
+    FARPROC mciGetDeviceIDA;
+    FARPROC mciGetDeviceIDFromElementIDA;
+    FARPROC mciGetDeviceIDFromElementIDW;
+    FARPROC mciGetDeviceIDW;
+    FARPROC mciGetDriverData;
+    FARPROC mciGetErrorStringA;
+    FARPROC mciGetErrorStringW;
+    FARPROC mciGetYieldProc;
+    FARPROC mciLoadCommandResource;
+    FARPROC mciSendCommandA;
+    FARPROC mciSendCommandW;
+    FARPROC mciSendStringA;
+    FARPROC mciSendStringW;
+    FARPROC mciSetDriverData;
+    FARPROC mciSetYieldProc;
+    FARPROC mid32Message;
     FARPROC midiConnect;
     FARPROC midiDisconnect;
     FARPROC midiInAddBuffer;
@@ -1158,7 +1190,19 @@ struct winmmbase_dll
     FARPROC mmioStringToFOURCCA;
     FARPROC mmioStringToFOURCCW;
     FARPROC mmioWrite;
-    FARPROC sndOpenSound;
+    FARPROC mmsystemGetVersion;
+    FARPROC mod32Message;
+    FARPROC mxd32Message;
+    FARPROC sndPlaySoundA;
+    FARPROC sndPlaySoundW;
+    FARPROC tid32Message;
+    FARPROC timeBeginPeriod;
+    FARPROC timeEndPeriod;
+    FARPROC timeGetDevCaps;
+    FARPROC timeGetSystemTime;
+    FARPROC timeGetTime;
+    FARPROC timeKillEvent;
+    FARPROC timeSetEvent;
     FARPROC waveInAddBuffer;
     FARPROC waveInClose;
     FARPROC waveInGetDevCapsA;
@@ -1198,10 +1242,8 @@ struct winmmbase_dll
     FARPROC waveOutSetVolume;
     FARPROC waveOutUnprepareHeader;
     FARPROC waveOutWrite;
-    FARPROC winmmbaseFreeMMEHandles;
-    FARPROC winmmbaseGetWOWHandle;
-    FARPROC winmmbaseHandle32FromHandle16;
-    FARPROC winmmbaseSetWOWHandle;
+    FARPROC wid32Message;
+    FARPROC wod32Message;
 
     void LoadOriginalLibrary(HMODULE module)
     {
@@ -1212,14 +1254,23 @@ struct winmmbase_dll
         DriverCallback = GetProcAddress(dll, "DriverCallback");
         DrvGetModuleHandle = GetProcAddress(dll, "DrvGetModuleHandle");
         GetDriverModuleHandle = GetProcAddress(dll, "GetDriverModuleHandle");
+        NotifyCallbackData = GetProcAddress(dll, "NotifyCallbackData");
         OpenDriver = GetProcAddress(dll, "OpenDriver");
+        PlaySound = GetProcAddress(dll, "PlaySound");
+        PlaySoundA = GetProcAddress(dll, "PlaySoundA");
+        PlaySoundW = GetProcAddress(dll, "PlaySoundW");
         SendDriverMessage = GetProcAddress(dll, "SendDriverMessage");
+        WOW32DriverCallback = GetProcAddress(dll, "WOW32DriverCallback");
+        WOW32ResolveMultiMediaHandle = GetProcAddress(dll, "WOW32ResolveMultiMediaHandle");
+        WOWAppExit = GetProcAddress(dll, "WOWAppExit");
+        aux32Message = GetProcAddress(dll, "aux32Message");
         auxGetDevCapsA = GetProcAddress(dll, "auxGetDevCapsA");
         auxGetDevCapsW = GetProcAddress(dll, "auxGetDevCapsW");
         auxGetNumDevs = GetProcAddress(dll, "auxGetNumDevs");
         auxGetVolume = GetProcAddress(dll, "auxGetVolume");
         auxOutMessage = GetProcAddress(dll, "auxOutMessage");
         auxSetVolume = GetProcAddress(dll, "auxSetVolume");
+        joy32Message = GetProcAddress(dll, "joy32Message");
         joyConfigChanged = GetProcAddress(dll, "joyConfigChanged");
         joyGetDevCapsA = GetProcAddress(dll, "joyGetDevCapsA");
         joyGetDevCapsW = GetProcAddress(dll, "joyGetDevCapsW");
@@ -1230,6 +1281,28 @@ struct winmmbase_dll
         joyReleaseCapture = GetProcAddress(dll, "joyReleaseCapture");
         joySetCapture = GetProcAddress(dll, "joySetCapture");
         joySetThreshold = GetProcAddress(dll, "joySetThreshold");
+        mci32Message = GetProcAddress(dll, "mci32Message");
+        mciDriverNotify = GetProcAddress(dll, "mciDriverNotify");
+        mciDriverYield = GetProcAddress(dll, "mciDriverYield");
+        mciExecute = GetProcAddress(dll, "mciExecute");
+        mciFreeCommandResource = GetProcAddress(dll, "mciFreeCommandResource");
+        mciGetCreatorTask = GetProcAddress(dll, "mciGetCreatorTask");
+        mciGetDeviceIDA = GetProcAddress(dll, "mciGetDeviceIDA");
+        mciGetDeviceIDFromElementIDA = GetProcAddress(dll, "mciGetDeviceIDFromElementIDA");
+        mciGetDeviceIDFromElementIDW = GetProcAddress(dll, "mciGetDeviceIDFromElementIDW");
+        mciGetDeviceIDW = GetProcAddress(dll, "mciGetDeviceIDW");
+        mciGetDriverData = GetProcAddress(dll, "mciGetDriverData");
+        mciGetErrorStringA = GetProcAddress(dll, "mciGetErrorStringA");
+        mciGetErrorStringW = GetProcAddress(dll, "mciGetErrorStringW");
+        mciGetYieldProc = GetProcAddress(dll, "mciGetYieldProc");
+        mciLoadCommandResource = GetProcAddress(dll, "mciLoadCommandResource");
+        mciSendCommandA = GetProcAddress(dll, "mciSendCommandA");
+        mciSendCommandW = GetProcAddress(dll, "mciSendCommandW");
+        mciSendStringA = GetProcAddress(dll, "mciSendStringA");
+        mciSendStringW = GetProcAddress(dll, "mciSendStringW");
+        mciSetDriverData = GetProcAddress(dll, "mciSetDriverData");
+        mciSetYieldProc = GetProcAddress(dll, "mciSetYieldProc");
+        mid32Message = GetProcAddress(dll, "mid32Message");
         midiConnect = GetProcAddress(dll, "midiConnect");
         midiDisconnect = GetProcAddress(dll, "midiDisconnect");
         midiInAddBuffer = GetProcAddress(dll, "midiInAddBuffer");
@@ -1314,7 +1387,19 @@ struct winmmbase_dll
         mmioStringToFOURCCA = GetProcAddress(dll, "mmioStringToFOURCCA");
         mmioStringToFOURCCW = GetProcAddress(dll, "mmioStringToFOURCCW");
         mmioWrite = GetProcAddress(dll, "mmioWrite");
-        sndOpenSound = GetProcAddress(dll, "sndOpenSound");
+        mmsystemGetVersion = GetProcAddress(dll, "mmsystemGetVersion");
+        mod32Message = GetProcAddress(dll, "mod32Message");
+        mxd32Message = GetProcAddress(dll, "mxd32Message");
+        sndPlaySoundA = GetProcAddress(dll, "sndPlaySoundA");
+        sndPlaySoundW = GetProcAddress(dll, "sndPlaySoundW");
+        tid32Message = GetProcAddress(dll, "tid32Message");
+        timeBeginPeriod = GetProcAddress(dll, "timeBeginPeriod");
+        timeEndPeriod = GetProcAddress(dll, "timeEndPeriod");
+        timeGetDevCaps = GetProcAddress(dll, "timeGetDevCaps");
+        timeGetSystemTime = GetProcAddress(dll, "timeGetSystemTime");
+        timeGetTime = GetProcAddress(dll, "timeGetTime");
+        timeKillEvent = GetProcAddress(dll, "timeKillEvent");
+        timeSetEvent = GetProcAddress(dll, "timeSetEvent");
         waveInAddBuffer = GetProcAddress(dll, "waveInAddBuffer");
         waveInClose = GetProcAddress(dll, "waveInClose");
         waveInGetDevCapsA = GetProcAddress(dll, "waveInGetDevCapsA");
@@ -1354,12 +1439,10 @@ struct winmmbase_dll
         waveOutSetVolume = GetProcAddress(dll, "waveOutSetVolume");
         waveOutUnprepareHeader = GetProcAddress(dll, "waveOutUnprepareHeader");
         waveOutWrite = GetProcAddress(dll, "waveOutWrite");
-        winmmbaseFreeMMEHandles = GetProcAddress(dll, "winmmbaseFreeMMEHandles");
-        winmmbaseGetWOWHandle = GetProcAddress(dll, "winmmbaseGetWOWHandle");
-        winmmbaseHandle32FromHandle16 = GetProcAddress(dll, "winmmbaseHandle32FromHandle16");
-        winmmbaseSetWOWHandle = GetProcAddress(dll, "winmmbaseSetWOWHandle");
+        wid32Message = GetProcAddress(dll, "wid32Message");
+        wod32Message = GetProcAddress(dll, "wod32Message");
     }
-} winmmbase;
+} winmm;
 
 struct msacm32_dll
 {
@@ -2028,157 +2111,198 @@ __declspec(naked) void _RegisterSpecialCase() { _asm { jmp[ddraw.RegisterSpecial
 __declspec(naked) void _ReleaseDDThreadLock() { _asm { jmp[ddraw.ReleaseDDThreadLock] } }
 __declspec(naked) void _SetAppCompatData() { _asm { jmp[ddraw.SetAppCompatData] } }
 
-__declspec(naked) void _CloseDriver() { _asm { jmp[winmmbase.CloseDriver] } }
-__declspec(naked) void _DefDriverProc() { _asm { jmp[winmmbase.DefDriverProc] } }
-__declspec(naked) void _DriverCallback() { _asm { jmp[winmmbase.DriverCallback] } }
-__declspec(naked) void _DrvGetModuleHandle() { _asm { jmp[winmmbase.DrvGetModuleHandle] } }
-__declspec(naked) void _GetDriverModuleHandle() { _asm { jmp[winmmbase.GetDriverModuleHandle] } }
-__declspec(naked) void _OpenDriver() { _asm { jmp[winmmbase.OpenDriver] } }
-__declspec(naked) void _SendDriverMessage() { _asm { jmp[winmmbase.SendDriverMessage] } }
-__declspec(naked) void _auxGetDevCapsA() { _asm { jmp[winmmbase.auxGetDevCapsA] } }
-__declspec(naked) void _auxGetDevCapsW() { _asm { jmp[winmmbase.auxGetDevCapsW] } }
-__declspec(naked) void _auxGetNumDevs() { _asm { jmp[winmmbase.auxGetNumDevs] } }
-__declspec(naked) void _auxGetVolume() { _asm { jmp[winmmbase.auxGetVolume] } }
-__declspec(naked) void _auxOutMessage() { _asm { jmp[winmmbase.auxOutMessage] } }
-__declspec(naked) void _auxSetVolume() { _asm { jmp[winmmbase.auxSetVolume] } }
-__declspec(naked) void _joyConfigChanged() { _asm { jmp[winmmbase.joyConfigChanged] } }
-__declspec(naked) void _joyGetDevCapsA() { _asm { jmp[winmmbase.joyGetDevCapsA] } }
-__declspec(naked) void _joyGetDevCapsW() { _asm { jmp[winmmbase.joyGetDevCapsW] } }
-__declspec(naked) void _joyGetNumDevs() { _asm { jmp[winmmbase.joyGetNumDevs] } }
-__declspec(naked) void _joyGetPos() { _asm { jmp[winmmbase.joyGetPos] } }
-__declspec(naked) void _joyGetPosEx() { _asm { jmp[winmmbase.joyGetPosEx] } }
-__declspec(naked) void _joyGetThreshold() { _asm { jmp[winmmbase.joyGetThreshold] } }
-__declspec(naked) void _joyReleaseCapture() { _asm { jmp[winmmbase.joyReleaseCapture] } }
-__declspec(naked) void _joySetCapture() { _asm { jmp[winmmbase.joySetCapture] } }
-__declspec(naked) void _joySetThreshold() { _asm { jmp[winmmbase.joySetThreshold] } }
-__declspec(naked) void _midiConnect() { _asm { jmp[winmmbase.midiConnect] } }
-__declspec(naked) void _midiDisconnect() { _asm { jmp[winmmbase.midiDisconnect] } }
-__declspec(naked) void _midiInAddBuffer() { _asm { jmp[winmmbase.midiInAddBuffer] } }
-__declspec(naked) void _midiInClose() { _asm { jmp[winmmbase.midiInClose] } }
-__declspec(naked) void _midiInGetDevCapsA() { _asm { jmp[winmmbase.midiInGetDevCapsA] } }
-__declspec(naked) void _midiInGetDevCapsW() { _asm { jmp[winmmbase.midiInGetDevCapsW] } }
-__declspec(naked) void _midiInGetErrorTextA() { _asm { jmp[winmmbase.midiInGetErrorTextA] } }
-__declspec(naked) void _midiInGetErrorTextW() { _asm { jmp[winmmbase.midiInGetErrorTextW] } }
-__declspec(naked) void _midiInGetID() { _asm { jmp[winmmbase.midiInGetID] } }
-__declspec(naked) void _midiInGetNumDevs() { _asm { jmp[winmmbase.midiInGetNumDevs] } }
-__declspec(naked) void _midiInMessage() { _asm { jmp[winmmbase.midiInMessage] } }
-__declspec(naked) void _midiInOpen() { _asm { jmp[winmmbase.midiInOpen] } }
-__declspec(naked) void _midiInPrepareHeader() { _asm { jmp[winmmbase.midiInPrepareHeader] } }
-__declspec(naked) void _midiInReset() { _asm { jmp[winmmbase.midiInReset] } }
-__declspec(naked) void _midiInStart() { _asm { jmp[winmmbase.midiInStart] } }
-__declspec(naked) void _midiInStop() { _asm { jmp[winmmbase.midiInStop] } }
-__declspec(naked) void _midiInUnprepareHeader() { _asm { jmp[winmmbase.midiInUnprepareHeader] } }
-__declspec(naked) void _midiOutCacheDrumPatches() { _asm { jmp[winmmbase.midiOutCacheDrumPatches] } }
-__declspec(naked) void _midiOutCachePatches() { _asm { jmp[winmmbase.midiOutCachePatches] } }
-__declspec(naked) void _midiOutClose() { _asm { jmp[winmmbase.midiOutClose] } }
-__declspec(naked) void _midiOutGetDevCapsA() { _asm { jmp[winmmbase.midiOutGetDevCapsA] } }
-__declspec(naked) void _midiOutGetDevCapsW() { _asm { jmp[winmmbase.midiOutGetDevCapsW] } }
-__declspec(naked) void _midiOutGetErrorTextA() { _asm { jmp[winmmbase.midiOutGetErrorTextA] } }
-__declspec(naked) void _midiOutGetErrorTextW() { _asm { jmp[winmmbase.midiOutGetErrorTextW] } }
-__declspec(naked) void _midiOutGetID() { _asm { jmp[winmmbase.midiOutGetID] } }
-__declspec(naked) void _midiOutGetNumDevs() { _asm { jmp[winmmbase.midiOutGetNumDevs] } }
-__declspec(naked) void _midiOutGetVolume() { _asm { jmp[winmmbase.midiOutGetVolume] } }
-__declspec(naked) void _midiOutLongMsg() { _asm { jmp[winmmbase.midiOutLongMsg] } }
-__declspec(naked) void _midiOutMessage() { _asm { jmp[winmmbase.midiOutMessage] } }
-__declspec(naked) void _midiOutOpen() { _asm { jmp[winmmbase.midiOutOpen] } }
-__declspec(naked) void _midiOutPrepareHeader() { _asm { jmp[winmmbase.midiOutPrepareHeader] } }
-__declspec(naked) void _midiOutReset() { _asm { jmp[winmmbase.midiOutReset] } }
-__declspec(naked) void _midiOutSetVolume() { _asm { jmp[winmmbase.midiOutSetVolume] } }
-__declspec(naked) void _midiOutShortMsg() { _asm { jmp[winmmbase.midiOutShortMsg] } }
-__declspec(naked) void _midiOutUnprepareHeader() { _asm { jmp[winmmbase.midiOutUnprepareHeader] } }
-__declspec(naked) void _midiStreamClose() { _asm { jmp[winmmbase.midiStreamClose] } }
-__declspec(naked) void _midiStreamOpen() { _asm { jmp[winmmbase.midiStreamOpen] } }
-__declspec(naked) void _midiStreamOut() { _asm { jmp[winmmbase.midiStreamOut] } }
-__declspec(naked) void _midiStreamPause() { _asm { jmp[winmmbase.midiStreamPause] } }
-__declspec(naked) void _midiStreamPosition() { _asm { jmp[winmmbase.midiStreamPosition] } }
-__declspec(naked) void _midiStreamProperty() { _asm { jmp[winmmbase.midiStreamProperty] } }
-__declspec(naked) void _midiStreamRestart() { _asm { jmp[winmmbase.midiStreamRestart] } }
-__declspec(naked) void _midiStreamStop() { _asm { jmp[winmmbase.midiStreamStop] } }
-__declspec(naked) void _mixerClose() { _asm { jmp[winmmbase.mixerClose] } }
-__declspec(naked) void _mixerGetControlDetailsA() { _asm { jmp[winmmbase.mixerGetControlDetailsA] } }
-__declspec(naked) void _mixerGetControlDetailsW() { _asm { jmp[winmmbase.mixerGetControlDetailsW] } }
-__declspec(naked) void _mixerGetDevCapsA() { _asm { jmp[winmmbase.mixerGetDevCapsA] } }
-__declspec(naked) void _mixerGetDevCapsW() { _asm { jmp[winmmbase.mixerGetDevCapsW] } }
-__declspec(naked) void _mixerGetID() { _asm { jmp[winmmbase.mixerGetID] } }
-__declspec(naked) void _mixerGetLineControlsA() { _asm { jmp[winmmbase.mixerGetLineControlsA] } }
-__declspec(naked) void _mixerGetLineControlsW() { _asm { jmp[winmmbase.mixerGetLineControlsW] } }
-__declspec(naked) void _mixerGetLineInfoA() { _asm { jmp[winmmbase.mixerGetLineInfoA] } }
-__declspec(naked) void _mixerGetLineInfoW() { _asm { jmp[winmmbase.mixerGetLineInfoW] } }
-__declspec(naked) void _mixerGetNumDevs() { _asm { jmp[winmmbase.mixerGetNumDevs] } }
-__declspec(naked) void _mixerMessage() { _asm { jmp[winmmbase.mixerMessage] } }
-__declspec(naked) void _mixerOpen() { _asm { jmp[winmmbase.mixerOpen] } }
-__declspec(naked) void _mixerSetControlDetails() { _asm { jmp[winmmbase.mixerSetControlDetails] } }
-__declspec(naked) void _mmDrvInstall() { _asm { jmp[winmmbase.mmDrvInstall] } }
-__declspec(naked) void _mmGetCurrentTask() { _asm { jmp[winmmbase.mmGetCurrentTask] } }
-__declspec(naked) void _mmTaskBlock() { _asm { jmp[winmmbase.mmTaskBlock] } }
-__declspec(naked) void _mmTaskCreate() { _asm { jmp[winmmbase.mmTaskCreate] } }
-__declspec(naked) void _mmTaskSignal() { _asm { jmp[winmmbase.mmTaskSignal] } }
-__declspec(naked) void _mmTaskYield() { _asm { jmp[winmmbase.mmTaskYield] } }
-__declspec(naked) void _mmioAdvance() { _asm { jmp[winmmbase.mmioAdvance] } }
-__declspec(naked) void _mmioAscend() { _asm { jmp[winmmbase.mmioAscend] } }
-__declspec(naked) void _mmioClose() { _asm { jmp[winmmbase.mmioClose] } }
-__declspec(naked) void _mmioCreateChunk() { _asm { jmp[winmmbase.mmioCreateChunk] } }
-__declspec(naked) void _mmioDescend() { _asm { jmp[winmmbase.mmioDescend] } }
-__declspec(naked) void _mmioFlush() { _asm { jmp[winmmbase.mmioFlush] } }
-__declspec(naked) void _mmioGetInfo() { _asm { jmp[winmmbase.mmioGetInfo] } }
-__declspec(naked) void _mmioInstallIOProcA() { _asm { jmp[winmmbase.mmioInstallIOProcA] } }
-__declspec(naked) void _mmioInstallIOProcW() { _asm { jmp[winmmbase.mmioInstallIOProcW] } }
-__declspec(naked) void _mmioOpenA() { _asm { jmp[winmmbase.mmioOpenA] } }
-__declspec(naked) void _mmioOpenW() { _asm { jmp[winmmbase.mmioOpenW] } }
-__declspec(naked) void _mmioRead() { _asm { jmp[winmmbase.mmioRead] } }
-__declspec(naked) void _mmioRenameA() { _asm { jmp[winmmbase.mmioRenameA] } }
-__declspec(naked) void _mmioRenameW() { _asm { jmp[winmmbase.mmioRenameW] } }
-__declspec(naked) void _mmioSeek() { _asm { jmp[winmmbase.mmioSeek] } }
-__declspec(naked) void _mmioSendMessage() { _asm { jmp[winmmbase.mmioSendMessage] } }
-__declspec(naked) void _mmioSetBuffer() { _asm { jmp[winmmbase.mmioSetBuffer] } }
-__declspec(naked) void _mmioSetInfo() { _asm { jmp[winmmbase.mmioSetInfo] } }
-__declspec(naked) void _mmioStringToFOURCCA() { _asm { jmp[winmmbase.mmioStringToFOURCCA] } }
-__declspec(naked) void _mmioStringToFOURCCW() { _asm { jmp[winmmbase.mmioStringToFOURCCW] } }
-__declspec(naked) void _mmioWrite() { _asm { jmp[winmmbase.mmioWrite] } }
-__declspec(naked) void _sndOpenSound() { _asm { jmp[winmmbase.sndOpenSound] } }
-__declspec(naked) void _waveInAddBuffer() { _asm { jmp[winmmbase.waveInAddBuffer] } }
-__declspec(naked) void _waveInClose() { _asm { jmp[winmmbase.waveInClose] } }
-__declspec(naked) void _waveInGetDevCapsA() { _asm { jmp[winmmbase.waveInGetDevCapsA] } }
-__declspec(naked) void _waveInGetDevCapsW() { _asm { jmp[winmmbase.waveInGetDevCapsW] } }
-__declspec(naked) void _waveInGetErrorTextA() { _asm { jmp[winmmbase.waveInGetErrorTextA] } }
-__declspec(naked) void _waveInGetErrorTextW() { _asm { jmp[winmmbase.waveInGetErrorTextW] } }
-__declspec(naked) void _waveInGetID() { _asm { jmp[winmmbase.waveInGetID] } }
-__declspec(naked) void _waveInGetNumDevs() { _asm { jmp[winmmbase.waveInGetNumDevs] } }
-__declspec(naked) void _waveInGetPosition() { _asm { jmp[winmmbase.waveInGetPosition] } }
-__declspec(naked) void _waveInMessage() { _asm { jmp[winmmbase.waveInMessage] } }
-__declspec(naked) void _waveInOpen() { _asm { jmp[winmmbase.waveInOpen] } }
-__declspec(naked) void _waveInPrepareHeader() { _asm { jmp[winmmbase.waveInPrepareHeader] } }
-__declspec(naked) void _waveInReset() { _asm { jmp[winmmbase.waveInReset] } }
-__declspec(naked) void _waveInStart() { _asm { jmp[winmmbase.waveInStart] } }
-__declspec(naked) void _waveInStop() { _asm { jmp[winmmbase.waveInStop] } }
-__declspec(naked) void _waveInUnprepareHeader() { _asm { jmp[winmmbase.waveInUnprepareHeader] } }
-__declspec(naked) void _waveOutBreakLoop() { _asm { jmp[winmmbase.waveOutBreakLoop] } }
-__declspec(naked) void _waveOutClose() { _asm { jmp[winmmbase.waveOutClose] } }
-__declspec(naked) void _waveOutGetDevCapsA() { _asm { jmp[winmmbase.waveOutGetDevCapsA] } }
-__declspec(naked) void _waveOutGetDevCapsW() { _asm { jmp[winmmbase.waveOutGetDevCapsW] } }
-__declspec(naked) void _waveOutGetErrorTextA() { _asm { jmp[winmmbase.waveOutGetErrorTextA] } }
-__declspec(naked) void _waveOutGetErrorTextW() { _asm { jmp[winmmbase.waveOutGetErrorTextW] } }
-__declspec(naked) void _waveOutGetID() { _asm { jmp[winmmbase.waveOutGetID] } }
-__declspec(naked) void _waveOutGetNumDevs() { _asm { jmp[winmmbase.waveOutGetNumDevs] } }
-__declspec(naked) void _waveOutGetPitch() { _asm { jmp[winmmbase.waveOutGetPitch] } }
-__declspec(naked) void _waveOutGetPlaybackRate() { _asm { jmp[winmmbase.waveOutGetPlaybackRate] } }
-__declspec(naked) void _waveOutGetPosition() { _asm { jmp[winmmbase.waveOutGetPosition] } }
-__declspec(naked) void _waveOutGetVolume() { _asm { jmp[winmmbase.waveOutGetVolume] } }
-__declspec(naked) void _waveOutMessage() { _asm { jmp[winmmbase.waveOutMessage] } }
-__declspec(naked) void _waveOutOpen() { _asm { jmp[winmmbase.waveOutOpen] } }
-__declspec(naked) void _waveOutPause() { _asm { jmp[winmmbase.waveOutPause] } }
-__declspec(naked) void _waveOutPrepareHeader() { _asm { jmp[winmmbase.waveOutPrepareHeader] } }
-__declspec(naked) void _waveOutReset() { _asm { jmp[winmmbase.waveOutReset] } }
-__declspec(naked) void _waveOutRestart() { _asm { jmp[winmmbase.waveOutRestart] } }
-__declspec(naked) void _waveOutSetPitch() { _asm { jmp[winmmbase.waveOutSetPitch] } }
-__declspec(naked) void _waveOutSetPlaybackRate() { _asm { jmp[winmmbase.waveOutSetPlaybackRate] } }
-__declspec(naked) void _waveOutSetVolume() { _asm { jmp[winmmbase.waveOutSetVolume] } }
-__declspec(naked) void _waveOutUnprepareHeader() { _asm { jmp[winmmbase.waveOutUnprepareHeader] } }
-__declspec(naked) void _waveOutWrite() { _asm { jmp[winmmbase.waveOutWrite] } }
-__declspec(naked) void _winmmbaseFreeMMEHandles() { _asm { jmp[winmmbase.winmmbaseFreeMMEHandles] } }
-__declspec(naked) void _winmmbaseGetWOWHandle() { _asm { jmp[winmmbase.winmmbaseGetWOWHandle] } }
-__declspec(naked) void _winmmbaseHandle32FromHandle16() { _asm { jmp[winmmbase.winmmbaseHandle32FromHandle16] } }
-__declspec(naked) void _winmmbaseSetWOWHandle() { _asm { jmp[winmmbase.winmmbaseSetWOWHandle] } }
+__declspec(naked) void _CloseDriver() { _asm { jmp[winmm.CloseDriver] } }
+__declspec(naked) void _DefDriverProc() { _asm { jmp[winmm.DefDriverProc] } }
+__declspec(naked) void _DriverCallback() { _asm { jmp[winmm.DriverCallback] } }
+__declspec(naked) void _DrvGetModuleHandle() { _asm { jmp[winmm.DrvGetModuleHandle] } }
+__declspec(naked) void _GetDriverModuleHandle() { _asm { jmp[winmm.GetDriverModuleHandle] } }
+__declspec(naked) void _NotifyCallbackData() { _asm { jmp[winmm.NotifyCallbackData] } }
+__declspec(naked) void _OpenDriver() { _asm { jmp[winmm.OpenDriver] } }
+__declspec(naked) void _PlaySound() { _asm { jmp[winmm.PlaySound] } }
+__declspec(naked) void _PlaySoundA() { _asm { jmp[winmm.PlaySoundA] } }
+__declspec(naked) void _PlaySoundW() { _asm { jmp[winmm.PlaySoundW] } }
+__declspec(naked) void _SendDriverMessage() { _asm { jmp[winmm.SendDriverMessage] } }
+__declspec(naked) void _WOW32DriverCallback() { _asm { jmp[winmm.WOW32DriverCallback] } }
+__declspec(naked) void _WOW32ResolveMultiMediaHandle() { _asm { jmp[winmm.WOW32ResolveMultiMediaHandle] } }
+__declspec(naked) void _WOWAppExit() { _asm { jmp[winmm.WOWAppExit] } }
+__declspec(naked) void _aux32Message() { _asm { jmp[winmm.aux32Message] } }
+__declspec(naked) void _auxGetDevCapsA() { _asm { jmp[winmm.auxGetDevCapsA] } }
+__declspec(naked) void _auxGetDevCapsW() { _asm { jmp[winmm.auxGetDevCapsW] } }
+__declspec(naked) void _auxGetNumDevs() { _asm { jmp[winmm.auxGetNumDevs] } }
+__declspec(naked) void _auxGetVolume() { _asm { jmp[winmm.auxGetVolume] } }
+__declspec(naked) void _auxOutMessage() { _asm { jmp[winmm.auxOutMessage] } }
+__declspec(naked) void _auxSetVolume() { _asm { jmp[winmm.auxSetVolume] } }
+__declspec(naked) void _joy32Message() { _asm { jmp[winmm.joy32Message] } }
+__declspec(naked) void _joyConfigChanged() { _asm { jmp[winmm.joyConfigChanged] } }
+__declspec(naked) void _joyGetDevCapsA() { _asm { jmp[winmm.joyGetDevCapsA] } }
+__declspec(naked) void _joyGetDevCapsW() { _asm { jmp[winmm.joyGetDevCapsW] } }
+__declspec(naked) void _joyGetNumDevs() { _asm { jmp[winmm.joyGetNumDevs] } }
+__declspec(naked) void _joyGetPos() { _asm { jmp[winmm.joyGetPos] } }
+__declspec(naked) void _joyGetPosEx() { _asm { jmp[winmm.joyGetPosEx] } }
+__declspec(naked) void _joyGetThreshold() { _asm { jmp[winmm.joyGetThreshold] } }
+__declspec(naked) void _joyReleaseCapture() { _asm { jmp[winmm.joyReleaseCapture] } }
+__declspec(naked) void _joySetCapture() { _asm { jmp[winmm.joySetCapture] } }
+__declspec(naked) void _joySetThreshold() { _asm { jmp[winmm.joySetThreshold] } }
+__declspec(naked) void _mci32Message() { _asm { jmp[winmm.mci32Message] } }
+__declspec(naked) void _mciDriverNotify() { _asm { jmp[winmm.mciDriverNotify] } }
+__declspec(naked) void _mciDriverYield() { _asm { jmp[winmm.mciDriverYield] } }
+__declspec(naked) void _mciExecute() { _asm { jmp[winmm.mciExecute] } }
+__declspec(naked) void _mciFreeCommandResource() { _asm { jmp[winmm.mciFreeCommandResource] } }
+__declspec(naked) void _mciGetCreatorTask() { _asm { jmp[winmm.mciGetCreatorTask] } }
+__declspec(naked) void _mciGetDeviceIDA() { _asm { jmp[winmm.mciGetDeviceIDA] } }
+__declspec(naked) void _mciGetDeviceIDFromElementIDA() { _asm { jmp[winmm.mciGetDeviceIDFromElementIDA] } }
+__declspec(naked) void _mciGetDeviceIDFromElementIDW() { _asm { jmp[winmm.mciGetDeviceIDFromElementIDW] } }
+__declspec(naked) void _mciGetDeviceIDW() { _asm { jmp[winmm.mciGetDeviceIDW] } }
+__declspec(naked) void _mciGetDriverData() { _asm { jmp[winmm.mciGetDriverData] } }
+__declspec(naked) void _mciGetErrorStringA() { _asm { jmp[winmm.mciGetErrorStringA] } }
+__declspec(naked) void _mciGetErrorStringW() { _asm { jmp[winmm.mciGetErrorStringW] } }
+__declspec(naked) void _mciGetYieldProc() { _asm { jmp[winmm.mciGetYieldProc] } }
+__declspec(naked) void _mciLoadCommandResource() { _asm { jmp[winmm.mciLoadCommandResource] } }
+__declspec(naked) void _mciSendCommandA() { _asm { jmp[winmm.mciSendCommandA] } }
+__declspec(naked) void _mciSendCommandW() { _asm { jmp[winmm.mciSendCommandW] } }
+__declspec(naked) void _mciSendStringA() { _asm { jmp[winmm.mciSendStringA] } }
+__declspec(naked) void _mciSendStringW() { _asm { jmp[winmm.mciSendStringW] } }
+__declspec(naked) void _mciSetDriverData() { _asm { jmp[winmm.mciSetDriverData] } }
+__declspec(naked) void _mciSetYieldProc() { _asm { jmp[winmm.mciSetYieldProc] } }
+__declspec(naked) void _mid32Message() { _asm { jmp[winmm.mid32Message] } }
+__declspec(naked) void _midiConnect() { _asm { jmp[winmm.midiConnect] } }
+__declspec(naked) void _midiDisconnect() { _asm { jmp[winmm.midiDisconnect] } }
+__declspec(naked) void _midiInAddBuffer() { _asm { jmp[winmm.midiInAddBuffer] } }
+__declspec(naked) void _midiInClose() { _asm { jmp[winmm.midiInClose] } }
+__declspec(naked) void _midiInGetDevCapsA() { _asm { jmp[winmm.midiInGetDevCapsA] } }
+__declspec(naked) void _midiInGetDevCapsW() { _asm { jmp[winmm.midiInGetDevCapsW] } }
+__declspec(naked) void _midiInGetErrorTextA() { _asm { jmp[winmm.midiInGetErrorTextA] } }
+__declspec(naked) void _midiInGetErrorTextW() { _asm { jmp[winmm.midiInGetErrorTextW] } }
+__declspec(naked) void _midiInGetID() { _asm { jmp[winmm.midiInGetID] } }
+__declspec(naked) void _midiInGetNumDevs() { _asm { jmp[winmm.midiInGetNumDevs] } }
+__declspec(naked) void _midiInMessage() { _asm { jmp[winmm.midiInMessage] } }
+__declspec(naked) void _midiInOpen() { _asm { jmp[winmm.midiInOpen] } }
+__declspec(naked) void _midiInPrepareHeader() { _asm { jmp[winmm.midiInPrepareHeader] } }
+__declspec(naked) void _midiInReset() { _asm { jmp[winmm.midiInReset] } }
+__declspec(naked) void _midiInStart() { _asm { jmp[winmm.midiInStart] } }
+__declspec(naked) void _midiInStop() { _asm { jmp[winmm.midiInStop] } }
+__declspec(naked) void _midiInUnprepareHeader() { _asm { jmp[winmm.midiInUnprepareHeader] } }
+__declspec(naked) void _midiOutCacheDrumPatches() { _asm { jmp[winmm.midiOutCacheDrumPatches] } }
+__declspec(naked) void _midiOutCachePatches() { _asm { jmp[winmm.midiOutCachePatches] } }
+__declspec(naked) void _midiOutClose() { _asm { jmp[winmm.midiOutClose] } }
+__declspec(naked) void _midiOutGetDevCapsA() { _asm { jmp[winmm.midiOutGetDevCapsA] } }
+__declspec(naked) void _midiOutGetDevCapsW() { _asm { jmp[winmm.midiOutGetDevCapsW] } }
+__declspec(naked) void _midiOutGetErrorTextA() { _asm { jmp[winmm.midiOutGetErrorTextA] } }
+__declspec(naked) void _midiOutGetErrorTextW() { _asm { jmp[winmm.midiOutGetErrorTextW] } }
+__declspec(naked) void _midiOutGetID() { _asm { jmp[winmm.midiOutGetID] } }
+__declspec(naked) void _midiOutGetNumDevs() { _asm { jmp[winmm.midiOutGetNumDevs] } }
+__declspec(naked) void _midiOutGetVolume() { _asm { jmp[winmm.midiOutGetVolume] } }
+__declspec(naked) void _midiOutLongMsg() { _asm { jmp[winmm.midiOutLongMsg] } }
+__declspec(naked) void _midiOutMessage() { _asm { jmp[winmm.midiOutMessage] } }
+__declspec(naked) void _midiOutOpen() { _asm { jmp[winmm.midiOutOpen] } }
+__declspec(naked) void _midiOutPrepareHeader() { _asm { jmp[winmm.midiOutPrepareHeader] } }
+__declspec(naked) void _midiOutReset() { _asm { jmp[winmm.midiOutReset] } }
+__declspec(naked) void _midiOutSetVolume() { _asm { jmp[winmm.midiOutSetVolume] } }
+__declspec(naked) void _midiOutShortMsg() { _asm { jmp[winmm.midiOutShortMsg] } }
+__declspec(naked) void _midiOutUnprepareHeader() { _asm { jmp[winmm.midiOutUnprepareHeader] } }
+__declspec(naked) void _midiStreamClose() { _asm { jmp[winmm.midiStreamClose] } }
+__declspec(naked) void _midiStreamOpen() { _asm { jmp[winmm.midiStreamOpen] } }
+__declspec(naked) void _midiStreamOut() { _asm { jmp[winmm.midiStreamOut] } }
+__declspec(naked) void _midiStreamPause() { _asm { jmp[winmm.midiStreamPause] } }
+__declspec(naked) void _midiStreamPosition() { _asm { jmp[winmm.midiStreamPosition] } }
+__declspec(naked) void _midiStreamProperty() { _asm { jmp[winmm.midiStreamProperty] } }
+__declspec(naked) void _midiStreamRestart() { _asm { jmp[winmm.midiStreamRestart] } }
+__declspec(naked) void _midiStreamStop() { _asm { jmp[winmm.midiStreamStop] } }
+__declspec(naked) void _mixerClose() { _asm { jmp[winmm.mixerClose] } }
+__declspec(naked) void _mixerGetControlDetailsA() { _asm { jmp[winmm.mixerGetControlDetailsA] } }
+__declspec(naked) void _mixerGetControlDetailsW() { _asm { jmp[winmm.mixerGetControlDetailsW] } }
+__declspec(naked) void _mixerGetDevCapsA() { _asm { jmp[winmm.mixerGetDevCapsA] } }
+__declspec(naked) void _mixerGetDevCapsW() { _asm { jmp[winmm.mixerGetDevCapsW] } }
+__declspec(naked) void _mixerGetID() { _asm { jmp[winmm.mixerGetID] } }
+__declspec(naked) void _mixerGetLineControlsA() { _asm { jmp[winmm.mixerGetLineControlsA] } }
+__declspec(naked) void _mixerGetLineControlsW() { _asm { jmp[winmm.mixerGetLineControlsW] } }
+__declspec(naked) void _mixerGetLineInfoA() { _asm { jmp[winmm.mixerGetLineInfoA] } }
+__declspec(naked) void _mixerGetLineInfoW() { _asm { jmp[winmm.mixerGetLineInfoW] } }
+__declspec(naked) void _mixerGetNumDevs() { _asm { jmp[winmm.mixerGetNumDevs] } }
+__declspec(naked) void _mixerMessage() { _asm { jmp[winmm.mixerMessage] } }
+__declspec(naked) void _mixerOpen() { _asm { jmp[winmm.mixerOpen] } }
+__declspec(naked) void _mixerSetControlDetails() { _asm { jmp[winmm.mixerSetControlDetails] } }
+__declspec(naked) void _mmDrvInstall() { _asm { jmp[winmm.mmDrvInstall] } }
+__declspec(naked) void _mmGetCurrentTask() { _asm { jmp[winmm.mmGetCurrentTask] } }
+__declspec(naked) void _mmTaskBlock() { _asm { jmp[winmm.mmTaskBlock] } }
+__declspec(naked) void _mmTaskCreate() { _asm { jmp[winmm.mmTaskCreate] } }
+__declspec(naked) void _mmTaskSignal() { _asm { jmp[winmm.mmTaskSignal] } }
+__declspec(naked) void _mmTaskYield() { _asm { jmp[winmm.mmTaskYield] } }
+__declspec(naked) void _mmioAdvance() { _asm { jmp[winmm.mmioAdvance] } }
+__declspec(naked) void _mmioAscend() { _asm { jmp[winmm.mmioAscend] } }
+__declspec(naked) void _mmioClose() { _asm { jmp[winmm.mmioClose] } }
+__declspec(naked) void _mmioCreateChunk() { _asm { jmp[winmm.mmioCreateChunk] } }
+__declspec(naked) void _mmioDescend() { _asm { jmp[winmm.mmioDescend] } }
+__declspec(naked) void _mmioFlush() { _asm { jmp[winmm.mmioFlush] } }
+__declspec(naked) void _mmioGetInfo() { _asm { jmp[winmm.mmioGetInfo] } }
+__declspec(naked) void _mmioInstallIOProcA() { _asm { jmp[winmm.mmioInstallIOProcA] } }
+__declspec(naked) void _mmioInstallIOProcW() { _asm { jmp[winmm.mmioInstallIOProcW] } }
+__declspec(naked) void _mmioOpenA() { _asm { jmp[winmm.mmioOpenA] } }
+__declspec(naked) void _mmioOpenW() { _asm { jmp[winmm.mmioOpenW] } }
+__declspec(naked) void _mmioRead() { _asm { jmp[winmm.mmioRead] } }
+__declspec(naked) void _mmioRenameA() { _asm { jmp[winmm.mmioRenameA] } }
+__declspec(naked) void _mmioRenameW() { _asm { jmp[winmm.mmioRenameW] } }
+__declspec(naked) void _mmioSeek() { _asm { jmp[winmm.mmioSeek] } }
+__declspec(naked) void _mmioSendMessage() { _asm { jmp[winmm.mmioSendMessage] } }
+__declspec(naked) void _mmioSetBuffer() { _asm { jmp[winmm.mmioSetBuffer] } }
+__declspec(naked) void _mmioSetInfo() { _asm { jmp[winmm.mmioSetInfo] } }
+__declspec(naked) void _mmioStringToFOURCCA() { _asm { jmp[winmm.mmioStringToFOURCCA] } }
+__declspec(naked) void _mmioStringToFOURCCW() { _asm { jmp[winmm.mmioStringToFOURCCW] } }
+__declspec(naked) void _mmioWrite() { _asm { jmp[winmm.mmioWrite] } }
+__declspec(naked) void _mmsystemGetVersion() { _asm { jmp[winmm.mmsystemGetVersion] } }
+__declspec(naked) void _mod32Message() { _asm { jmp[winmm.mod32Message] } }
+__declspec(naked) void _mxd32Message() { _asm { jmp[winmm.mxd32Message] } }
+__declspec(naked) void _sndPlaySoundA() { _asm { jmp[winmm.sndPlaySoundA] } }
+__declspec(naked) void _sndPlaySoundW() { _asm { jmp[winmm.sndPlaySoundW] } }
+__declspec(naked) void _tid32Message() { _asm { jmp[winmm.tid32Message] } }
+__declspec(naked) void _timeBeginPeriod() { _asm { jmp[winmm.timeBeginPeriod] } }
+__declspec(naked) void _timeEndPeriod() { _asm { jmp[winmm.timeEndPeriod] } }
+__declspec(naked) void _timeGetDevCaps() { _asm { jmp[winmm.timeGetDevCaps] } }
+__declspec(naked) void _timeGetSystemTime() { _asm { jmp[winmm.timeGetSystemTime] } }
+__declspec(naked) void _timeGetTime() { _asm { jmp[winmm.timeGetTime] } }
+__declspec(naked) void _timeKillEvent() { _asm { jmp[winmm.timeKillEvent] } }
+__declspec(naked) void _timeSetEvent() { _asm { jmp[winmm.timeSetEvent] } }
+__declspec(naked) void _waveInAddBuffer() { _asm { jmp[winmm.waveInAddBuffer] } }
+__declspec(naked) void _waveInClose() { _asm { jmp[winmm.waveInClose] } }
+__declspec(naked) void _waveInGetDevCapsA() { _asm { jmp[winmm.waveInGetDevCapsA] } }
+__declspec(naked) void _waveInGetDevCapsW() { _asm { jmp[winmm.waveInGetDevCapsW] } }
+__declspec(naked) void _waveInGetErrorTextA() { _asm { jmp[winmm.waveInGetErrorTextA] } }
+__declspec(naked) void _waveInGetErrorTextW() { _asm { jmp[winmm.waveInGetErrorTextW] } }
+__declspec(naked) void _waveInGetID() { _asm { jmp[winmm.waveInGetID] } }
+__declspec(naked) void _waveInGetNumDevs() { _asm { jmp[winmm.waveInGetNumDevs] } }
+__declspec(naked) void _waveInGetPosition() { _asm { jmp[winmm.waveInGetPosition] } }
+__declspec(naked) void _waveInMessage() { _asm { jmp[winmm.waveInMessage] } }
+__declspec(naked) void _waveInOpen() { _asm { jmp[winmm.waveInOpen] } }
+__declspec(naked) void _waveInPrepareHeader() { _asm { jmp[winmm.waveInPrepareHeader] } }
+__declspec(naked) void _waveInReset() { _asm { jmp[winmm.waveInReset] } }
+__declspec(naked) void _waveInStart() { _asm { jmp[winmm.waveInStart] } }
+__declspec(naked) void _waveInStop() { _asm { jmp[winmm.waveInStop] } }
+__declspec(naked) void _waveInUnprepareHeader() { _asm { jmp[winmm.waveInUnprepareHeader] } }
+__declspec(naked) void _waveOutBreakLoop() { _asm { jmp[winmm.waveOutBreakLoop] } }
+__declspec(naked) void _waveOutClose() { _asm { jmp[winmm.waveOutClose] } }
+__declspec(naked) void _waveOutGetDevCapsA() { _asm { jmp[winmm.waveOutGetDevCapsA] } }
+__declspec(naked) void _waveOutGetDevCapsW() { _asm { jmp[winmm.waveOutGetDevCapsW] } }
+__declspec(naked) void _waveOutGetErrorTextA() { _asm { jmp[winmm.waveOutGetErrorTextA] } }
+__declspec(naked) void _waveOutGetErrorTextW() { _asm { jmp[winmm.waveOutGetErrorTextW] } }
+__declspec(naked) void _waveOutGetID() { _asm { jmp[winmm.waveOutGetID] } }
+__declspec(naked) void _waveOutGetNumDevs() { _asm { jmp[winmm.waveOutGetNumDevs] } }
+__declspec(naked) void _waveOutGetPitch() { _asm { jmp[winmm.waveOutGetPitch] } }
+__declspec(naked) void _waveOutGetPlaybackRate() { _asm { jmp[winmm.waveOutGetPlaybackRate] } }
+__declspec(naked) void _waveOutGetPosition() { _asm { jmp[winmm.waveOutGetPosition] } }
+__declspec(naked) void _waveOutGetVolume() { _asm { jmp[winmm.waveOutGetVolume] } }
+__declspec(naked) void _waveOutMessage() { _asm { jmp[winmm.waveOutMessage] } }
+__declspec(naked) void _waveOutOpen() { _asm { jmp[winmm.waveOutOpen] } }
+__declspec(naked) void _waveOutPause() { _asm { jmp[winmm.waveOutPause] } }
+__declspec(naked) void _waveOutPrepareHeader() { _asm { jmp[winmm.waveOutPrepareHeader] } }
+__declspec(naked) void _waveOutReset() { _asm { jmp[winmm.waveOutReset] } }
+__declspec(naked) void _waveOutRestart() { _asm { jmp[winmm.waveOutRestart] } }
+__declspec(naked) void _waveOutSetPitch() { _asm { jmp[winmm.waveOutSetPitch] } }
+__declspec(naked) void _waveOutSetPlaybackRate() { _asm { jmp[winmm.waveOutSetPlaybackRate] } }
+__declspec(naked) void _waveOutSetVolume() { _asm { jmp[winmm.waveOutSetVolume] } }
+__declspec(naked) void _waveOutUnprepareHeader() { _asm { jmp[winmm.waveOutUnprepareHeader] } }
+__declspec(naked) void _waveOutWrite() { _asm { jmp[winmm.waveOutWrite] } }
+__declspec(naked) void _wid32Message() { _asm { jmp[winmm.wid32Message] } }
+__declspec(naked) void _wod32Message() { _asm { jmp[winmm.wod32Message] } }
 
 __declspec(naked) void _acmDriverAddA() { _asm { jmp[msacm32.acmDriverAddA] } }
 __declspec(naked) void _acmDriverAddW() { _asm { jmp[msacm32.acmDriverAddW] } }
