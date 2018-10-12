@@ -15,7 +15,7 @@ This is a DLL file which adds ASI plugin loading functionality to any game, whic
 * msvfw32.dll
 * version.dll (x86 and x64)
 * wininet.dll (x86 and x64)
-* winmmbase.dll
+* winmm.dll
 * xlive.dll
 
 * vorbisFile.dll
