@@ -8,6 +8,9 @@
 #include <functional>
 #include <set>
 #include <ModuleList\ModuleList.hpp>
+#include <time.h>
+#include <DbgHelp.h>
+#pragma comment(lib, "Dbghelp.lib")
 #include <intrin.h>
 #pragma intrinsic(_ReturnAddress)
 

@@ -278,7 +278,7 @@ void LoadOriginalLibrary()
             if (!VirtualProtect(reinterpret_cast<VOID*>(dwLoadOffset + pSection->VirtualAddress), dwPhysSize, newProtect, &oldProtect)) {
                 ExitProcess(0);
             }
-        }, ".text", ".rdata");
+            }, ".text", ".rdata");
     }
     else
     {
@@ -501,7 +501,7 @@ void LoadPluginsAndRestoreIAT(uintptr_t retaddr)
         auto dwEnd = dwStart + dwPhysSize;
         if (retaddr >= dwStart && retaddr <= dwEnd)
             calledFromBind = true;
-    }, ".bind");
+        }, ".bind");
 
     if (calledFromBind) return;
 
@@ -907,6 +907,59 @@ bool HookKernel32IAT(HMODULE mod, bool exe)
     return matchedImports > 0;
 }
 
+LONG WINAPI CustomUnhandledExceptionFilter(LPEXCEPTION_POINTERS ExceptionInfo)
+{
+    // step 1: write minidump
+    wchar_t		modulename[MAX_PATH];
+    wchar_t		filename[MAX_PATH];
+    wchar_t		timestamp[128];
+    __time64_t	time;
+    struct tm	ltime;
+    HANDLE		hFile;
+    HWND		hWnd;
+
+    wchar_t* modulenameptr;
+    if (GetModuleFileNameW(GetModuleHandle(NULL), modulename, _countof(modulename)) != 0)
+    {
+        modulenameptr = wcsrchr(modulename, '\\');
+        *modulenameptr = L'\0';
+        modulenameptr += 1;
+    }
+    else
+    {
+        modulenameptr = L"err.err";
+    }
+
+    _time64(&time);
+    _localtime64_s(&ltime, &time);
+    wcsftime(timestamp, _countof(timestamp), L"%Y%m%d%H%M%S", &ltime);
+    swprintf_s(filename, L"%s\\%s\\%s.%s.dmp", modulename, L"CrashDumps", modulenameptr, timestamp);
+
+    hFile = CreateFileW(filename, GENERIC_WRITE, FILE_SHARE_WRITE, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+
+    if (hFile != INVALID_HANDLE_VALUE)
+    {
+        MINIDUMP_EXCEPTION_INFORMATION ex;
+        memset(&ex, 0, sizeof(ex));
+        ex.ThreadId = GetCurrentThreadId();
+        ex.ExceptionPointers = ExceptionInfo;
+        ex.ClientPointers = TRUE;
+
+        if (FAILED(MiniDumpWriteDump(GetCurrentProcess(), GetCurrentProcessId(), hFile, MiniDumpWithDataSegs, &ex, NULL, NULL)))
+        {
+        }
+
+        CloseHandle(hFile);
+    }
+
+    // step 2: exit the application
+    ShowCursor(TRUE);
+    hWnd = FindWindowW(0, L"");
+    SetForegroundWindow(hWnd);
+
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
 void Init()
 {
     std::wstring modulePath = GetModuleFileNameW(hm);
@@ -921,6 +974,34 @@ void Init()
     auto nForceEPHook = GetPrivateProfileInt(TEXT("globalsets"), TEXT("forceentrypointhook"), FALSE, iniPaths);
     auto nDontLoadFromDllMain = GetPrivateProfileInt(TEXT("globalsets"), TEXT("dontloadfromdllmain"), TRUE, iniPaths);
     auto nFindModule = GetPrivateProfileInt(TEXT("globalsets"), TEXT("findmodule"), FALSE, iniPaths);
+    auto nDisableCrashDumps = GetPrivateProfileInt(TEXT("globalsets"), TEXT("disablecrashdumps"), FALSE, iniPaths);
+
+    if (!nDisableCrashDumps)
+    {
+        std::wstring m = GetModuleFileNameW(NULL);
+        m = m.substr(0, m.find_last_of(L"/\\") + 1) + L"CrashDumps";
+
+        auto FolderExists = [](LPCWSTR szPath) -> BOOL
+        {
+            DWORD dwAttrib = GetFileAttributes(szPath);
+            return (dwAttrib != INVALID_FILE_ATTRIBUTES && (dwAttrib & FILE_ATTRIBUTE_DIRECTORY));
+        };
+
+        if (FolderExists(m.c_str()))
+        {
+            SetUnhandledExceptionFilter(CustomUnhandledExceptionFilter);
+            // Now stub out CustomUnhandledExceptionFilter so NO ONE ELSE can set it!
+#if !X64
+            uint32_t ret = 0x900004C2; //ret4
+#else
+            uint32_t ret = 0x909090C3; //ret
+#endif
+            DWORD protect[2];
+            VirtualProtect(&SetUnhandledExceptionFilter, sizeof(ret), PAGE_EXECUTE_READWRITE, &protect[0]);
+            memcpy(&SetUnhandledExceptionFilter, &ret, sizeof(ret));
+            VirtualProtect(&SetUnhandledExceptionFilter, sizeof(ret), protect[0], &protect[1]);
+        }
+    }
 
     if (nForceEPHook != FALSE || nDontLoadFromDllMain != FALSE)
     {
@@ -936,14 +1017,28 @@ void Init()
         {
             ModuleList dlls;
             dlls.Enumerate(ModuleList::SearchLocation::LocalOnly);
+
             auto ual = std::find_if(dlls.m_moduleList.begin(), dlls.m_moduleList.end(), [](auto const& it)
-            {
-                return std::get<HMODULE>(it) == hm;
-            });
+                {
+                    return std::get<HMODULE>(it) == hm;
+                });
+
+            auto sim = std::find_if(dlls.m_moduleList.rbegin(), dlls.m_moduleList.rend(), [&ual](auto const& it)
+                {
+                    auto str1 = std::get<std::wstring>(*ual);
+                    auto str2 = std::get<std::wstring>(it);
+                    std::transform(str1.begin(), str1.end(), str1.begin(), [](wchar_t c) { return ::towlower(c); });
+                    std::transform(str2.begin(), str2.end(), str2.begin(), [](wchar_t c) { return ::towlower(c); });
+
+                    return (str2 != str1) && (str2.find(str1) != std::wstring::npos);
+                });
 
             if (ual != dlls.m_moduleList.begin())
             {
-                m = std::get<HMODULE>(*std::prev(ual, 1));
+                if (sim != dlls.m_moduleList.rend())
+                    m = std::get<HMODULE>(*sim);
+                else
+                    m = std::get<HMODULE>(*std::prev(ual, 1));
             }
         }
 
