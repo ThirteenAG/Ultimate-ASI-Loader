@@ -891,9 +891,11 @@ bool HookKernel32IAT(HMODULE mod, bool exe)
                                 if ((IMAGE_ORDINAL(thunk->u1.Ordinal)) == 1)
                                     p[j] = _DirectInput8Create;
                             }
+                            ++j;
                         }
                         ++thunk;
                     }
+                    break;
                 }
             }
         }
