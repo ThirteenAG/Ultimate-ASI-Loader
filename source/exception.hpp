@@ -324,23 +324,49 @@ void ExceptionTracer::PrintRegisters()
         // Print main general purposes registers
         if (context.ContextFlags & CONTEXT_INTEGER)
         {
+#if !_M_X64
             PrintIntRegister("EAX", context.Eax);
             PrintIntRegister("EBX", context.Ebx);
             PrintIntRegister("ECX", context.Ecx);
             PrintIntRegister("EDX", context.Edx);
             PrintIntRegister("EDI", context.Edi);
             PrintIntRegister("ESI", context.Esi);
+#else
+            PrintIntRegister("RAX", context.Rax);
+            PrintIntRegister("RCX", context.Rcx);
+            PrintIntRegister("RDX", context.Rdx);
+            PrintIntRegister("RBX", context.Rbx);
+            PrintIntRegister("RSP", context.Rsp);
+            PrintIntRegister("RBP", context.Rbp);
+            PrintIntRegister("RSI", context.Rsi);
+            PrintIntRegister("RDI", context.Rdi);
+            PrintIntRegister("_R8", context.R8);
+            PrintIntRegister("_R9", context.R9);
+            PrintIntRegister("R10", context.R10);
+            PrintIntRegister("R11", context.R11);
+            PrintIntRegister("R12", context.R12);
+            PrintIntRegister("R13", context.R13);
+            PrintIntRegister("R14", context.R14);
+            PrintIntRegister("R15", context.R15);
+#endif
         }
 
         // Print control registers
         if (context.ContextFlags & CONTEXT_CONTROL)
         {
+#if !_M_X64
             PrintIntRegister("EBP", context.Ebp);
             PrintIntRegister("EIP", context.Eip);
             PrintIntRegister("ESP", context.Esp);
             PrintIntRegister("EFL", context.EFlags);
             PrintSegRegister("CS", context.SegCs);
             PrintSegRegister("SS", context.SegSs);
+#else
+            PrintIntRegister("RIP", context.Rip);
+            PrintIntRegister("RFL", context.EFlags);
+            PrintSegRegister("CS", context.SegCs);
+            PrintSegRegister("SS", context.SegSs);
+#endif
         }
 
         // Print segment registers
@@ -369,7 +395,11 @@ void ExceptionTracer::PrintStackdump()
     static const auto max_words_in_line_magic = stackdump_words_per_line + 10;
 
     MEMORY_BASIC_INFORMATION mbi;
+#if !_M_X64
     uintptr_t base, bottom, top = (uintptr_t)context.Esp;
+#else
+    uintptr_t base, bottom, top = (uintptr_t)context.Rsp;
+#endif
     auto words_in_line = max_words_in_line_magic;
 
     // Finds the bottom of the stack from it's base pointer
@@ -580,12 +610,21 @@ StackTracer::StackTracer(const CONTEXT& context)
     memcpy(&this->context, &context, sizeof(context));
 
     // Setup the initial frame context
+#if !_M_X64
     frame.AddrPC.Mode = AddrModeFlat;
     frame.AddrPC.Offset = context.Eip;
     frame.AddrFrame.Mode = AddrModeFlat;
     frame.AddrFrame.Offset = context.Ebp;
     frame.AddrStack.Mode = AddrModeFlat;
     frame.AddrStack.Offset = context.Esp;
+#else
+    frame.AddrPC.Mode = AddrModeFlat;
+    frame.AddrPC.Offset = context.Rip;
+    frame.AddrFrame.Mode = AddrModeFlat;
+    frame.AddrFrame.Offset = context.Rbp;
+    frame.AddrStack.Mode = AddrModeFlat;
+    frame.AddrStack.Offset = context.Rsp;
+#endif
 }
 
 /*
