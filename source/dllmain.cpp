@@ -1,4 +1,5 @@
 #include "dllmain.h"
+#include "exception.hpp"
 
 #if !X64
 #include <d3d8to9\source\d3d8to9.hpp>
@@ -952,7 +953,42 @@ LONG WINAPI CustomUnhandledExceptionFilter(LPEXCEPTION_POINTERS ExceptionInfo)
         CloseHandle(hFile);
     }
 
-    // step 2: exit the application
+    // step 2: write log
+    // Logs exception into buffer and writes to file
+    swprintf_s(filename, L"%s\\%s\\%s.%s.log", modulename, L"CrashDumps", modulenameptr, timestamp);
+    hFile = CreateFileW(filename, GENERIC_WRITE, FILE_SHARE_WRITE, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+
+    if (hFile != INVALID_HANDLE_VALUE)
+    {
+        auto Log = [ExceptionInfo, hFile](char* buffer, size_t size, bool reg, bool stack, bool trace)
+        {
+            if (LogException(buffer, size, (LPEXCEPTION_POINTERS)ExceptionInfo, reg, stack, trace))
+            {
+                DWORD NumberOfBytesWritten = 0;
+                WriteFile(hFile, buffer, strlen(buffer), &NumberOfBytesWritten, NULL);
+            }
+        };
+
+        // Try to make a very descriptive exception, for that we need to malloc a huge buffer...
+        if (auto buffer = (char*)malloc(max_logsize_ever))
+        {
+            Log(buffer, max_logsize_ever, true, true, true);
+            free(buffer);
+        }
+        else
+        {
+            // Use a static buffer, no need for any allocation
+            static const auto size = max_logsize_basic + max_logsize_regs + max_logsize_stackdump;
+            static char static_buf[size];
+            static_assert(size <= max_static_buffer, "Static buffer is too big");
+
+            Log(buffer = static_buf, sizeof(static_buf), true, true, false);
+        }
+
+        CloseHandle(hFile);
+    }
+
+    // step 3: exit the application
     ShowCursor(TRUE);
     hWnd = FindWindowW(0, L"");
     SetForegroundWindow(hWnd);
