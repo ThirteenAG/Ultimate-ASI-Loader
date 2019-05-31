@@ -30,9 +30,13 @@ project "Ultimate-ASI-Loader-x86"
    files { "external/MemoryModule/*.h", "external/MemoryModule/*.c" }
    files { "external/ModuleList/*.hpp" }
 
-   local dxsdk = os.getenv "DXSDK_DIR" or "Error: DXSDK_DIR not set!"
-   includedirs { dxsdk .. "/include" }
-   libdirs { dxsdk .. "/lib/x86" }
+   if dxsdk then
+      includedirs { dxsdk .. "/include" }
+      libdirs { dxsdk .. "/lib/x86" }
+   else
+      includedirs { "C:/Program Files (x86)/Microsoft DirectX SDK (June 2010)/include" }
+      libdirs { "C:/Program Files (x86)/Microsoft DirectX SDK (June 2010)/lib/x86" }
+   end
    
    characterset ("UNICODE")
    
