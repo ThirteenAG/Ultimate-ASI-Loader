@@ -47,7 +47,7 @@ Some mods, like [SkyGfx](https://github.com/aap/skygfx_vc) require [d3d8to9](htt
 UseD3D8to9=1
 ```
 
-[See example of global.ini here](https://github.com/ThirteenAG/Ultimate-ASI-Loader/blob/master/data/scripts/global.ini#L5).
+[See example of global.ini here](https://github.com/ThirteenAG/Ultimate-ASI-Loader/blob/master/data/scripts/global.ini#L6).
 
 ## CrashDumps
 

@@ -34,7 +34,7 @@ deploy:
 - provider: GitHub
   tag: v$(appveyor_build_version)
   release: Ultimate ASI Loader v$(appveyor_build_version)
-  description: DESCRIPTION\r\n------------------------\r\nThis is a DLL file which adds ASI plugin loading functionality to any game, which uses any of the following libraries:\r\n* d3d8.dll\r\n* d3d9.dll\r\n* d3d11.dll\r\n* ddraw.dll\r\n* dinput.dll\r\n* dinput8.dll (x86 and x64)\r\n* dsound.dll (x86 and x64)\r\n* msacm32.dll\r\n* msvfw32.dll\r\n* version.dll (x86 and x64)\r\n* vorbisFile.dll\r\n* wininet.dll (x86 and x64)\r\n* winmm.dll\r\n* xlive.dll\r\n\r\n\r\nINSTALLATION\r\n------------------------\r\nIn order to install it, you just need to place DLL into game directory. Usually it works as dinput8.dll, but if it's not, there is a possibility to rename it(see the list of supported names above).
+  description: DESCRIPTION\n------------------------\nThis is a DLL file which adds ASI plugin loading functionality to any game, which uses any of the following libraries:\n* d3d8.dll\n* d3d9.dll\n* d3d11.dll\n* ddraw.dll\n* dinput.dll\n* dinput8.dll (x86 and x64)\n* dsound.dll (x86 and x64)\n* msacm32.dll\n* msvfw32.dll\n* version.dll (x86 and x64)\n* vorbisFile.dll\n* wininet.dll (x86 and x64)\n* winmm.dll\n* xlive.dll\n\n\nINSTALLATION\n------------------------\nIn order to install it, you just need to place DLL into game directory. Usually it works as dinput8.dll, but if it's not, there is a possibility to rename it(see the list of supported names above).
   auth_token:
     secure: SXMI7bm5RKh5j1S8A8dnUP2HFw97xHHlJH+mA0hx819vtxOPCpMFY3aFZ+2v16ri
   artifact: Ultimate-ASI-Loader.zip, Ultimate-ASI-Loader_x64.zip

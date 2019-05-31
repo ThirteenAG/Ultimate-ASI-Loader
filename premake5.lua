@@ -47,7 +47,7 @@ project "Ultimate-ASI-Loader-x86"
    filter "configurations:Release"
       defines { "NDEBUG", "D3D8TO9NOLOG" }
       optimize "On"
-      flags { "StaticRuntime" }
+      staticruntime "On"
       
 project "MessageBox"
    kind "SharedLib"
@@ -67,7 +67,7 @@ project "MessageBox"
    filter "configurations:Release"
       defines { "NDEBUG" }
       optimize "On"
-      flags { "StaticRuntime" }
+      staticruntime "On"
       
 project "ExeUnprotect"
    kind "SharedLib"
@@ -87,7 +87,7 @@ project "ExeUnprotect"
    filter "configurations:Release"
       defines { "NDEBUG" }
       optimize "On"
-      flags { "StaticRuntime" }
+      staticruntime "On"
       
       
 -- x64
@@ -129,7 +129,7 @@ project "Ultimate-ASI-Loader-x64"
    filter "configurations:Release"
       defines { "NDEBUG" }
       optimize "On"
-      flags { "StaticRuntime" }
+      staticruntime "On"
       
 project "RE7Demo.InfiniteAmmo"
    kind "SharedLib"
@@ -149,4 +149,4 @@ project "RE7Demo.InfiniteAmmo"
    filter "configurations:Release"
       defines { "NDEBUG" }
       optimize "On"
-      flags { "StaticRuntime" }
+      staticruntime "On"
