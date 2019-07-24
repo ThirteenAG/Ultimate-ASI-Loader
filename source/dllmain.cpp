@@ -1,5 +1,6 @@
 #include "dllmain.h"
 #include "exception.hpp"
+#include <initguid.h>
 
 #if !X64
 #include <d3d8to9\source\d3d8to9.hpp>
@@ -623,6 +624,46 @@ void WINAPI CustomSleep(DWORD dwMilliseconds)
     return Sleep(dwMilliseconds);
 }
 
+DEFINE_GUID(CLSID_DirectInput, 0x25E609E0, 0xB259, 0x11CF, 0xBF, 0xC7, 0x44, 0x45, 0x53, 0x54, 0x00, 0x00);
+DEFINE_GUID(CLSID_DirectInput8, 0x25E609E4, 0xB259, 0x11CF, 0xBF, 0xC7, 0x44, 0x45, 0x53, 0x54, 0x00, 0x00);
+DEFINE_GUID(CLSID_WinInet, 0xC39EE728, 0xD419, 0x4BD4, 0xA3, 0xEF, 0xED, 0xA0, 0x59, 0xDB, 0xD9, 0x35);
+HRESULT WINAPI CustomCoCreateInstance(REFCLSID rclsid, LPUNKNOWN pUnkOuter, DWORD dwClsContext, REFIID riid, LPVOID *ppv)
+{
+    HRESULT hr = REGDB_E_KEYMISSING;
+    HMODULE hDll = NULL;
+
+    if (rclsid == CLSID_DirectInput8)
+        hDll = ::LoadLibrary(L"dinput8.dll");
+    else if (rclsid == CLSID_DirectInput)
+        hDll = ::LoadLibrary(L"dinput.dll");
+    else if (rclsid == CLSID_WinInet)
+        hDll = ::LoadLibrary(L"wininet.dll");
+
+    if (hDll == NULL)
+        return ::CoCreateInstance(rclsid, pUnkOuter, dwClsContext, riid, ppv);
+
+    typedef HRESULT(__stdcall *pDllGetClassObject)(IN REFCLSID rclsid, IN REFIID riid, OUT LPVOID FAR* ppv);
+
+    pDllGetClassObject GetClassObject = (pDllGetClassObject)::GetProcAddress(hDll, "DllGetClassObject");
+    if (GetClassObject == NULL)
+    {
+        ::FreeLibrary(hDll);
+        return hr;
+    }
+
+    IClassFactory *pIFactory;
+
+    hr = GetClassObject(rclsid, IID_IClassFactory, (LPVOID *)&pIFactory);
+
+    if (!SUCCEEDED(hr))
+        return hr;
+
+    hr = pIFactory->CreateInstance(pUnkOuter, riid, ppv);
+    pIFactory->Release();
+
+    return hr;
+}
+
 bool HookKernel32IAT(HMODULE mod, bool exe)
 {
     auto hExecutableInstance = (size_t)mod;
@@ -777,6 +818,41 @@ bool HookKernel32IAT(HMODULE mod, bool exe)
         }
     };
 
+    auto PatchCoCreateInstance = [&](size_t start, size_t end, size_t exe_end)
+    {
+        for (size_t i = 0; i < nNumImports; i++)
+        {
+            if (hExecutableInstance + (pImports + i)->FirstThunk > start && !(end && hExecutableInstance + (pImports + i)->FirstThunk > end))
+                end = hExecutableInstance + (pImports + i)->FirstThunk;
+        }
+
+        if (!end) { end = start + 0x100; }
+        if (end > exe_end) //for very broken exes
+        {
+            start = hExecutableInstance;
+            end = exe_end;
+        }
+
+        for (auto i = start; i < end; i += sizeof(size_t))
+        {
+            DWORD dwProtect[2];
+            VirtualProtect((size_t*)i, sizeof(size_t), PAGE_EXECUTE_READWRITE, &dwProtect[0]);
+
+            auto ptr = *(size_t*)i;
+            if (!ptr)
+                continue;
+
+            if (ptr == (size_t)GetProcAddress(GetModuleHandle(TEXT("OLE32.DLL")), "CoCreateInstance"))
+            {
+                *(size_t*)i = (size_t)CustomCoCreateInstance;
+                VirtualProtect((size_t*)i, sizeof(size_t), dwProtect[0], &dwProtect[1]);
+                break;
+            }
+
+            VirtualProtect((size_t*)i, sizeof(size_t), dwProtect[0], &dwProtect[1]);
+        }
+    };
+
     static auto getSection = [](const PIMAGE_NT_HEADERS nt_headers, unsigned section) -> PIMAGE_SECTION_HEADER
     {
         return reinterpret_cast<PIMAGE_SECTION_HEADER>(
@@ -802,6 +878,8 @@ bool HookKernel32IAT(HMODULE mod, bool exe)
         {
             if (!_stricmp((const char*)(hExecutableInstance + (pImports + i)->Name), "KERNEL32.DLL"))
                 PatchIAT(hExecutableInstance + (pImports + i)->FirstThunk, 0, hExecutableInstance_end);
+            else if (!_stricmp((const char*)(hExecutableInstance + (pImports + i)->Name), "OLE32.DLL"))
+                PatchCoCreateInstance(hExecutableInstance + (pImports + i)->FirstThunk, 0, hExecutableInstance_end);
         }
     }
 
