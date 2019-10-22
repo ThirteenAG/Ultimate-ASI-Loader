@@ -30,6 +30,7 @@ project "Ultimate-ASI-Loader-x86"
    files { "external/MemoryModule/*.h", "external/MemoryModule/*.c" }
    files { "external/ModuleList/*.hpp" }
 
+   local dxsdk = os.getenv "DXSDK_DIR"
    if dxsdk then
       includedirs { dxsdk .. "/include" }
       libdirs { dxsdk .. "/lib/x86" }
