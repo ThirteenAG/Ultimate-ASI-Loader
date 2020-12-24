@@ -136,17 +136,17 @@ INT WINAPI XNetDnsRelease(XNDNS *pxndns);
 #define XNET_QOS_LOOKUP_RESERVED 0x00000000         // No flags defined yet for XNetQosLookup
 #define XNET_QOS_SERVICE_LOOKUP_RESERVED 0x00000000 // No flags defined yet for XNetQosServiceLookup
 INT WINAPI XNetQosListen(const XNKID *pxnkid,
-    const BYTE *pb,
-    UINT cb,
-    DWORD dwBitsPerSec, DWORD dwFlags);
+                         const BYTE *pb,
+                         UINT cb,
+                         DWORD dwBitsPerSec, DWORD dwFlags);
 INT WINAPI XNetQosLookup(UINT cxna,
-    const XNADDR *apxna[],
-    const XNKID *apxnkid[],
-    const XNKEY *apxnkey[],
-    UINT cina,
-    const IN_ADDR aina[],
-    const DWORD adwServiceId[],
-    UINT cProbes, DWORD dwBitsPerSec, DWORD dwFlags, WSAEVENT hEvent, XNQOS **ppxnqos);
+                         const XNADDR *apxna[],
+                         const XNKID *apxnkid[],
+                         const XNKEY *apxnkey[],
+                         UINT cina,
+                         const IN_ADDR aina[],
+                         const DWORD adwServiceId[],
+                         UINT cProbes, DWORD dwBitsPerSec, DWORD dwFlags, WSAEVENT hEvent, XNQOS **ppxnqos);
 INT WINAPI XNetQosServiceLookup(DWORD dwFlags, WSAEVENT hEvent, XNQOS **ppxnqos);
 INT WINAPI XNetQosRelease(XNQOS *pxnqos);
 INT WINAPI XNetQosGetListenStats(const XNKID *pxnkid, XNQOSLISTENSTATS *pQosListenStats);
@@ -315,7 +315,8 @@ typedef enum _XUSER_PROFILE_SOURCE
 typedef struct
 {
     BYTE type;
-    union {
+    union
+    {
         LONG nData;
         LONGLONG i64Data;
         double dblData;
@@ -337,7 +338,8 @@ typedef struct
 typedef struct _XUSER_PROFILE_SETTING
 {
     XUSER_PROFILE_SOURCE source;
-    union {
+    union
+    {
         DWORD dwUserIndex;
         XUID xuid;
     } user;
@@ -540,7 +542,7 @@ typedef struct _XONLINE_FRIEND
 class IXHV2ENGINE
 {
 public:
-    IXHV2ENGINE::IXHV2ENGINE();
+    IXHV2ENGINE();
     // 2F0 bytes = actual size
     // - note: check all INT return values - may not be true
     INT Dummy1(VOID *pThis);            // 00
@@ -600,7 +602,8 @@ typedef struct
 
 typedef struct _MESSAGEBOX_RESULT
 {
-    union {
+    union
+    {
         DWORD dwButtonPressed;
         WORD rgwPasscode[4];
     };

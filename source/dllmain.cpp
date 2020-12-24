@@ -158,7 +158,8 @@ void LoadOriginalLibrary()
     if (iequals(szSelfName, L"vorbisFile.dll"))
     {
         szLocalPath += L"vorbisHooked.dll";
-        if (std::filesystem::exists(szLocalPath)) {
+        if (std::filesystem::exists(szLocalPath))
+        {
             vorbisfile.LoadOriginalLibrary(LoadLibraryW(szLocalPath), false);
         }
         else
@@ -189,47 +190,61 @@ void LoadOriginalLibrary()
             }
         }
     }
-    else if (iequals(szSelfName, L"dsound.dll")) {
+    else if (iequals(szSelfName, L"dsound.dll"))
+    {
         dsound.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
     }
-    else if (iequals(szSelfName, L"dinput8.dll")) {
+    else if (iequals(szSelfName, L"dinput8.dll"))
+    {
         dinput8.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
     }
-    else if (iequals(szSelfName, L"ddraw.dll")) {
+    else if (iequals(szSelfName, L"ddraw.dll"))
+    {
         ddraw.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
     }
-    else if (iequals(szSelfName, L"d3d8.dll")) {
+    else if (iequals(szSelfName, L"d3d8.dll"))
+    {
         d3d8.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
         if (GetPrivateProfileIntW(L"globalsets", L"used3d8to9", FALSE, iniPaths))
             d3d8.Direct3DCreate8 = (FARPROC)Direct3DCreate8;
     }
-    else if (iequals(szSelfName, L"d3d9.dll")) {
+    else if (iequals(szSelfName, L"d3d9.dll"))
+    {
         d3d9.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
     }
-    else if (iequals(szSelfName, L"d3d11.dll")) {
+    else if (iequals(szSelfName, L"d3d11.dll"))
+    {
         d3d11.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
     }
-    else if (iequals(szSelfName, L"winmm.dll")) {
+    else if (iequals(szSelfName, L"winmm.dll"))
+    {
         winmm.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
     }
-    else if (iequals(szSelfName, L"msacm32.dll")) {
+    else if (iequals(szSelfName, L"msacm32.dll"))
+    {
         msacm32.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
     }
-    else if (iequals(szSelfName, L"dinput.dll")) {
+    else if (iequals(szSelfName, L"dinput.dll"))
+    {
         dinput.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
     }
-    else if (iequals(szSelfName, L"msvfw32.dll")) {
+    else if (iequals(szSelfName, L"msvfw32.dll"))
+    {
         msvfw32.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
     }
-    else if (iequals(szSelfName, L"wininet.dll")) {
+    else if (iequals(szSelfName, L"wininet.dll"))
+    {
         wininet.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
     }
-    else if (iequals(szSelfName, L"version.dll")) {
+    else if (iequals(szSelfName, L"version.dll"))
+    {
         version.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
     }
-    else if (iequals(szSelfName, L"binkw32.dll")) {
+    else if (iequals(szSelfName, L"binkw32.dll"))
+    {
         szLocalPath += L"binkw32Hooked.dll";
-        if (std::filesystem::exists(szLocalPath)) {
+        if (std::filesystem::exists(szLocalPath))
+        {
             binkw32.LoadOriginalLibrary(LoadLibraryW(szLocalPath), false);
         }
         else
@@ -272,15 +287,18 @@ void LoadOriginalLibrary()
             }
         }
     }
-    else if (iequals(szSelfName, L"xlive.dll")) {
+    else if (iequals(szSelfName, L"xlive.dll"))
+    {
         // Unprotect image - make .text and .rdata section writeable
-        GetSections([](PIMAGE_SECTION_HEADER pSection, size_t dwLoadOffset, DWORD dwPhysSize) {
+        GetSections([](PIMAGE_SECTION_HEADER pSection, size_t dwLoadOffset, DWORD dwPhysSize)
+        {
             DWORD oldProtect = 0;
             DWORD newProtect = (pSection->Characteristics & IMAGE_SCN_MEM_EXECUTE) ? PAGE_EXECUTE_READWRITE : PAGE_READWRITE;
-            if (!VirtualProtect(reinterpret_cast<VOID*>(dwLoadOffset + pSection->VirtualAddress), dwPhysSize, newProtect, &oldProtect)) {
+            if (!VirtualProtect(reinterpret_cast<VOID*>(dwLoadOffset + pSection->VirtualAddress), dwPhysSize, newProtect, &oldProtect))
+            {
                 ExitProcess(0);
             }
-            }, ".text", ".rdata");
+        }, ".text", ".rdata");
     }
     else
     {
@@ -289,16 +307,20 @@ void LoadOriginalLibrary()
         ExitProcess(0);
     }
 #else
-    if (iequals(szSelfName, L"dsound.dll")) {
+    if (iequals(szSelfName, L"dsound.dll"))
+    {
         dsound.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
     }
-    else if (iequals(szSelfName, L"dinput8.dll")) {
+    else if (iequals(szSelfName, L"dinput8.dll"))
+    {
         dinput8.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
     }
-    else if (iequals(szSelfName, L"wininet.dll")) {
+    else if (iequals(szSelfName, L"wininet.dll"))
+    {
         wininet.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
     }
-    else if (iequals(szSelfName, L"version.dll")) {
+    else if (iequals(szSelfName, L"version.dll"))
+    {
         version.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
     }
     else
@@ -352,15 +374,16 @@ void FindFiles(WIN32_FIND_DATAW* fd)
     HANDLE asiFile = FindFirstFileW(L"*.asi", fd);
     if (asiFile != INVALID_HANDLE_VALUE)
     {
-        do {
+        do
+        {
             if (!(fd->dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
             {
                 auto pos = wcslen(fd->cFileName);
 
                 if (fd->cFileName[pos - 4] == '.' &&
-                    (fd->cFileName[pos - 3] == 'a' || fd->cFileName[pos - 3] == 'A') &&
-                    (fd->cFileName[pos - 2] == 's' || fd->cFileName[pos - 2] == 'S') &&
-                    (fd->cFileName[pos - 1] == 'i' || fd->cFileName[pos - 1] == 'I'))
+                        (fd->cFileName[pos - 3] == 'a' || fd->cFileName[pos - 3] == 'A') &&
+                        (fd->cFileName[pos - 2] == 's' || fd->cFileName[pos - 2] == 'S') &&
+                        (fd->cFileName[pos - 1] == 'i' || fd->cFileName[pos - 1] == 'I'))
                 {
                     auto path = dir + L'\\' + fd->cFileName;
 
@@ -390,7 +413,8 @@ void FindFiles(WIN32_FIND_DATAW* fd)
                     }
                 }
             }
-        } while (FindNextFileW(asiFile, fd));
+        }
+        while (FindNextFileW(asiFile, fd));
         FindClose(asiFile);
     }
 }
@@ -498,12 +522,13 @@ void LoadPluginsAndRestoreIAT(uintptr_t retaddr)
     bool calledFromBind = false;
 
     //steam drm check
-    GetSections([&](PIMAGE_SECTION_HEADER pSection, size_t dwLoadOffset, DWORD dwPhysSize) {
+    GetSections([&](PIMAGE_SECTION_HEADER pSection, size_t dwLoadOffset, DWORD dwPhysSize)
+    {
         auto dwStart = static_cast<uintptr_t>(dwLoadOffset + pSection->VirtualAddress);
         auto dwEnd = dwStart + dwPhysSize;
         if (retaddr >= dwStart && retaddr <= dwEnd)
             calledFromBind = true;
-        }, ".bind");
+    }, ".bind");
 
     if (calledFromBind) return;
 
@@ -991,13 +1016,13 @@ bool HookKernel32IAT(HMODULE mod, bool exe)
 LONG WINAPI CustomUnhandledExceptionFilter(LPEXCEPTION_POINTERS ExceptionInfo)
 {
     // step 1: write minidump
-    wchar_t		modulename[MAX_PATH];
-    wchar_t		filename[MAX_PATH];
-    wchar_t		timestamp[128];
-    __time64_t	time;
-    struct tm	ltime;
-    HANDLE		hFile;
-    HWND		hWnd;
+    wchar_t     modulename[MAX_PATH];
+    wchar_t     filename[MAX_PATH];
+    wchar_t     timestamp[128];
+    __time64_t  time;
+    struct tm   ltime;
+    HANDLE      hFile;
+    HWND        hWnd;
 
     wchar_t* modulenameptr;
     if (GetModuleFileNameW(GetModuleHandle(NULL), modulename, _countof(modulename)) != 0)
@@ -1008,7 +1033,7 @@ LONG WINAPI CustomUnhandledExceptionFilter(LPEXCEPTION_POINTERS ExceptionInfo)
     }
     else
     {
-        modulenameptr = L"err.err";
+        wcscpy(modulenameptr, L"err.err");
     }
 
     _time64(&time);
@@ -1135,19 +1160,19 @@ void Init()
             dlls.Enumerate(ModuleList::SearchLocation::LocalOnly);
 
             auto ual = std::find_if(dlls.m_moduleList.begin(), dlls.m_moduleList.end(), [](auto const& it)
-                {
-                    return std::get<HMODULE>(it) == hm;
-                });
+            {
+                return std::get<HMODULE>(it) == hm;
+            });
 
             auto sim = std::find_if(dlls.m_moduleList.rbegin(), dlls.m_moduleList.rend(), [&ual](auto const& it)
-                {
-                    auto str1 = std::get<std::wstring>(*ual);
-                    auto str2 = std::get<std::wstring>(it);
-                    std::transform(str1.begin(), str1.end(), str1.begin(), [](wchar_t c) { return ::towlower(c); });
-                    std::transform(str2.begin(), str2.end(), str2.begin(), [](wchar_t c) { return ::towlower(c); });
+            {
+                auto str1 = std::get<std::wstring>(*ual);
+                auto str2 = std::get<std::wstring>(it);
+                std::transform(str1.begin(), str1.end(), str1.begin(), [](wchar_t c) { return ::towlower(c); });
+                std::transform(str2.begin(), str2.end(), str2.begin(), [](wchar_t c) { return ::towlower(c); });
 
-                    return (str2 != str1) && (str2.find(str1) != std::wstring::npos);
-                });
+                return (str2 != str1) && (str2.find(str1) != std::wstring::npos);
+            });
 
             if (ual != dlls.m_moduleList.begin())
             {
