@@ -889,6 +889,10 @@ bool HookKernel32IAT(HMODULE mod, bool exe)
     static auto getSectionEnd = [](IMAGE_NT_HEADERS* ntHeader, size_t inst) -> auto
     {
         auto sec = getSection(ntHeader, ntHeader->FileHeader.NumberOfSections - 1);
+        // .bind section may have vanished from the executable (test case: Yakuza 4)
+        // so back to the first valid section if that happened
+        while (sec->Misc.VirtualSize == 0) sec--;
+
         auto secSize = max(sec->SizeOfRawData, sec->Misc.VirtualSize);
         auto end = inst + max(sec->PointerToRawData, sec->VirtualAddress) + secSize;
         return end;
