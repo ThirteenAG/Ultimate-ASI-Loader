@@ -152,7 +152,7 @@ project "RE7Demo.InfiniteAmmo"
       optimize "On"
       staticruntime "On"
 
-project "MessageBox"
+project "MessageBox_x64"
    kind "SharedLib"
    language "C++"
    targetdir "bin/x64/%{cfg.buildcfg}/scripts"
