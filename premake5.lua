@@ -151,3 +151,23 @@ project "RE7Demo.InfiniteAmmo"
       defines { "NDEBUG" }
       optimize "On"
       staticruntime "On"
+
+project "MessageBox"
+   kind "SharedLib"
+   language "C++"
+   targetdir "bin/x64/%{cfg.buildcfg}/scripts"
+   targetextension ".asi"
+   
+   files { "source/demo_plugins/MessageBox.cpp" }
+   files { "source/resources/Versioninfo.rc" }
+
+   characterset ("UNICODE")
+   
+   filter "configurations:Debug"
+      defines { "DEBUG" }
+      symbols "On"
+
+   filter "configurations:Release"
+      defines { "NDEBUG" }
+      optimize "On"
+      staticruntime "On"

@@ -212,10 +212,6 @@ void LoadOriginalLibrary()
     {
         d3d9.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
     }
-    else if (iequals(szSelfName, L"d3d11.dll"))
-    {
-        d3d11.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
-    }
     else if (iequals(szSelfName, L"winmm.dll"))
     {
         winmm.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
@@ -322,6 +318,10 @@ void LoadOriginalLibrary()
     else if (iequals(szSelfName, L"version.dll"))
     {
         version.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
+    }
+    else if (iequals(szSelfName, L"d3d11.dll"))
+    {
+        d3d11.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
     }
     else
     {
