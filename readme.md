@@ -20,7 +20,7 @@ This is a DLL file which adds ASI plugin loading functionality to any game, whic
 - winmm.dll
 - xlive.dll
 
-- binkw64.dll (rename original to bink2w64Hooked.dll)
+- bink2w64.dll (rename original to bink2w64Hooked.dll)
 - vorbisFile.dll (rename original to vorbisHooked.dll, optional)
 - binkw32.dll (rename original to binkw32Hooked.dll, optional)
 
