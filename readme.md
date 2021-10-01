@@ -5,8 +5,10 @@
 This is a DLL file which adds ASI plugin loading functionality to any game, which uses any of the following libraries:
 
 - d3d8.dll
-- d3d9.dll
-- d3d11.dll
+- d3d9.dll (x86 and x64)
+- d3d10.dll (x86 and x64)
+- d3d11.dll (x86 and x64)
+- d3d12.dll (x86 and x64)
 - ddraw.dll
 - dinput.dll
 - dinput8.dll (x86 and x64)
@@ -18,8 +20,9 @@ This is a DLL file which adds ASI plugin loading functionality to any game, whic
 - winmm.dll
 - xlive.dll
 
-- vorbisFile.dll
-- binkw32.dll
+- binkw64.dll (rename original to bink2w64Hooked.dll)
+- vorbisFile.dll (rename original to vorbisHooked.dll, optional)
+- binkw32.dll (rename original to binkw32Hooked.dll, optional)
 
 With the last two, it is possible to load the original dll by renaming it to 'vorbisHooked.dll' or 'binkw32Hooked.dll'.
 Usually it is not required and you can simply replace the dll. Always make a backup before replacing any files.

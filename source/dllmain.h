@@ -813,6 +813,120 @@ struct version_dll
     }
 } version;
 
+struct d3d9_dll
+{
+    HMODULE dll;
+    FARPROC D3DPERF_BeginEvent;
+    FARPROC D3DPERF_EndEvent;
+    FARPROC D3DPERF_GetStatus;
+    FARPROC D3DPERF_QueryRepeatFrame;
+    FARPROC D3DPERF_SetMarker;
+    FARPROC D3DPERF_SetOptions;
+    FARPROC D3DPERF_SetRegion;
+    FARPROC DebugSetLevel;
+    FARPROC DebugSetMute;
+    FARPROC Direct3D9EnableMaximizedWindowedModeShim;
+    FARPROC Direct3DCreate9;
+    FARPROC Direct3DCreate9Ex;
+    FARPROC Direct3DCreate9On12;
+    FARPROC Direct3DCreate9On12Ex;
+    FARPROC Direct3DShaderValidatorCreate9;
+    FARPROC PSGPError;
+    FARPROC PSGPSampleTexture;
+
+    void LoadOriginalLibrary(HMODULE module)
+    {
+        dll = module;
+        shared.LoadOriginalLibrary(dll);
+        D3DPERF_BeginEvent = GetProcAddress(dll, "D3DPERF_BeginEvent");
+        D3DPERF_EndEvent = GetProcAddress(dll, "D3DPERF_EndEvent");
+        D3DPERF_GetStatus = GetProcAddress(dll, "D3DPERF_GetStatus");
+        D3DPERF_QueryRepeatFrame = GetProcAddress(dll, "D3DPERF_QueryRepeatFrame");
+        D3DPERF_SetMarker = GetProcAddress(dll, "D3DPERF_SetMarker");
+        D3DPERF_SetOptions = GetProcAddress(dll, "D3DPERF_SetOptions");
+        D3DPERF_SetRegion = GetProcAddress(dll, "D3DPERF_SetRegion");
+        DebugSetLevel = GetProcAddress(dll, "DebugSetLevel");
+        DebugSetMute = GetProcAddress(dll, "DebugSetMute");
+        Direct3D9EnableMaximizedWindowedModeShim = GetProcAddress(dll, "Direct3D9EnableMaximizedWindowedModeShim");
+        Direct3DCreate9 = GetProcAddress(dll, "Direct3DCreate9");
+        Direct3DCreate9Ex = GetProcAddress(dll, "Direct3DCreate9Ex");
+        Direct3DCreate9On12 = GetProcAddress(dll, "Direct3DCreate9On12");
+        Direct3DCreate9On12Ex = GetProcAddress(dll, "Direct3DCreate9On12Ex");
+        Direct3DShaderValidatorCreate9 = GetProcAddress(dll, "Direct3DShaderValidatorCreate9");
+        PSGPError = GetProcAddress(dll, "PSGPError");
+        PSGPSampleTexture = GetProcAddress(dll, "PSGPSampleTexture");
+    }
+} d3d9;
+
+struct d3d10_dll
+{
+    HMODULE dll;
+    FARPROC D3D10CompileEffectFromMemory;
+    FARPROC D3D10CompileShader;
+    FARPROC D3D10CreateBlob;
+    FARPROC D3D10CreateDevice;
+    FARPROC D3D10CreateDeviceAndSwapChain;
+    FARPROC D3D10CreateEffectFromMemory;
+    FARPROC D3D10CreateEffectPoolFromMemory;
+    FARPROC D3D10CreateStateBlock;
+    FARPROC D3D10DisassembleEffect;
+    FARPROC D3D10DisassembleShader;
+    FARPROC D3D10GetGeometryShaderProfile;
+    FARPROC D3D10GetInputAndOutputSignatureBlob;
+    FARPROC D3D10GetInputSignatureBlob;
+    FARPROC D3D10GetOutputSignatureBlob;
+    FARPROC D3D10GetPixelShaderProfile;
+    FARPROC D3D10GetShaderDebugInfo;
+    FARPROC D3D10GetVersion;
+    FARPROC D3D10GetVertexShaderProfile;
+    FARPROC D3D10PreprocessShader;
+    FARPROC D3D10ReflectShader;
+    FARPROC D3D10RegisterLayers;
+    FARPROC D3D10StateBlockMaskDifference;
+    FARPROC D3D10StateBlockMaskDisableAll;
+    FARPROC D3D10StateBlockMaskDisableCapture;
+    FARPROC D3D10StateBlockMaskEnableAll;
+    FARPROC D3D10StateBlockMaskEnableCapture;
+    FARPROC D3D10StateBlockMaskGetSetting;
+    FARPROC D3D10StateBlockMaskIntersect;
+    FARPROC D3D10StateBlockMaskUnion;
+
+    void LoadOriginalLibrary(HMODULE module)
+    {
+        dll = module;
+        shared.LoadOriginalLibrary(dll);
+        D3D10CompileEffectFromMemory = GetProcAddress(dll, "D3D10CompileEffectFromMemory");
+        D3D10CompileShader = GetProcAddress(dll, "D3D10CompileShader");
+        D3D10CreateBlob = GetProcAddress(dll, "D3D10CreateBlob");
+        D3D10CreateDevice = GetProcAddress(dll, "D3D10CreateDevice");
+        D3D10CreateDeviceAndSwapChain = GetProcAddress(dll, "D3D10CreateDeviceAndSwapChain");
+        D3D10CreateEffectFromMemory = GetProcAddress(dll, "D3D10CreateEffectFromMemory");
+        D3D10CreateEffectPoolFromMemory = GetProcAddress(dll, "D3D10CreateEffectPoolFromMemory");
+        D3D10CreateStateBlock = GetProcAddress(dll, "D3D10CreateStateBlock");
+        D3D10DisassembleEffect = GetProcAddress(dll, "D3D10DisassembleEffect");
+        D3D10DisassembleShader = GetProcAddress(dll, "D3D10DisassembleShader");
+        D3D10GetGeometryShaderProfile = GetProcAddress(dll, "D3D10GetGeometryShaderProfile");
+        D3D10GetInputAndOutputSignatureBlob = GetProcAddress(dll, "D3D10GetInputAndOutputSignatureBlob");
+        D3D10GetInputSignatureBlob = GetProcAddress(dll, "D3D10GetInputSignatureBlob");
+        D3D10GetOutputSignatureBlob = GetProcAddress(dll, "D3D10GetOutputSignatureBlob");
+        D3D10GetPixelShaderProfile = GetProcAddress(dll, "D3D10GetPixelShaderProfile");
+        D3D10GetShaderDebugInfo = GetProcAddress(dll, "D3D10GetShaderDebugInfo");
+        D3D10GetVersion = GetProcAddress(dll, "D3D10GetVersion");
+        D3D10GetVertexShaderProfile = GetProcAddress(dll, "D3D10GetVertexShaderProfile");
+        D3D10PreprocessShader = GetProcAddress(dll, "D3D10PreprocessShader");
+        D3D10ReflectShader = GetProcAddress(dll, "D3D10ReflectShader");
+        D3D10RegisterLayers = GetProcAddress(dll, "D3D10RegisterLayers");
+        D3D10StateBlockMaskDifference = GetProcAddress(dll, "D3D10StateBlockMaskDifference");
+        D3D10StateBlockMaskDisableAll = GetProcAddress(dll, "D3D10StateBlockMaskDisableAll");
+        D3D10StateBlockMaskDisableCapture = GetProcAddress(dll, "D3D10StateBlockMaskDisableCapture");
+        D3D10StateBlockMaskEnableAll = GetProcAddress(dll, "D3D10StateBlockMaskEnableAll");
+        D3D10StateBlockMaskEnableCapture = GetProcAddress(dll, "D3D10StateBlockMaskEnableCapture");
+        D3D10StateBlockMaskGetSetting = GetProcAddress(dll, "D3D10StateBlockMaskGetSetting");
+        D3D10StateBlockMaskIntersect = GetProcAddress(dll, "D3D10StateBlockMaskIntersect");
+        D3D10StateBlockMaskUnion = GetProcAddress(dll, "D3D10StateBlockMaskUnion");
+    }
+} d3d10;
+
 struct d3d11_dll
 {
     HMODULE dll;
@@ -926,6 +1040,220 @@ struct d3d11_dll
     }
 } d3d11;
 
+struct d3d12_dll
+{
+    HMODULE dll;
+    FARPROC D3D12CoreCreateLayeredDevice;
+    FARPROC D3D12CoreGetLayeredDeviceSize;
+    FARPROC D3D12CoreRegisterLayers;
+    FARPROC D3D12CreateDevice;
+    FARPROC D3D12CreateRootSignatureDeserializer;
+    FARPROC D3D12CreateVersionedRootSignatureDeserializer;
+    FARPROC D3D12DeviceRemovedExtendedData;
+    FARPROC D3D12EnableExperimentalFeatures;
+    FARPROC D3D12GetDebugInterface;
+    FARPROC D3D12GetInterface;
+    FARPROC D3D12PIXEventsReplaceBlock;
+    FARPROC D3D12PIXGetThreadInfo;
+    FARPROC D3D12PIXNotifyWakeFromFenceSignal;
+    FARPROC D3D12PIXReportCounter;
+    FARPROC D3D12SerializeRootSignature;
+    FARPROC D3D12SerializeVersionedRootSignature;
+    FARPROC GetBehaviorValue;
+    FARPROC SetAppCompatStringPointer;
+
+    void LoadOriginalLibrary(HMODULE module)
+    {
+        dll = module;
+        shared.LoadOriginalLibrary(dll);
+        D3D12CoreCreateLayeredDevice = GetProcAddress(dll, "D3D12CoreCreateLayeredDevice");
+        D3D12CoreGetLayeredDeviceSize = GetProcAddress(dll, "D3D12CoreGetLayeredDeviceSize");
+        D3D12CoreRegisterLayers = GetProcAddress(dll, "D3D12CoreRegisterLayers");
+        D3D12CreateDevice = GetProcAddress(dll, "D3D12CreateDevice");
+        D3D12CreateRootSignatureDeserializer = GetProcAddress(dll, "D3D12CreateRootSignatureDeserializer");
+        D3D12CreateVersionedRootSignatureDeserializer = GetProcAddress(dll, "D3D12CreateVersionedRootSignatureDeserializer");
+        D3D12DeviceRemovedExtendedData = GetProcAddress(dll, "D3D12DeviceRemovedExtendedData");
+        D3D12EnableExperimentalFeatures = GetProcAddress(dll, "D3D12EnableExperimentalFeatures");
+        D3D12GetDebugInterface = GetProcAddress(dll, "D3D12GetDebugInterface");
+        D3D12GetInterface = GetProcAddress(dll, "D3D12GetInterface");
+        D3D12PIXEventsReplaceBlock = GetProcAddress(dll, "D3D12PIXEventsReplaceBlock");
+        D3D12PIXGetThreadInfo = GetProcAddress(dll, "D3D12PIXGetThreadInfo");
+        D3D12PIXNotifyWakeFromFenceSignal = GetProcAddress(dll, "D3D12PIXNotifyWakeFromFenceSignal");
+        D3D12PIXReportCounter = GetProcAddress(dll, "D3D12PIXReportCounter");
+        D3D12SerializeRootSignature = GetProcAddress(dll, "D3D12SerializeRootSignature");
+        D3D12SerializeVersionedRootSignature = GetProcAddress(dll, "D3D12SerializeVersionedRootSignature");
+        GetBehaviorValue = GetProcAddress(dll, "GetBehaviorValue");
+        SetAppCompatStringPointer = GetProcAddress(dll, "SetAppCompatStringPointer");
+    }
+} d3d12;
+
+#if X64
+struct bink2w64_dll
+{
+    HMODULE dll;
+    FARPROC BinkAllocateFrameBuffers;
+    FARPROC BinkClose;
+    FARPROC BinkCloseTrack;
+    FARPROC BinkControlBackgroundIO;
+    FARPROC BinkCopyToBuffer;
+    FARPROC BinkCopyToBufferRect;
+    FARPROC BinkDoFrame;
+    FARPROC BinkDoFrameAsync;
+    FARPROC BinkDoFrameAsyncMulti;
+    FARPROC BinkDoFrameAsyncWait;
+    FARPROC BinkDoFramePlane;
+    FARPROC BinkFindXAudio2WinDevice;
+    FARPROC BinkFreeGlobals;
+    FARPROC BinkGetError;
+    FARPROC BinkGetFrameBuffersInfo;
+    FARPROC BinkGetGPUDataBuffersInfo;
+    FARPROC BinkGetKeyFrame;
+    FARPROC BinkGetPlatformInfo;
+    FARPROC BinkGetRealtime;
+    FARPROC BinkGetRects;
+    FARPROC BinkGetSummary;
+    FARPROC BinkGetTrackData;
+    FARPROC BinkGetTrackID;
+    FARPROC BinkGetTrackMaxSize;
+    FARPROC BinkGetTrackType;
+    FARPROC BinkGoto;
+    FARPROC BinkLogoAddress;
+    FARPROC BinkNextFrame;
+    FARPROC BinkOpen;
+    FARPROC BinkOpenDirectSound;
+    FARPROC BinkOpenMiles;
+    FARPROC BinkOpenTrack;
+    FARPROC BinkOpenWaveOut;
+    FARPROC BinkOpenWithOptions;
+    FARPROC BinkOpenXAudio2;
+    FARPROC BinkOpenXAudio27;
+    FARPROC BinkOpenXAudio28;
+    FARPROC BinkOpenXAudio29;
+    FARPROC BinkPause;
+    FARPROC BinkRegisterFrameBuffers;
+    FARPROC BinkRegisterGPUDataBuffers;
+    FARPROC BinkRequestStopAsyncThread;
+    FARPROC BinkRequestStopAsyncThreadsMulti;
+    FARPROC BinkService;
+    FARPROC BinkSetError;
+    FARPROC BinkSetFileOffset;
+    FARPROC BinkSetFrameRate;
+    FARPROC BinkSetIO;
+    FARPROC BinkSetIOSize;
+    FARPROC BinkSetMemory;
+    FARPROC BinkSetOSFileCallbacks;
+    FARPROC BinkSetPan;
+    FARPROC BinkSetSimulate;
+    FARPROC BinkSetSoundOnOff;
+    FARPROC BinkSetSoundSystem;
+    FARPROC BinkSetSoundSystem2;
+    FARPROC BinkSetSoundTrack;
+    FARPROC BinkSetSpeakerVolumes;
+    FARPROC BinkSetVideoOnOff;
+    FARPROC BinkSetVolume;
+    FARPROC BinkSetWillLoop;
+    FARPROC BinkShouldSkip;
+    FARPROC BinkStartAsyncThread;
+    FARPROC BinkUtilCPUs;
+    FARPROC BinkUtilFree;
+    FARPROC BinkUtilMalloc;
+    FARPROC BinkUtilMutexCreate;
+    FARPROC BinkUtilMutexDestroy;
+    FARPROC BinkUtilMutexLock;
+    FARPROC BinkUtilMutexLockTimeOut;
+    FARPROC BinkUtilMutexUnlock;
+    FARPROC BinkUtilSoundGlobalLock;
+    FARPROC BinkUtilSoundGlobalUnlock;
+    FARPROC BinkWait;
+    FARPROC BinkWaitStopAsyncThread;
+    FARPROC BinkWaitStopAsyncThreadsMulti;
+    FARPROC RADTimerRead;
+
+    void LoadOriginalLibrary(HMODULE module)
+    {
+        dll = module;
+        shared.LoadOriginalLibrary(dll);
+        BinkAllocateFrameBuffers = GetProcAddress(dll, "BinkAllocateFrameBuffers");
+        BinkClose = GetProcAddress(dll, "BinkClose");
+        BinkCloseTrack = GetProcAddress(dll, "BinkCloseTrack");
+        BinkControlBackgroundIO = GetProcAddress(dll, "BinkControlBackgroundIO");
+        BinkCopyToBuffer = GetProcAddress(dll, "BinkCopyToBuffer");
+        BinkCopyToBufferRect = GetProcAddress(dll, "BinkCopyToBufferRect");
+        BinkDoFrame = GetProcAddress(dll, "BinkDoFrame");
+        BinkDoFrameAsync = GetProcAddress(dll, "BinkDoFrameAsync");
+        BinkDoFrameAsyncMulti = GetProcAddress(dll, "BinkDoFrameAsyncMulti");
+        BinkDoFrameAsyncWait = GetProcAddress(dll, "BinkDoFrameAsyncWait");
+        BinkDoFramePlane = GetProcAddress(dll, "BinkDoFramePlane");
+        BinkFindXAudio2WinDevice = GetProcAddress(dll, "BinkFindXAudio2WinDevice");
+        BinkFreeGlobals = GetProcAddress(dll, "BinkFreeGlobals");
+        BinkGetError = GetProcAddress(dll, "BinkGetError");
+        BinkGetFrameBuffersInfo = GetProcAddress(dll, "BinkGetFrameBuffersInfo");
+        BinkGetGPUDataBuffersInfo = GetProcAddress(dll, "BinkGetGPUDataBuffersInfo");
+        BinkGetKeyFrame = GetProcAddress(dll, "BinkGetKeyFrame");
+        BinkGetPlatformInfo = GetProcAddress(dll, "BinkGetPlatformInfo");
+        BinkGetRealtime = GetProcAddress(dll, "BinkGetRealtime");
+        BinkGetRects = GetProcAddress(dll, "BinkGetRects");
+        BinkGetSummary = GetProcAddress(dll, "BinkGetSummary");
+        BinkGetTrackData = GetProcAddress(dll, "BinkGetTrackData");
+        BinkGetTrackID = GetProcAddress(dll, "BinkGetTrackID");
+        BinkGetTrackMaxSize = GetProcAddress(dll, "BinkGetTrackMaxSize");
+        BinkGetTrackType = GetProcAddress(dll, "BinkGetTrackType");
+        BinkGoto = GetProcAddress(dll, "BinkGoto");
+        BinkLogoAddress = GetProcAddress(dll, "BinkLogoAddress");
+        BinkNextFrame = GetProcAddress(dll, "BinkNextFrame");
+        BinkOpen = GetProcAddress(dll, "BinkOpen");
+        BinkOpenDirectSound = GetProcAddress(dll, "BinkOpenDirectSound");
+        BinkOpenMiles = GetProcAddress(dll, "BinkOpenMiles");
+        BinkOpenTrack = GetProcAddress(dll, "BinkOpenTrack");
+        BinkOpenWaveOut = GetProcAddress(dll, "BinkOpenWaveOut");
+        BinkOpenWithOptions = GetProcAddress(dll, "BinkOpenWithOptions");
+        BinkOpenXAudio2 = GetProcAddress(dll, "BinkOpenXAudio2");
+        BinkOpenXAudio27 = GetProcAddress(dll, "BinkOpenXAudio27");
+        BinkOpenXAudio28 = GetProcAddress(dll, "BinkOpenXAudio28");
+        BinkOpenXAudio29 = GetProcAddress(dll, "BinkOpenXAudio29");
+        BinkPause = GetProcAddress(dll, "BinkPause");
+        BinkRegisterFrameBuffers = GetProcAddress(dll, "BinkRegisterFrameBuffers");
+        BinkRegisterGPUDataBuffers = GetProcAddress(dll, "BinkRegisterGPUDataBuffers");
+        BinkRequestStopAsyncThread = GetProcAddress(dll, "BinkRequestStopAsyncThread");
+        BinkRequestStopAsyncThreadsMulti = GetProcAddress(dll, "BinkRequestStopAsyncThreadsMulti");
+        BinkService = GetProcAddress(dll, "BinkService");
+        BinkSetError = GetProcAddress(dll, "BinkSetError");
+        BinkSetFileOffset = GetProcAddress(dll, "BinkSetFileOffset");
+        BinkSetFrameRate = GetProcAddress(dll, "BinkSetFrameRate");
+        BinkSetIO = GetProcAddress(dll, "BinkSetIO");
+        BinkSetIOSize = GetProcAddress(dll, "BinkSetIOSize");
+        BinkSetMemory = GetProcAddress(dll, "BinkSetMemory");
+        BinkSetOSFileCallbacks = GetProcAddress(dll, "BinkSetOSFileCallbacks");
+        BinkSetPan = GetProcAddress(dll, "BinkSetPan");
+        BinkSetSimulate = GetProcAddress(dll, "BinkSetSimulate");
+        BinkSetSoundOnOff = GetProcAddress(dll, "BinkSetSoundOnOff");
+        BinkSetSoundSystem = GetProcAddress(dll, "BinkSetSoundSystem");
+        BinkSetSoundSystem2 = GetProcAddress(dll, "BinkSetSoundSystem2");
+        BinkSetSoundTrack = GetProcAddress(dll, "BinkSetSoundTrack");
+        BinkSetSpeakerVolumes = GetProcAddress(dll, "BinkSetSpeakerVolumes");
+        BinkSetVideoOnOff = GetProcAddress(dll, "BinkSetVideoOnOff");
+        BinkSetVolume = GetProcAddress(dll, "BinkSetVolume");
+        BinkSetWillLoop = GetProcAddress(dll, "BinkSetWillLoop");
+        BinkShouldSkip = GetProcAddress(dll, "BinkShouldSkip");
+        BinkStartAsyncThread = GetProcAddress(dll, "BinkStartAsyncThread");
+        BinkUtilCPUs = GetProcAddress(dll, "BinkUtilCPUs");
+        BinkUtilFree = GetProcAddress(dll, "BinkUtilFree");
+        BinkUtilMalloc = GetProcAddress(dll, "BinkUtilMalloc");
+        BinkUtilMutexCreate = GetProcAddress(dll, "BinkUtilMutexCreate");
+        BinkUtilMutexDestroy = GetProcAddress(dll, "BinkUtilMutexDestroy");
+        BinkUtilMutexLock = GetProcAddress(dll, "BinkUtilMutexLock");
+        BinkUtilMutexLockTimeOut = GetProcAddress(dll, "BinkUtilMutexLockTimeOut");
+        BinkUtilMutexUnlock = GetProcAddress(dll, "BinkUtilMutexUnlock");
+        BinkUtilSoundGlobalLock = GetProcAddress(dll, "BinkUtilSoundGlobalLock");
+        BinkUtilSoundGlobalUnlock = GetProcAddress(dll, "BinkUtilSoundGlobalUnlock");
+        BinkWait = GetProcAddress(dll, "BinkWait");
+        BinkWaitStopAsyncThread = GetProcAddress(dll, "BinkWaitStopAsyncThread");
+        BinkWaitStopAsyncThreadsMulti = GetProcAddress(dll, "BinkWaitStopAsyncThreadsMulti");
+        RADTimerRead = GetProcAddress(dll, "RADTimerRead");
+    }
+} bink2w64;
+#endif
+
 #if !X64
 struct dinput_dll
 {
@@ -964,47 +1292,6 @@ struct d3d8_dll
         ValidateVertexShader = GetProcAddress(dll, "ValidateVertexShader");
     }
 } d3d8;
-
-struct d3d9_dll
-{
-    HMODULE dll;
-    FARPROC D3DPERF_BeginEvent;
-    FARPROC D3DPERF_EndEvent;
-    FARPROC D3DPERF_GetStatus;
-    FARPROC D3DPERF_QueryRepeatFrame;
-    FARPROC D3DPERF_SetMarker;
-    FARPROC D3DPERF_SetOptions;
-    FARPROC D3DPERF_SetRegion;
-    FARPROC DebugSetLevel;
-    FARPROC DebugSetMute;
-    FARPROC Direct3D9EnableMaximizedWindowedModeShim;
-    FARPROC Direct3DCreate9;
-    FARPROC Direct3DCreate9Ex;
-    FARPROC Direct3DShaderValidatorCreate9;
-    FARPROC PSGPError;
-    FARPROC PSGPSampleTexture;
-
-    void LoadOriginalLibrary(HMODULE module)
-    {
-        dll = module;
-        shared.LoadOriginalLibrary(dll);
-        D3DPERF_BeginEvent = GetProcAddress(dll, "D3DPERF_BeginEvent");
-        D3DPERF_EndEvent = GetProcAddress(dll, "D3DPERF_EndEvent");
-        D3DPERF_GetStatus = GetProcAddress(dll, "D3DPERF_GetStatus");
-        D3DPERF_QueryRepeatFrame = GetProcAddress(dll, "D3DPERF_QueryRepeatFrame");
-        D3DPERF_SetMarker = GetProcAddress(dll, "D3DPERF_SetMarker");
-        D3DPERF_SetOptions = GetProcAddress(dll, "D3DPERF_SetOptions");
-        D3DPERF_SetRegion = GetProcAddress(dll, "D3DPERF_SetRegion");
-        DebugSetLevel = GetProcAddress(dll, "DebugSetLevel");
-        DebugSetMute = GetProcAddress(dll, "DebugSetMute");
-        Direct3D9EnableMaximizedWindowedModeShim = GetProcAddress(dll, "Direct3D9EnableMaximizedWindowedModeShim");
-        Direct3DCreate9 = GetProcAddress(dll, "Direct3DCreate9");
-        Direct3DCreate9Ex = GetProcAddress(dll, "Direct3DCreate9Ex");
-        Direct3DShaderValidatorCreate9 = GetProcAddress(dll, "Direct3DShaderValidatorCreate9");
-        PSGPError = GetProcAddress(dll, "PSGPError");
-        PSGPSampleTexture = GetProcAddress(dll, "PSGPSampleTexture");
-    }
-} d3d9;
 
 struct ddraw_dll
 {
@@ -2045,9 +2332,112 @@ __declspec(naked) void _DebugSetLevel() { _asm { jmp[d3d9.DebugSetLevel] } }
 __declspec(naked) void _Direct3D9EnableMaximizedWindowedModeShim() { _asm { jmp[d3d9.Direct3D9EnableMaximizedWindowedModeShim] } }
 __declspec(naked) void _Direct3DCreate9() { _asm { jmp[d3d9.Direct3DCreate9] } }
 __declspec(naked) void _Direct3DCreate9Ex() { _asm { jmp[d3d9.Direct3DCreate9Ex] } }
+__declspec(naked) void _Direct3DCreate9On12() { _asm { jmp[d3d9.Direct3DCreate9On12] } }
+__declspec(naked) void _Direct3DCreate9On12Ex() { _asm { jmp[d3d9.Direct3DCreate9On12Ex] } }
 __declspec(naked) void _Direct3DShaderValidatorCreate9() { _asm { jmp[d3d9.Direct3DShaderValidatorCreate9] } }
 __declspec(naked) void _PSGPError() { _asm { jmp[d3d9.PSGPError] } }
 __declspec(naked) void _PSGPSampleTexture() { _asm { jmp[d3d9.PSGPSampleTexture] } }
+
+__declspec(naked) void _D3D10CompileEffectFromMemory() { _asm { jmp[d3d10.D3D10CompileEffectFromMemory] } }
+__declspec(naked) void _D3D10CompileShader() { _asm { jmp[d3d10.D3D10CompileShader] } }
+__declspec(naked) void _D3D10CreateBlob() { _asm { jmp[d3d10.D3D10CreateBlob] } }
+__declspec(naked) void _D3D10CreateDevice() { _asm { jmp[d3d10.D3D10CreateDevice] } }
+__declspec(naked) void _D3D10CreateDeviceAndSwapChain() { _asm { jmp[d3d10.D3D10CreateDeviceAndSwapChain] } }
+__declspec(naked) void _D3D10CreateEffectFromMemory() { _asm { jmp[d3d10.D3D10CreateEffectFromMemory] } }
+__declspec(naked) void _D3D10CreateEffectPoolFromMemory() { _asm { jmp[d3d10.D3D10CreateEffectPoolFromMemory] } }
+__declspec(naked) void _D3D10CreateStateBlock() { _asm { jmp[d3d10.D3D10CreateStateBlock] } }
+__declspec(naked) void _D3D10DisassembleEffect() { _asm { jmp[d3d10.D3D10DisassembleEffect] } }
+__declspec(naked) void _D3D10DisassembleShader() { _asm { jmp[d3d10.D3D10DisassembleShader] } }
+__declspec(naked) void _D3D10GetGeometryShaderProfile() { _asm { jmp[d3d10.D3D10GetGeometryShaderProfile] } }
+__declspec(naked) void _D3D10GetInputAndOutputSignatureBlob() { _asm { jmp[d3d10.D3D10GetInputAndOutputSignatureBlob] } }
+__declspec(naked) void _D3D10GetInputSignatureBlob() { _asm { jmp[d3d10.D3D10GetInputSignatureBlob] } }
+__declspec(naked) void _D3D10GetOutputSignatureBlob() { _asm { jmp[d3d10.D3D10GetOutputSignatureBlob] } }
+__declspec(naked) void _D3D10GetPixelShaderProfile() { _asm { jmp[d3d10.D3D10GetPixelShaderProfile] } }
+__declspec(naked) void _D3D10GetShaderDebugInfo() { _asm { jmp[d3d10.D3D10GetShaderDebugInfo] } }
+__declspec(naked) void _D3D10GetVersion() { _asm { jmp[d3d10.D3D10GetVersion] } }
+__declspec(naked) void _D3D10GetVertexShaderProfile() { _asm { jmp[d3d10.D3D10GetVertexShaderProfile] } }
+__declspec(naked) void _D3D10PreprocessShader() { _asm { jmp[d3d10.D3D10PreprocessShader] } }
+__declspec(naked) void _D3D10ReflectShader() { _asm { jmp[d3d10.D3D10ReflectShader] } }
+__declspec(naked) void _D3D10RegisterLayers() { _asm { jmp[d3d10.D3D10RegisterLayers] } }
+__declspec(naked) void _D3D10StateBlockMaskDifference() { _asm { jmp[d3d10.D3D10StateBlockMaskDifference] } }
+__declspec(naked) void _D3D10StateBlockMaskDisableAll() { _asm { jmp[d3d10.D3D10StateBlockMaskDisableAll] } }
+__declspec(naked) void _D3D10StateBlockMaskDisableCapture() { _asm { jmp[d3d10.D3D10StateBlockMaskDisableCapture] } }
+__declspec(naked) void _D3D10StateBlockMaskEnableAll() { _asm { jmp[d3d10.D3D10StateBlockMaskEnableAll] } }
+__declspec(naked) void _D3D10StateBlockMaskEnableCapture() { _asm { jmp[d3d10.D3D10StateBlockMaskEnableCapture] } }
+__declspec(naked) void _D3D10StateBlockMaskGetSetting() { _asm { jmp[d3d10.D3D10StateBlockMaskGetSetting] } }
+__declspec(naked) void _D3D10StateBlockMaskIntersect() { _asm { jmp[d3d10.D3D10StateBlockMaskIntersect] } }
+__declspec(naked) void _D3D10StateBlockMaskUnion() { _asm { jmp[d3d10.D3D10StateBlockMaskUnion] } }
+
+__declspec(naked) void _CreateDirect3D11DeviceFromDXGIDevice() { _asm { jmp[d3d11.CreateDirect3D11DeviceFromDXGIDevice] } }
+__declspec(naked) void _CreateDirect3D11SurfaceFromDXGISurface() { _asm { jmp[d3d11.CreateDirect3D11SurfaceFromDXGISurface] } }
+__declspec(naked) void _D3D11CoreCreateDevice() { _asm { jmp[d3d11.D3D11CoreCreateDevice] } }
+__declspec(naked) void _D3D11CoreCreateLayeredDevice() { _asm { jmp[d3d11.D3D11CoreCreateLayeredDevice] } }
+__declspec(naked) void _D3D11CoreGetLayeredDeviceSize() { _asm { jmp[d3d11.D3D11CoreGetLayeredDeviceSize] } }
+__declspec(naked) void _D3D11CoreRegisterLayers() { _asm { jmp[d3d11.D3D11CoreRegisterLayers] } }
+__declspec(naked) void _D3D11CreateDevice() { _asm { jmp[d3d11.D3D11CreateDevice] } }
+__declspec(naked) void _D3D11CreateDeviceAndSwapChain() { _asm { jmp[d3d11.D3D11CreateDeviceAndSwapChain] } }
+__declspec(naked) void _D3D11CreateDeviceForD3D12() { _asm { jmp[d3d11.D3D11CreateDeviceForD3D12] } }
+__declspec(naked) void _D3D11On12CreateDevice() { _asm { jmp[d3d11.D3D11On12CreateDevice] } }
+__declspec(naked) void _D3DKMTCloseAdapter() { _asm { jmp[d3d11.D3DKMTCloseAdapter] } }
+__declspec(naked) void _D3DKMTCreateAllocation() { _asm { jmp[d3d11.D3DKMTCreateAllocation] } }
+__declspec(naked) void _D3DKMTCreateContext() { _asm { jmp[d3d11.D3DKMTCreateContext] } }
+__declspec(naked) void _D3DKMTCreateDevice() { _asm { jmp[d3d11.D3DKMTCreateDevice] } }
+__declspec(naked) void _D3DKMTCreateSynchronizationObject() { _asm { jmp[d3d11.D3DKMTCreateSynchronizationObject] } }
+__declspec(naked) void _D3DKMTDestroyAllocation() { _asm { jmp[d3d11.D3DKMTDestroyAllocation] } }
+__declspec(naked) void _D3DKMTDestroyContext() { _asm { jmp[d3d11.D3DKMTDestroyContext] } }
+__declspec(naked) void _D3DKMTDestroyDevice() { _asm { jmp[d3d11.D3DKMTDestroyDevice] } }
+__declspec(naked) void _D3DKMTDestroySynchronizationObject() { _asm { jmp[d3d11.D3DKMTDestroySynchronizationObject] } }
+__declspec(naked) void _D3DKMTEscape() { _asm { jmp[d3d11.D3DKMTEscape] } }
+__declspec(naked) void _D3DKMTGetContextSchedulingPriority() { _asm { jmp[d3d11.D3DKMTGetContextSchedulingPriority] } }
+__declspec(naked) void _D3DKMTGetDeviceState() { _asm { jmp[d3d11.D3DKMTGetDeviceState] } }
+__declspec(naked) void _D3DKMTGetDisplayModeList() { _asm { jmp[d3d11.D3DKMTGetDisplayModeList] } }
+__declspec(naked) void _D3DKMTGetMultisampleMethodList() { _asm { jmp[d3d11.D3DKMTGetMultisampleMethodList] } }
+__declspec(naked) void _D3DKMTGetRuntimeData() { _asm { jmp[d3d11.D3DKMTGetRuntimeData] } }
+__declspec(naked) void _D3DKMTGetSharedPrimaryHandle() { _asm { jmp[d3d11.D3DKMTGetSharedPrimaryHandle] } }
+__declspec(naked) void _D3DKMTLock() { _asm { jmp[d3d11.D3DKMTLock] } }
+__declspec(naked) void _D3DKMTOpenAdapterFromHdc() { _asm { jmp[d3d11.D3DKMTOpenAdapterFromHdc] } }
+__declspec(naked) void _D3DKMTOpenResource() { _asm { jmp[d3d11.D3DKMTOpenResource] } }
+__declspec(naked) void _D3DKMTPresent() { _asm { jmp[d3d11.D3DKMTPresent] } }
+__declspec(naked) void _D3DKMTQueryAdapterInfo() { _asm { jmp[d3d11.D3DKMTQueryAdapterInfo] } }
+__declspec(naked) void _D3DKMTQueryAllocationResidency() { _asm { jmp[d3d11.D3DKMTQueryAllocationResidency] } }
+__declspec(naked) void _D3DKMTQueryResourceInfo() { _asm { jmp[d3d11.D3DKMTQueryResourceInfo] } }
+__declspec(naked) void _D3DKMTRender() { _asm { jmp[d3d11.D3DKMTRender] } }
+__declspec(naked) void _D3DKMTSetAllocationPriority() { _asm { jmp[d3d11.D3DKMTSetAllocationPriority] } }
+__declspec(naked) void _D3DKMTSetContextSchedulingPriority() { _asm { jmp[d3d11.D3DKMTSetContextSchedulingPriority] } }
+__declspec(naked) void _D3DKMTSetDisplayMode() { _asm { jmp[d3d11.D3DKMTSetDisplayMode] } }
+__declspec(naked) void _D3DKMTSetDisplayPrivateDriverFormat() { _asm { jmp[d3d11.D3DKMTSetDisplayPrivateDriverFormat] } }
+__declspec(naked) void _D3DKMTSetGammaRamp() { _asm { jmp[d3d11.D3DKMTSetGammaRamp] } }
+__declspec(naked) void _D3DKMTSetVidPnSourceOwner() { _asm { jmp[d3d11.D3DKMTSetVidPnSourceOwner] } }
+__declspec(naked) void _D3DKMTSignalSynchronizationObject() { _asm { jmp[d3d11.D3DKMTSignalSynchronizationObject] } }
+__declspec(naked) void _D3DKMTUnlock() { _asm { jmp[d3d11.D3DKMTUnlock] } }
+__declspec(naked) void _D3DKMTWaitForSynchronizationObject() { _asm { jmp[d3d11.D3DKMTWaitForSynchronizationObject] } }
+__declspec(naked) void _D3DKMTWaitForVerticalBlankEvent() { _asm { jmp[d3d11.D3DKMTWaitForVerticalBlankEvent] } }
+__declspec(naked) void _D3DPerformance_BeginEvent() { _asm { jmp[d3d11.D3DPerformance_BeginEvent] } }
+__declspec(naked) void _D3DPerformance_EndEvent() { _asm { jmp[d3d11.D3DPerformance_EndEvent] } }
+__declspec(naked) void _D3DPerformance_GetStatus() { _asm { jmp[d3d11.D3DPerformance_GetStatus] } }
+__declspec(naked) void _D3DPerformance_SetMarker() { _asm { jmp[d3d11.D3DPerformance_SetMarker] } }
+__declspec(naked) void _EnableFeatureLevelUpgrade() { _asm { jmp[d3d11.EnableFeatureLevelUpgrade] } }
+__declspec(naked) void _OpenAdapter10() { _asm { jmp[d3d11.OpenAdapter10] } }
+__declspec(naked) void _OpenAdapter10_2() { _asm { jmp[d3d11.OpenAdapter10_2] } }
+
+__declspec(naked) void _D3D12CoreCreateLayeredDevice() { _asm { jmp[d3d12.D3D12CoreCreateLayeredDevice] } }
+__declspec(naked) void _D3D12CoreGetLayeredDeviceSize() { _asm { jmp[d3d12.D3D12CoreGetLayeredDeviceSize] } }
+__declspec(naked) void _D3D12CoreRegisterLayers() { _asm { jmp[d3d12.D3D12CoreRegisterLayers] } }
+__declspec(naked) void _D3D12CreateDevice() { _asm { jmp[d3d12.D3D12CreateDevice] } }
+__declspec(naked) void _D3D12CreateRootSignatureDeserializer() { _asm { jmp[d3d12.D3D12CreateRootSignatureDeserializer] } }
+__declspec(naked) void _D3D12CreateVersionedRootSignatureDeserializer() { _asm { jmp[d3d12.D3D12CreateVersionedRootSignatureDeserializer] } }
+__declspec(naked) void _D3D12DeviceRemovedExtendedData() { _asm { jmp[d3d12.D3D12DeviceRemovedExtendedData] } }
+__declspec(naked) void _D3D12EnableExperimentalFeatures() { _asm { jmp[d3d12.D3D12EnableExperimentalFeatures] } }
+__declspec(naked) void _D3D12GetDebugInterface() { _asm { jmp[d3d12.D3D12GetDebugInterface] } }
+__declspec(naked) void _D3D12GetInterface() { _asm { jmp[d3d12.D3D12GetInterface] } }
+__declspec(naked) void _D3D12PIXEventsReplaceBlock() { _asm { jmp[d3d12.D3D12PIXEventsReplaceBlock] } }
+__declspec(naked) void _D3D12PIXGetThreadInfo() { _asm { jmp[d3d12.D3D12PIXGetThreadInfo] } }
+__declspec(naked) void _D3D12PIXNotifyWakeFromFenceSignal() { _asm { jmp[d3d12.D3D12PIXNotifyWakeFromFenceSignal] } }
+__declspec(naked) void _D3D12PIXReportCounter() { _asm { jmp[d3d12.D3D12PIXReportCounter] } }
+__declspec(naked) void _D3D12SerializeRootSignature() { _asm { jmp[d3d12.D3D12SerializeRootSignature] } }
+__declspec(naked) void _D3D12SerializeVersionedRootSignature() { _asm { jmp[d3d12.D3D12SerializeVersionedRootSignature] } }
+__declspec(naked) void _GetBehaviorValue() { _asm { jmp[d3d12.GetBehaviorValue] } }
+__declspec(naked) void _SetAppCompatStringPointer() { _asm { jmp[d3d12.SetAppCompatStringPointer] } }
 
 __declspec(naked) void _AcquireDDThreadLock() { _asm { jmp[ddraw.AcquireDDThreadLock] } }
 __declspec(naked) void _CompleteCreateSysmemSurface() { _asm { jmp[ddraw.CompleteCreateSysmemSurface] } }
@@ -2866,6 +3256,7 @@ void _DllRegisterServer() { shared.DllRegisterServer(); }
 void _DllUnregisterServer() { shared.DllUnregisterServer(); }
 void _DllCanUnloadNow() { shared.DllCanUnloadNow(); }
 void _DllGetClassObject() { shared.DllGetClassObject(); }
+void _DebugSetMute() { shared.DebugSetMute(); }
 
 void _AppCacheCheckManifest() { wininet.AppCacheCheckManifest(); }
 void _AppCacheCloseHandle() { wininet.AppCacheCloseHandle(); }
@@ -3179,6 +3570,54 @@ void _VerLanguageNameW() { version.VerLanguageNameW(); }
 void _VerQueryValueA() { version.VerQueryValueA(); }
 void _VerQueryValueW() { version.VerQueryValueW(); }
 
+void _D3DPERF_BeginEvent() { d3d9.D3DPERF_BeginEvent(); }
+void _D3DPERF_EndEvent() { d3d9.D3DPERF_EndEvent(); }
+void _D3DPERF_GetStatus() { d3d9.D3DPERF_GetStatus(); }
+void _D3DPERF_QueryRepeatFrame() { d3d9.D3DPERF_QueryRepeatFrame(); }
+void _D3DPERF_SetMarker() { d3d9.D3DPERF_SetMarker(); }
+void _D3DPERF_SetOptions() { d3d9.D3DPERF_SetOptions(); }
+void _D3DPERF_SetRegion() { d3d9.D3DPERF_SetRegion(); }
+void _DebugSetLevel() { d3d9.DebugSetLevel(); }
+//void _DebugSetMute() { d3d9.DebugSetMute(); }
+void _Direct3D9EnableMaximizedWindowedModeShim() { d3d9.Direct3D9EnableMaximizedWindowedModeShim(); }
+void _Direct3DCreate9() { d3d9.Direct3DCreate9(); }
+void _Direct3DCreate9Ex() { d3d9.Direct3DCreate9Ex(); }
+void _Direct3DCreate9On12() { d3d9.Direct3DCreate9On12(); }
+void _Direct3DCreate9On12Ex() { d3d9.Direct3DCreate9On12Ex(); }
+void _Direct3DShaderValidatorCreate9() { d3d9.Direct3DShaderValidatorCreate9(); }
+void _PSGPError() { d3d9.PSGPError(); }
+void _PSGPSampleTexture() { d3d9.PSGPSampleTexture(); }
+
+void _D3D10CompileEffectFromMemory() { d3d10.D3D10CompileEffectFromMemory(); }
+void _D3D10CompileShader() { d3d10.D3D10CompileShader(); }
+void _D3D10CreateBlob() { d3d10.D3D10CreateBlob(); }
+void _D3D10CreateDevice() { d3d10.D3D10CreateDevice(); }
+void _D3D10CreateDeviceAndSwapChain() { d3d10.D3D10CreateDeviceAndSwapChain(); }
+void _D3D10CreateEffectFromMemory() { d3d10.D3D10CreateEffectFromMemory(); }
+void _D3D10CreateEffectPoolFromMemory() { d3d10.D3D10CreateEffectPoolFromMemory(); }
+void _D3D10CreateStateBlock() { d3d10.D3D10CreateStateBlock(); }
+void _D3D10DisassembleEffect() { d3d10.D3D10DisassembleEffect(); }
+void _D3D10DisassembleShader() { d3d10.D3D10DisassembleShader(); }
+void _D3D10GetGeometryShaderProfile() { d3d10.D3D10GetGeometryShaderProfile(); }
+void _D3D10GetInputAndOutputSignatureBlob() { d3d10.D3D10GetInputAndOutputSignatureBlob(); }
+void _D3D10GetInputSignatureBlob() { d3d10.D3D10GetInputSignatureBlob(); }
+void _D3D10GetOutputSignatureBlob() { d3d10.D3D10GetOutputSignatureBlob(); }
+void _D3D10GetPixelShaderProfile() { d3d10.D3D10GetPixelShaderProfile(); }
+void _D3D10GetShaderDebugInfo() { d3d10.D3D10GetShaderDebugInfo(); }
+void _D3D10GetVersion() { d3d10.D3D10GetVersion(); }
+void _D3D10GetVertexShaderProfile() { d3d10.D3D10GetVertexShaderProfile(); }
+void _D3D10PreprocessShader() { d3d10.D3D10PreprocessShader(); }
+void _D3D10ReflectShader() { d3d10.D3D10ReflectShader(); }
+void _D3D10RegisterLayers() { d3d10.D3D10RegisterLayers(); }
+void _D3D10StateBlockMaskDifference() { d3d10.D3D10StateBlockMaskDifference(); }
+void _D3D10StateBlockMaskDisableAll() { d3d10.D3D10StateBlockMaskDisableAll(); }
+void _D3D10StateBlockMaskDisableCapture() { d3d10.D3D10StateBlockMaskDisableCapture(); }
+void _D3D10StateBlockMaskEnableAll() { d3d10.D3D10StateBlockMaskEnableAll(); }
+void _D3D10StateBlockMaskEnableCapture() { d3d10.D3D10StateBlockMaskEnableCapture(); }
+void _D3D10StateBlockMaskGetSetting() { d3d10.D3D10StateBlockMaskGetSetting(); }
+void _D3D10StateBlockMaskIntersect() { d3d10.D3D10StateBlockMaskIntersect(); }
+void _D3D10StateBlockMaskUnion() { d3d10.D3D10StateBlockMaskUnion(); }
+
 void _CreateDirect3D11DeviceFromDXGIDevice() { d3d11.CreateDirect3D11DeviceFromDXGIDevice(); }
 void _CreateDirect3D11SurfaceFromDXGISurface() { d3d11.CreateDirect3D11SurfaceFromDXGISurface(); }
 void _D3D11CoreCreateDevice() { d3d11.D3D11CoreCreateDevice(); }
@@ -3230,6 +3669,103 @@ void _D3DPerformance_SetMarker() { d3d11.D3DPerformance_SetMarker(); }
 void _EnableFeatureLevelUpgrade() { d3d11.EnableFeatureLevelUpgrade(); }
 void _OpenAdapter10() { d3d11.OpenAdapter10(); }
 void _OpenAdapter10_2() { d3d11.OpenAdapter10_2(); }
+
+void _D3D12CoreCreateLayeredDevice() { d3d12.D3D12CoreCreateLayeredDevice(); }
+void _D3D12CoreGetLayeredDeviceSize() { d3d12.D3D12CoreGetLayeredDeviceSize(); }
+void _D3D12CoreRegisterLayers() { d3d12.D3D12CoreRegisterLayers(); }
+void _D3D12CreateDevice() { d3d12.D3D12CreateDevice(); }
+void _D3D12CreateRootSignatureDeserializer() { d3d12.D3D12CreateRootSignatureDeserializer(); }
+void _D3D12CreateVersionedRootSignatureDeserializer() { d3d12.D3D12CreateVersionedRootSignatureDeserializer(); }
+void _D3D12DeviceRemovedExtendedData() { d3d12.D3D12DeviceRemovedExtendedData(); }
+void _D3D12EnableExperimentalFeatures() { d3d12.D3D12EnableExperimentalFeatures(); }
+void _D3D12GetDebugInterface() { d3d12.D3D12GetDebugInterface(); }
+void _D3D12GetInterface() { d3d12.D3D12GetInterface(); }
+void _D3D12PIXEventsReplaceBlock() { d3d12.D3D12PIXEventsReplaceBlock(); }
+void _D3D12PIXGetThreadInfo() { d3d12.D3D12PIXGetThreadInfo(); }
+void _D3D12PIXNotifyWakeFromFenceSignal() { d3d12.D3D12PIXNotifyWakeFromFenceSignal(); }
+void _D3D12PIXReportCounter() { d3d12.D3D12PIXReportCounter(); }
+void _D3D12SerializeRootSignature() { d3d12.D3D12SerializeRootSignature(); }
+void _D3D12SerializeVersionedRootSignature() { d3d12.D3D12SerializeVersionedRootSignature(); }
+void _GetBehaviorValue() { d3d12.GetBehaviorValue(); }
+void _SetAppCompatStringPointer() { d3d12.SetAppCompatStringPointer(); }
+
+void _BinkAllocateFrameBuffers() { bink2w64.BinkAllocateFrameBuffers(); }
+void _BinkClose() { bink2w64.BinkClose(); }
+void _BinkCloseTrack() { bink2w64.BinkCloseTrack(); }
+void _BinkControlBackgroundIO() { bink2w64.BinkControlBackgroundIO(); }
+void _BinkCopyToBuffer() { bink2w64.BinkCopyToBuffer(); }
+void _BinkCopyToBufferRect() { bink2w64.BinkCopyToBufferRect(); }
+void _BinkDoFrame() { bink2w64.BinkDoFrame(); }
+void _BinkDoFrameAsync() { bink2w64.BinkDoFrameAsync(); }
+void _BinkDoFrameAsyncMulti() { bink2w64.BinkDoFrameAsyncMulti(); }
+void _BinkDoFrameAsyncWait() { bink2w64.BinkDoFrameAsyncWait(); }
+void _BinkDoFramePlane() { bink2w64.BinkDoFramePlane(); }
+void _BinkFindXAudio2WinDevice() { bink2w64.BinkFindXAudio2WinDevice(); }
+void _BinkFreeGlobals() { bink2w64.BinkFreeGlobals(); }
+void _BinkGetError() { bink2w64.BinkGetError(); }
+void _BinkGetFrameBuffersInfo() { bink2w64.BinkGetFrameBuffersInfo(); }
+void _BinkGetGPUDataBuffersInfo() { bink2w64.BinkGetGPUDataBuffersInfo(); }
+void _BinkGetKeyFrame() { bink2w64.BinkGetKeyFrame(); }
+void _BinkGetPlatformInfo() { bink2w64.BinkGetPlatformInfo(); }
+void _BinkGetRealtime() { bink2w64.BinkGetRealtime(); }
+void _BinkGetRects() { bink2w64.BinkGetRects(); }
+void _BinkGetSummary() { bink2w64.BinkGetSummary(); }
+void _BinkGetTrackData() { bink2w64.BinkGetTrackData(); }
+void _BinkGetTrackID() { bink2w64.BinkGetTrackID(); }
+void _BinkGetTrackMaxSize() { bink2w64.BinkGetTrackMaxSize(); }
+void _BinkGetTrackType() { bink2w64.BinkGetTrackType(); }
+void _BinkGoto() { bink2w64.BinkGoto(); }
+void _BinkLogoAddress() { bink2w64.BinkLogoAddress(); }
+void _BinkNextFrame() { bink2w64.BinkNextFrame(); }
+void _BinkOpen() { bink2w64.BinkOpen(); }
+void _BinkOpenDirectSound() { bink2w64.BinkOpenDirectSound(); }
+void _BinkOpenMiles() { bink2w64.BinkOpenMiles(); }
+void _BinkOpenTrack() { bink2w64.BinkOpenTrack(); }
+void _BinkOpenWaveOut() { bink2w64.BinkOpenWaveOut(); }
+void _BinkOpenWithOptions() { bink2w64.BinkOpenWithOptions(); }
+void _BinkOpenXAudio2() { bink2w64.BinkOpenXAudio2(); }
+void _BinkOpenXAudio27() { bink2w64.BinkOpenXAudio27(); }
+void _BinkOpenXAudio28() { bink2w64.BinkOpenXAudio28(); }
+void _BinkOpenXAudio29() { bink2w64.BinkOpenXAudio29(); }
+void _BinkPause() { bink2w64.BinkPause(); }
+void _BinkRegisterFrameBuffers() { bink2w64.BinkRegisterFrameBuffers(); }
+void _BinkRegisterGPUDataBuffers() { bink2w64.BinkRegisterGPUDataBuffers(); }
+void _BinkRequestStopAsyncThread() { bink2w64.BinkRequestStopAsyncThread(); }
+void _BinkRequestStopAsyncThreadsMulti() { bink2w64.BinkRequestStopAsyncThreadsMulti(); }
+void _BinkService() { bink2w64.BinkService(); }
+void _BinkSetError() { bink2w64.BinkSetError(); }
+void _BinkSetFileOffset() { bink2w64.BinkSetFileOffset(); }
+void _BinkSetFrameRate() { bink2w64.BinkSetFrameRate(); }
+void _BinkSetIO() { bink2w64.BinkSetIO(); }
+void _BinkSetIOSize() { bink2w64.BinkSetIOSize(); }
+void _BinkSetMemory() { bink2w64.BinkSetMemory(); }
+void _BinkSetOSFileCallbacks() { bink2w64.BinkSetOSFileCallbacks(); }
+void _BinkSetPan() { bink2w64.BinkSetPan(); }
+void _BinkSetSimulate() { bink2w64.BinkSetSimulate(); }
+void _BinkSetSoundOnOff() { bink2w64.BinkSetSoundOnOff(); }
+void _BinkSetSoundSystem() { bink2w64.BinkSetSoundSystem(); }
+void _BinkSetSoundSystem2() { bink2w64.BinkSetSoundSystem2(); }
+void _BinkSetSoundTrack() { bink2w64.BinkSetSoundTrack(); }
+void _BinkSetSpeakerVolumes() { bink2w64.BinkSetSpeakerVolumes(); }
+void _BinkSetVideoOnOff() { bink2w64.BinkSetVideoOnOff(); }
+void _BinkSetVolume() { bink2w64.BinkSetVolume(); }
+void _BinkSetWillLoop() { bink2w64.BinkSetWillLoop(); }
+void _BinkShouldSkip() { bink2w64.BinkShouldSkip(); }
+void _BinkStartAsyncThread() { bink2w64.BinkStartAsyncThread(); }
+void _BinkUtilCPUs() { bink2w64.BinkUtilCPUs(); }
+void _BinkUtilFree() { bink2w64.BinkUtilFree(); }
+void _BinkUtilMalloc() { bink2w64.BinkUtilMalloc(); }
+void _BinkUtilMutexCreate() { bink2w64.BinkUtilMutexCreate(); }
+void _BinkUtilMutexDestroy() { bink2w64.BinkUtilMutexDestroy(); }
+void _BinkUtilMutexLock() { bink2w64.BinkUtilMutexLock(); }
+void _BinkUtilMutexLockTimeOut() { bink2w64.BinkUtilMutexLockTimeOut(); }
+void _BinkUtilMutexUnlock() { bink2w64.BinkUtilMutexUnlock(); }
+void _BinkUtilSoundGlobalLock() { bink2w64.BinkUtilSoundGlobalLock(); }
+void _BinkUtilSoundGlobalUnlock() { bink2w64.BinkUtilSoundGlobalUnlock(); }
+void _BinkWait() { bink2w64.BinkWait(); }
+void _BinkWaitStopAsyncThread() { bink2w64.BinkWaitStopAsyncThread(); }
+void _BinkWaitStopAsyncThreadsMulti() { bink2w64.BinkWaitStopAsyncThreadsMulti(); }
+void _RADTimerRead() { bink2w64.RADTimerRead(); }
 
 #pragma runtime_checks( "", restore )
 #endif

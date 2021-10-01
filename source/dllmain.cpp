@@ -154,6 +154,38 @@ void LoadOriginalLibrary()
     auto szSystemPath = SHGetKnownFolderPath(FOLDERID_System, 0, nullptr) + L'\\' + szSelfName;
     auto szLocalPath = GetModuleFileNameW(hm); szLocalPath = szLocalPath.substr(0, szLocalPath.find_last_of(L"/\\") + 1);
 
+    if (iequals(szSelfName, L"dsound.dll"))
+    {
+        dsound.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
+    }
+    else if (iequals(szSelfName, L"dinput8.dll"))
+    {
+        dinput8.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
+    }
+    else if (iequals(szSelfName, L"wininet.dll"))
+    {
+        wininet.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
+    }
+    else if (iequals(szSelfName, L"version.dll"))
+    {
+        version.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
+    }
+    else if (iequals(szSelfName, L"d3d9.dll"))
+    {
+        d3d9.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
+    }
+    else if (iequals(szSelfName, L"d3d10.dll"))
+    {
+        d3d10.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
+    }
+    else if (iequals(szSelfName, L"d3d11.dll"))
+    {
+        d3d11.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
+    }
+    else if (iequals(szSelfName, L"d3d12.dll"))
+    {
+        d3d12.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
+    } else
 #if !X64
     if (iequals(szSelfName, L"vorbisFile.dll"))
     {
@@ -190,14 +222,6 @@ void LoadOriginalLibrary()
             }
         }
     }
-    else if (iequals(szSelfName, L"dsound.dll"))
-    {
-        dsound.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
-    }
-    else if (iequals(szSelfName, L"dinput8.dll"))
-    {
-        dinput8.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
-    }
     else if (iequals(szSelfName, L"ddraw.dll"))
     {
         ddraw.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
@@ -207,10 +231,6 @@ void LoadOriginalLibrary()
         d3d8.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
         if (GetPrivateProfileIntW(L"globalsets", L"used3d8to9", FALSE, iniPaths))
             d3d8.Direct3DCreate8 = (FARPROC)Direct3DCreate8;
-    }
-    else if (iequals(szSelfName, L"d3d9.dll"))
-    {
-        d3d9.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
     }
     else if (iequals(szSelfName, L"winmm.dll"))
     {
@@ -227,14 +247,6 @@ void LoadOriginalLibrary()
     else if (iequals(szSelfName, L"msvfw32.dll"))
     {
         msvfw32.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
-    }
-    else if (iequals(szSelfName, L"wininet.dll"))
-    {
-        wininet.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
-    }
-    else if (iequals(szSelfName, L"version.dll"))
-    {
-        version.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
     }
     else if (iequals(szSelfName, L"binkw32.dll"))
     {
@@ -297,38 +309,22 @@ void LoadOriginalLibrary()
         }, ".text", ".rdata");
     }
     else
-    {
-        MessageBox(0, TEXT("This library isn't supported. Try to rename it to d3d8.dll, d3d9.dll, d3d11.dll, winmm.dll, wininet.dll, version.dll, \
-            msacm32.dll, dinput.dll, dinput8.dll, dsound.dll, vorbisFile.dll, msvfw32.dll, xlive.dll or ddraw.dll."), TEXT("ASI Loader"), MB_ICONERROR);
-        ExitProcess(0);
-    }
 #else
-    if (iequals(szSelfName, L"dsound.dll"))
+    if (iequals(szSelfName, L"bink2w64.dll"))
     {
-        dsound.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
-    }
-    else if (iequals(szSelfName, L"dinput8.dll"))
-    {
-        dinput8.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
-    }
-    else if (iequals(szSelfName, L"wininet.dll"))
-    {
-        wininet.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
-    }
-    else if (iequals(szSelfName, L"version.dll"))
-    {
-        version.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
-    }
-    else if (iequals(szSelfName, L"d3d11.dll"))
-    {
-        d3d11.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
-    }
+        szLocalPath += L"bink2w64Hooked.dll";
+        if (std::filesystem::exists(szLocalPath))
+        {
+            bink2w64.LoadOriginalLibrary(LoadLibraryW(szLocalPath));
+        }
+    } 
     else
+#endif
     {
-        MessageBox(0, TEXT("This library isn't supported. Try to rename it to dsound.dll, dinput8.dll, wininet.dll or version.dll."), TEXT("ASI Loader"), MB_ICONERROR);
+        MessageBox(0, TEXT("This library isn't supported."), TEXT("ASI Loader"), MB_ICONERROR);
         ExitProcess(0);
     }
-#endif
+
 }
 
 #if !X64
@@ -920,6 +916,9 @@ bool HookKernel32IAT(HMODULE mod, bool exe)
         IMAGE_NT_HEADERS*           ntHeader = (IMAGE_NT_HEADERS*)(hInstance + ((IMAGE_DOS_HEADER*)hInstance)->e_lfanew);
         IMAGE_IMPORT_DESCRIPTOR*    pImports = (IMAGE_IMPORT_DESCRIPTOR*)(hInstance + ntHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress);
         size_t                      nNumImports = ntHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].Size / sizeof(IMAGE_IMPORT_DESCRIPTOR) - 1;
+
+        if (nNumImports == (size_t)-1)
+            return;
 
         for (size_t i = 0; i < nNumImports; i++)
         {

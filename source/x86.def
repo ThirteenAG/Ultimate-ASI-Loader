@@ -91,18 +91,56 @@ DebugSetMute = _DebugSetMute
 Direct3D9EnableMaximizedWindowedModeShim = _Direct3D9EnableMaximizedWindowedModeShim
 Direct3DCreate9 = _Direct3DCreate9
 Direct3DCreate9Ex = _Direct3DCreate9Ex
+Direct3DCreate9On12 = _Direct3DCreate9On12
+Direct3DCreate9On12Ex = _Direct3DCreate9On12Ex
 Direct3DShaderValidatorCreate9 = _Direct3DShaderValidatorCreate9
 PSGPError = _PSGPError
 PSGPSampleTexture = _PSGPSampleTexture
 
+LIBRARY "d3d10"
+EXPORTS
+D3D10CompileEffectFromMemory = _D3D10CompileEffectFromMemory
+D3D10CompileShader = _D3D10CompileShader
+D3D10CreateBlob = _D3D10CreateBlob
+D3D10CreateDevice = _D3D10CreateDevice
+D3D10CreateDeviceAndSwapChain = _D3D10CreateDeviceAndSwapChain
+D3D10CreateEffectFromMemory = _D3D10CreateEffectFromMemory
+D3D10CreateEffectPoolFromMemory = _D3D10CreateEffectPoolFromMemory
+D3D10CreateStateBlock = _D3D10CreateStateBlock
+D3D10DisassembleEffect = _D3D10DisassembleEffect
+D3D10DisassembleShader = _D3D10DisassembleShader
+D3D10GetGeometryShaderProfile = _D3D10GetGeometryShaderProfile
+D3D10GetInputAndOutputSignatureBlob = _D3D10GetInputAndOutputSignatureBlob
+D3D10GetInputSignatureBlob = _D3D10GetInputSignatureBlob
+D3D10GetOutputSignatureBlob = _D3D10GetOutputSignatureBlob
+D3D10GetPixelShaderProfile = _D3D10GetPixelShaderProfile
+D3D10GetShaderDebugInfo = _D3D10GetShaderDebugInfo
+D3D10GetVersion = _D3D10GetVersion
+D3D10GetVertexShaderProfile = _D3D10GetVertexShaderProfile
+D3D10PreprocessShader = _D3D10PreprocessShader
+D3D10ReflectShader = _D3D10ReflectShader
+D3D10RegisterLayers = _D3D10RegisterLayers
+D3D10StateBlockMaskDifference = _D3D10StateBlockMaskDifference
+D3D10StateBlockMaskDisableAll = _D3D10StateBlockMaskDisableAll
+D3D10StateBlockMaskDisableCapture = _D3D10StateBlockMaskDisableCapture
+D3D10StateBlockMaskEnableAll = _D3D10StateBlockMaskEnableAll
+D3D10StateBlockMaskEnableCapture = _D3D10StateBlockMaskEnableCapture
+D3D10StateBlockMaskGetSetting = _D3D10StateBlockMaskGetSetting
+D3D10StateBlockMaskIntersect = _D3D10StateBlockMaskIntersect
+D3D10StateBlockMaskUnion = _D3D10StateBlockMaskUnion
+
 LIBRARY "d3d11"
 EXPORTS
+CreateDirect3D11DeviceFromDXGIDevice = _CreateDirect3D11DeviceFromDXGIDevice
+CreateDirect3D11SurfaceFromDXGISurface = _CreateDirect3D11SurfaceFromDXGISurface
 D3D11CoreCreateDevice = _D3D11CoreCreateDevice
 D3D11CoreCreateLayeredDevice = _D3D11CoreCreateLayeredDevice
 D3D11CoreGetLayeredDeviceSize = _D3D11CoreGetLayeredDeviceSize
 D3D11CoreRegisterLayers = _D3D11CoreRegisterLayers
 D3D11CreateDevice = _D3D11CreateDevice
 D3D11CreateDeviceAndSwapChain = _D3D11CreateDeviceAndSwapChain
+D3D11CreateDeviceForD3D12 = _D3D11CreateDeviceForD3D12
+D3D11On12CreateDevice = _D3D11On12CreateDevice
 D3DKMTCloseAdapter = _D3DKMTCloseAdapter
 D3DKMTCreateAllocation = _D3DKMTCreateAllocation
 D3DKMTCreateContext = _D3DKMTCreateContext
@@ -144,6 +182,27 @@ D3DPerformance_SetMarker = _D3DPerformance_SetMarker
 EnableFeatureLevelUpgrade = _EnableFeatureLevelUpgrade
 OpenAdapter10 = _OpenAdapter10
 OpenAdapter10_2 = _OpenAdapter10_2
+
+LIBRARY "d3d12"
+EXPORTS
+D3D12CoreCreateLayeredDevice = _D3D12CoreCreateLayeredDevice
+D3D12CoreGetLayeredDeviceSize = _D3D12CoreGetLayeredDeviceSize
+D3D12CoreRegisterLayers = _D3D12CoreRegisterLayers
+D3D12CreateDevice = _D3D12CreateDevice
+D3D12CreateRootSignatureDeserializer = _D3D12CreateRootSignatureDeserializer
+D3D12CreateVersionedRootSignatureDeserializer = _D3D12CreateVersionedRootSignatureDeserializer
+D3D12DeviceRemovedExtendedData = _D3D12DeviceRemovedExtendedData
+D3D12EnableExperimentalFeatures = _D3D12EnableExperimentalFeatures
+D3D12GetDebugInterface = _D3D12GetDebugInterface
+D3D12GetInterface = _D3D12GetInterface
+D3D12PIXEventsReplaceBlock = _D3D12PIXEventsReplaceBlock
+D3D12PIXGetThreadInfo = _D3D12PIXGetThreadInfo
+D3D12PIXNotifyWakeFromFenceSignal = _D3D12PIXNotifyWakeFromFenceSignal
+D3D12PIXReportCounter = _D3D12PIXReportCounter
+D3D12SerializeRootSignature = _D3D12SerializeRootSignature
+D3D12SerializeVersionedRootSignature = _D3D12SerializeVersionedRootSignature
+GetBehaviorValue = _GetBehaviorValue
+SetAppCompatStringPointer = _SetAppCompatStringPointer
 
 LIBRARY "ddraw"
 EXPORTS
