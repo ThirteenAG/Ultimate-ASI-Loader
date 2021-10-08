@@ -55,3 +55,36 @@ UseD3D8to9=1
 ## CrashDumps
 
 ASI loader is now capable of generating crash minidumps and crash logs. To use this feature, create a folder named `CrashDumps` in the folder with asi loader's dll. You can disable that via `DisableCrashDumps=1` ini option.
+
+## Using with UWP games
+
+1. Enable Developer Mode (Windows Settings -> Update and Security -> For Developers -> Developer Mode)  
+![image](https://user-images.githubusercontent.com/4904157/136562544-6d249514-203e-40c2-808f-34786b043ec5.png)
+2. Install an UWP game, for example GTA San Andreas.  
+![image](https://user-images.githubusercontent.com/4904157/136558440-553ef1f6-cf69-413b-903b-fd4203d6cc1f.png)
+3. Launch an UWP game through the start menu.  
+4. Open [UWPInjector.exe](https://github.com/Wunkolo/UWPDumper) from the UWPDumper download.  
+![image](https://user-images.githubusercontent.com/4904157/136558563-6e39dd67-778e-4159-bb3b-83c499017223.png)
+5. Enter the Process ID that is displayed from the injector and then hit enter.  
+6. Wait until the game is dumped.  
+![image](https://user-images.githubusercontent.com/4904157/136558813-8b7c271c-2475-40b9-a432-f9640f328a43.png)
+7. Go to the directory : `C:\Users\[YOUR USERNAME]\AppData\Local\Packages\[YOUR UWP GAME NAME]\TempState\DUMP`  
+8. Copy these files into a new folder somewhere else of your choosing.  
+9. Uninstall an UWP game by clicking on start menu and right clicking on its icon and uninstall.  
+![image](https://user-images.githubusercontent.com/4904157/136559019-bdd6d278-d2ae-4acf-b119-9933baab7d96.png)
+10. Go to your directory with your new dumped files (the ones you copied over) and shift + right click in the directory and "Open Powershell window here".  
+11. In that folder, rename **AppxBlockMap.xml** and **AppxSignature.xml** to anything else.  
+12. Run the following command: `Add-AppxPackage -Register AppxManifest.xml`  
+13. Place Ultimate ASI Loader DLL into game directory. You need to find out which name works for a specific game, in case of GTA SA I've used **d3d11.dll**, so I put **dinput8.dll** from x86 archive and renamed it to **d3d11.dll**.  
+14. Create an ini file with the same name, in this case: **d3d11.ini**, with the following content:  
+```
+[GlobalSets]
+DontLoadFromDllMain=0
+```
+Sometimes it may not be necessary, but UWP GTA SA didn't work with current implementation of `DontLoadFromDllMain=1`.  
+15. Create **scripts** or **plugins** folder within the root directory and place your plugins in it.  
+Rough code example of radio for all vehicles plugin [here](https://gist.github.com/ThirteenAG/868a964b46b82ce5cebbd4a0823c69e4). Compiled binary here - [GTASAUWP.RadioForAllVehicles.zip](https://github.com/ThirteenAG/Ultimate-ASI-Loader/files/7311505/GTASAUWP.RadioForAllVehicles.zip)    
+16. Click on the start menu and launch the game!  
+17. See your mods in action.  
+![ApplicationFrameHost_2021-10-08_15-57-14](https://user-images.githubusercontent.com/4904157/136561208-e989119e-1ef4-42c2-8b20-c1f81f4e0931.png)
+
