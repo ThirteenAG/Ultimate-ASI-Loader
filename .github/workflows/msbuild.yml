@@ -37,4 +37,20 @@ jobs:
     - name: Pack binaries
       shell: cmd
       run: |
-        release.bat
+        release-${{matrix.platform}}.bat
+    - name: Get release info
+      id: release_info
+      uses: cardinalby/git-get-release-action@1.1.1
+      env:
+       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag: ${{matrix.platform}}-latest
+    - name: Upload Release
+      uses: ncipollo/release-action@v1
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        allowUpdates: true
+        name: ${{ steps.release_info.outputs.name }}
+        body: ${{ steps.release_info.outputs.body }}
+        tag: ${{ steps.release_info.outputs.tag_name }}
+        artifacts: bin/*.zip

@@ -13,7 +13,7 @@ install:
 
     premake5.bat
 build:
-  project: build/Ultimate-ASI-Loader-x86.sln
+  project: build/Ultimate-ASI-Loader-Win32.sln
   verbosity: minimal
 before_package:
 - cmd: msbuild.exe build/Ultimate-ASI-Loader-x64.sln /t:Build /p:Configuration=Release;Platform=x64
