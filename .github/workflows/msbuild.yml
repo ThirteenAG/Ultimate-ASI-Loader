@@ -1,0 +1,40 @@
+name: GitHub Actions Build
+
+on:
+  pull_request:
+  push:
+
+jobs:
+  build:
+    runs-on: windows-2022
+    strategy:
+      matrix:
+        platform: [Win32, x64]
+        buildtype: [Release]
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Add msbuild to PATH
+      uses: microsoft/setup-msbuild@v1.1
+    - uses: actions/checkout@v2
+      with:
+        submodules: 'true'
+    - name: DX SDK
+      shell: bash
+      run:  |
+        curl -L https://download.microsoft.com/download/a/e/7/ae743f1f-632b-4809-87a9-aa1bb3458e31/DXSDK_Jun10.exe -o DX.exe
+        7z x DX.exe DXSDK/Include -oDX
+        7z x DX.exe DXSDK/Lib/x86 -oDX
+        mv DX/DXSDK "C:/Program Files (x86)/Microsoft DirectX SDK (June 2010)"
+    - name: Configure build
+      shell: cmd
+      run: |
+        ./premake5.bat
+    - name: Build
+      shell: cmd
+      run: |
+        msbuild -m build/Ultimate-ASI-Loader-${{matrix.platform}}.sln /property:Configuration=${{matrix.buildtype}} /property:Platform=${{matrix.platform}}
+    - name: Pack binaries
+      shell: cmd
+      run: |
+        release.bat

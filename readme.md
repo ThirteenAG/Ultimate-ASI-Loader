@@ -1,28 +1,31 @@
+![AppVeyor](https://img.shields.io/appveyor/build/ThirteenAG/Ultimate-ASI-Loader?label=AppVeyor%20Build&logo=AppVeyor&logoColor=white)
+![GitHub Workflow Status](https://img.shields.io/github/workflow/status/ThirteenAG/Ultimate-ASI-Loader/GitHub%20Actions%20Build?label=GitHub%20Actions%20Build&logo=GitHub&logoColor=white)
+
 # Ultimate ASI Loader
 
 ## DESCRIPTION
 
 This is a DLL file which adds ASI plugin loading functionality to any game, which uses any of the following libraries:
 
-- d3d8.dll
-- d3d9.dll (x86 and x64)
-- d3d10.dll (x86 and x64)
-- d3d11.dll (x86 and x64)
-- d3d12.dll (x86 and x64)
-- ddraw.dll
-- dinput.dll
-- dinput8.dll (x86 and x64)
-- dsound.dll (x86 and x64)
-- msacm32.dll
-- msvfw32.dll
-- version.dll (x86 and x64)
-- wininet.dll (x86 and x64)
-- winmm.dll
-- xlive.dll
+- [d3d8.dll](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/Win32-latest/d3d8.zip)
+- d3d9.dll ([x86](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/Win32-latest/d3d9.zip) and [x64](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/x64-latest/d3d9.zip))
+- d3d10.dll ([x86](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/Win32-latest/d3d10.zip) and [x64](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/x64-latest/d3d10.zip))
+- d3d11.dll ([x86](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/Win32-latest/d3d11.zip) and [x64](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/x64-latest/d3d11.zip))
+- d3d12.dll ([x86](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/Win32-latest/d3d12.zip) and [x64](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/x64-latest/d3d12.zip))
+- [ddraw.dll](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/Win32-latest/ddraw.zip)
+- [dinput.dll](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/Win32-latest/dinput.zip)
+- dinput8.dll ([x86](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/Win32-latest/dinput8.zip) and [x64](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/x64-latest/dinput8.zip))
+- dsound.dll ([x86](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/Win32-latest/dsound.zip) and [x64](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/x64-latest/dsound.zip))
+- [msacm32.dll](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/Win32-latest/msacm32.zip)
+- [msvfw32.dll](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/Win32-latest/msvfw32.zip)
+- version.dll([x86](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/Win32-latest/version.zip) and [x64](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/x64-latest/version.zip))
+- wininet.dll([x86](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/Win32-latest/wininet.zip) and [x64](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/x64-latest/wininet.zip))
+- [winmm.dll](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/Win32-latest/winmm.zip)
+- [xlive.dll](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/Win32-latest/xlive.zip)
 
-- bink2w64.dll (rename original to bink2w64Hooked.dll)
-- vorbisFile.dll (rename original to vorbisHooked.dll, optional)
-- binkw32.dll (rename original to binkw32Hooked.dll, optional)
+- [bink2w64.dll](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/x64-latest/bink2w64.zip) (rename original to bink2w64Hooked.dll)
+- [vorbisFile.dll](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/Win32-latest/vorbisFile.zip) (rename original to vorbisHooked.dll, optional)
+- [binkw32.dll](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/Win32-latest/binkw32.zip) (rename original to binkw32Hooked.dll, optional)
 
 With the last two, it is possible to load the original dll by renaming it to 'vorbisHooked.dll' or 'binkw32Hooked.dll'.
 Usually it is not required and you can simply replace the dll. Always make a backup before replacing any files.
@@ -59,32 +62,33 @@ ASI loader is now capable of generating crash minidumps and crash logs. To use t
 ## Using with UWP games
 
 1. Enable Developer Mode (Windows Settings -> Update and Security -> For Developers -> Developer Mode)  
-![image](https://user-images.githubusercontent.com/4904157/136562544-6d249514-203e-40c2-808f-34786b043ec5.png)
+   ![image](https://user-images.githubusercontent.com/4904157/136562544-6d249514-203e-40c2-808f-34786b043ec5.png)
 2. Install an UWP game, for example GTA San Andreas.  
-![image](https://user-images.githubusercontent.com/4904157/136558440-553ef1f6-cf69-413b-903b-fd4203d6cc1f.png)
-3. Launch an UWP game through the start menu.  
+   ![image](https://user-images.githubusercontent.com/4904157/136558440-553ef1f6-cf69-413b-903b-fd4203d6cc1f.png)
+3. Launch an UWP game through the start menu.
 4. Open [UWPInjector.exe](https://github.com/Wunkolo/UWPDumper) from the UWPDumper download.  
-![image](https://user-images.githubusercontent.com/4904157/136558563-6e39dd67-778e-4159-bb3b-83c499017223.png)
-5. Enter the Process ID that is displayed from the injector and then hit enter.  
+   ![image](https://user-images.githubusercontent.com/4904157/136558563-6e39dd67-778e-4159-bb3b-83c499017223.png)
+5. Enter the Process ID that is displayed from the injector and then hit enter.
 6. Wait until the game is dumped.  
-![image](https://user-images.githubusercontent.com/4904157/136558813-8b7c271c-2475-40b9-a432-f9640f328a43.png)
-7. Go to the directory : `C:\Users\[YOUR USERNAME]\AppData\Local\Packages\[YOUR UWP GAME NAME]\TempState\DUMP`  
-8. Copy these files into a new folder somewhere else of your choosing.  
+   ![image](https://user-images.githubusercontent.com/4904157/136558813-8b7c271c-2475-40b9-a432-f9640f328a43.png)
+7. Go to the directory : `C:\Users\[YOUR USERNAME]\AppData\Local\Packages\[YOUR UWP GAME NAME]\TempState\DUMP`
+8. Copy these files into a new folder somewhere else of your choosing.
 9. Uninstall an UWP game by clicking on start menu and right clicking on its icon and uninstall.  
-![image](https://user-images.githubusercontent.com/4904157/136559019-bdd6d278-d2ae-4acf-b119-9933baab7d96.png)
-10. Go to your directory with your new dumped files (the ones you copied over) and shift + right click in the directory and "Open Powershell window here".  
-11. In that folder, rename **AppxBlockMap.xml** and **AppxSignature.xml** to anything else.  
-12. Run the following command: `Add-AppxPackage -Register AppxManifest.xml`  
-13. Place Ultimate ASI Loader DLL into game directory. You need to find out which name works for a specific game, in case of GTA SA I've used **d3d11.dll**, so I put **dinput8.dll** from x86 archive and renamed it to **d3d11.dll**.  
-14. Create an ini file with the same name, in this case: **d3d11.ini**, with the following content:  
+   ![image](https://user-images.githubusercontent.com/4904157/136559019-bdd6d278-d2ae-4acf-b119-9933baab7d96.png)
+10. Go to your directory with your new dumped files (the ones you copied over) and shift + right click in the directory and "Open Powershell window here".
+11. In that folder, rename **AppxBlockMap.xml** and **AppxSignature.xml** to anything else.
+12. Run the following command: `Add-AppxPackage -Register AppxManifest.xml`
+13. Place Ultimate ASI Loader DLL into game directory. You need to find out which name works for a specific game, in case of GTA SA I've used **d3d11.dll**, so I put **dinput8.dll** from x86 archive and renamed it to **d3d11.dll**.
+14. Create an ini file with the same name, in this case: **d3d11.ini**, with the following content:
+
 ```
 [GlobalSets]
 DontLoadFromDllMain=0
 ```
+
 Sometimes it may not be necessary, but UWP GTA SA didn't work with current implementation of `DontLoadFromDllMain=1`.  
 15. Create **scripts** or **plugins** folder within the root directory and place your plugins in it.  
-Rough code example of radio for all vehicles plugin [here](https://gist.github.com/ThirteenAG/868a964b46b82ce5cebbd4a0823c69e4). Compiled binary here - [GTASAUWP.RadioForAllVehicles.zip](https://github.com/ThirteenAG/Ultimate-ASI-Loader/files/7311505/GTASAUWP.RadioForAllVehicles.zip)    
+Rough code example of radio for all vehicles plugin [here](https://gist.github.com/ThirteenAG/868a964b46b82ce5cebbd4a0823c69e4). Compiled binary here - [GTASAUWP.RadioForAllVehicles.zip](https://github.com/ThirteenAG/Ultimate-ASI-Loader/files/7311505/GTASAUWP.RadioForAllVehicles.zip)  
 16. Click on the start menu and launch the game!  
 17. See your mods in action.  
 ![ApplicationFrameHost_2021-10-08_15-57-14](https://user-images.githubusercontent.com/4904157/136561208-e989119e-1ef4-42c2-8b20-c1f81f4e0931.png)
-

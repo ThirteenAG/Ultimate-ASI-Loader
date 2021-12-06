@@ -1,5 +1,5 @@
 -- x86
-workspace "Ultimate-ASI-Loader-x86"
+workspace "Ultimate-ASI-Loader-Win32"
    configurations { "Release", "Debug" }
    architecture "x86"
    location "build"
@@ -12,10 +12,10 @@ workspace "Ultimate-ASI-Loader-x86"
    defines { "rsc_FileDescription=\"Ultimate ASI Loader\"" }
    defines { "rsc_UpdateUrl=\"https://github.com/ThirteenAG/Ultimate-ASI-Loader\"" }
      
-project "Ultimate-ASI-Loader-x86"
+project "Ultimate-ASI-Loader-Win32"
    kind "SharedLib"
    language "C++"
-   targetdir "bin/x86/%{cfg.buildcfg}"
+   targetdir "bin/Win32/%{cfg.buildcfg}"
    targetname "dinput8"
    targetextension ".dll"
    
@@ -53,7 +53,7 @@ project "Ultimate-ASI-Loader-x86"
 project "MessageBox"
    kind "SharedLib"
    language "C++"
-   targetdir "bin/x86/%{cfg.buildcfg}/scripts"
+   targetdir "bin/Win32/%{cfg.buildcfg}/scripts"
    targetextension ".asi"
    
    files { "source/demo_plugins/MessageBox.cpp" }
@@ -73,7 +73,7 @@ project "MessageBox"
 project "ExeUnprotect"
    kind "SharedLib"
    language "C++"
-   targetdir "bin/x86/%{cfg.buildcfg}/scripts"
+   targetdir "bin/Win32/%{cfg.buildcfg}/scripts"
    targetextension ".asi"
    
    files { "source/demo_plugins/ExeUnprotect.cpp" }
