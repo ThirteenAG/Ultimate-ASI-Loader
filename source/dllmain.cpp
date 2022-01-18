@@ -185,6 +185,10 @@ void LoadOriginalLibrary()
     else if (iequals(szSelfName, L"d3d12.dll"))
     {
         d3d12.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
+    } 
+    else if (iequals(szSelfName, L"winmm.dll"))
+    {
+        winmm.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
     } else
 #if !X64
     if (iequals(szSelfName, L"vorbisFile.dll"))
@@ -231,10 +235,6 @@ void LoadOriginalLibrary()
         d3d8.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
         if (GetPrivateProfileIntW(L"globalsets", L"used3d8to9", FALSE, iniPaths))
             d3d8.Direct3DCreate8 = (FARPROC)Direct3DCreate8;
-    }
-    else if (iequals(szSelfName, L"winmm.dll"))
-    {
-        winmm.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
     }
     else if (iequals(szSelfName, L"msacm32.dll"))
     {

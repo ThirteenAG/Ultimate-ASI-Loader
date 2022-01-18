@@ -1087,265 +1087,8 @@ struct d3d12_dll
     }
 } d3d12;
 
-#if X64
-struct bink2w64_dll
-{
-    HMODULE dll;
-    FARPROC BinkAllocateFrameBuffers;
-    FARPROC BinkClose;
-    FARPROC BinkCloseTrack;
-    FARPROC BinkControlBackgroundIO;
-    FARPROC BinkCopyToBuffer;
-    FARPROC BinkCopyToBufferRect;
-    FARPROC BinkDoFrame;
-    FARPROC BinkDoFrameAsync;
-    FARPROC BinkDoFrameAsyncMulti;
-    FARPROC BinkDoFrameAsyncWait;
-    FARPROC BinkDoFramePlane;
-    FARPROC BinkFindXAudio2WinDevice;
-    FARPROC BinkFreeGlobals;
-    FARPROC BinkGetError;
-    FARPROC BinkGetFrameBuffersInfo;
-    FARPROC BinkGetGPUDataBuffersInfo;
-    FARPROC BinkGetKeyFrame;
-    FARPROC BinkGetPlatformInfo;
-    FARPROC BinkGetRealtime;
-    FARPROC BinkGetRects;
-    FARPROC BinkGetSummary;
-    FARPROC BinkGetTrackData;
-    FARPROC BinkGetTrackID;
-    FARPROC BinkGetTrackMaxSize;
-    FARPROC BinkGetTrackType;
-    FARPROC BinkGoto;
-    FARPROC BinkLogoAddress;
-    FARPROC BinkNextFrame;
-    FARPROC BinkOpen;
-    FARPROC BinkOpenDirectSound;
-    FARPROC BinkOpenMiles;
-    FARPROC BinkOpenTrack;
-    FARPROC BinkOpenWaveOut;
-    FARPROC BinkOpenWithOptions;
-    FARPROC BinkOpenXAudio2;
-    FARPROC BinkOpenXAudio27;
-    FARPROC BinkOpenXAudio28;
-    FARPROC BinkOpenXAudio29;
-    FARPROC BinkPause;
-    FARPROC BinkRegisterFrameBuffers;
-    FARPROC BinkRegisterGPUDataBuffers;
-    FARPROC BinkRequestStopAsyncThread;
-    FARPROC BinkRequestStopAsyncThreadsMulti;
-    FARPROC BinkService;
-    FARPROC BinkSetError;
-    FARPROC BinkSetFileOffset;
-    FARPROC BinkSetFrameRate;
-    FARPROC BinkSetIO;
-    FARPROC BinkSetIOSize;
-    FARPROC BinkSetMemory;
-    FARPROC BinkSetOSFileCallbacks;
-    FARPROC BinkSetPan;
-    FARPROC BinkSetSimulate;
-    FARPROC BinkSetSoundOnOff;
-    FARPROC BinkSetSoundSystem;
-    FARPROC BinkSetSoundSystem2;
-    FARPROC BinkSetSoundTrack;
-    FARPROC BinkSetSpeakerVolumes;
-    FARPROC BinkSetVideoOnOff;
-    FARPROC BinkSetVolume;
-    FARPROC BinkSetWillLoop;
-    FARPROC BinkShouldSkip;
-    FARPROC BinkStartAsyncThread;
-    FARPROC BinkUtilCPUs;
-    FARPROC BinkUtilFree;
-    FARPROC BinkUtilMalloc;
-    FARPROC BinkUtilMutexCreate;
-    FARPROC BinkUtilMutexDestroy;
-    FARPROC BinkUtilMutexLock;
-    FARPROC BinkUtilMutexLockTimeOut;
-    FARPROC BinkUtilMutexUnlock;
-    FARPROC BinkUtilSoundGlobalLock;
-    FARPROC BinkUtilSoundGlobalUnlock;
-    FARPROC BinkWait;
-    FARPROC BinkWaitStopAsyncThread;
-    FARPROC BinkWaitStopAsyncThreadsMulti;
-    FARPROC RADTimerRead;
-
-    void LoadOriginalLibrary(HMODULE module)
-    {
-        dll = module;
-        shared.LoadOriginalLibrary(dll);
-        BinkAllocateFrameBuffers = GetProcAddress(dll, "BinkAllocateFrameBuffers");
-        BinkClose = GetProcAddress(dll, "BinkClose");
-        BinkCloseTrack = GetProcAddress(dll, "BinkCloseTrack");
-        BinkControlBackgroundIO = GetProcAddress(dll, "BinkControlBackgroundIO");
-        BinkCopyToBuffer = GetProcAddress(dll, "BinkCopyToBuffer");
-        BinkCopyToBufferRect = GetProcAddress(dll, "BinkCopyToBufferRect");
-        BinkDoFrame = GetProcAddress(dll, "BinkDoFrame");
-        BinkDoFrameAsync = GetProcAddress(dll, "BinkDoFrameAsync");
-        BinkDoFrameAsyncMulti = GetProcAddress(dll, "BinkDoFrameAsyncMulti");
-        BinkDoFrameAsyncWait = GetProcAddress(dll, "BinkDoFrameAsyncWait");
-        BinkDoFramePlane = GetProcAddress(dll, "BinkDoFramePlane");
-        BinkFindXAudio2WinDevice = GetProcAddress(dll, "BinkFindXAudio2WinDevice");
-        BinkFreeGlobals = GetProcAddress(dll, "BinkFreeGlobals");
-        BinkGetError = GetProcAddress(dll, "BinkGetError");
-        BinkGetFrameBuffersInfo = GetProcAddress(dll, "BinkGetFrameBuffersInfo");
-        BinkGetGPUDataBuffersInfo = GetProcAddress(dll, "BinkGetGPUDataBuffersInfo");
-        BinkGetKeyFrame = GetProcAddress(dll, "BinkGetKeyFrame");
-        BinkGetPlatformInfo = GetProcAddress(dll, "BinkGetPlatformInfo");
-        BinkGetRealtime = GetProcAddress(dll, "BinkGetRealtime");
-        BinkGetRects = GetProcAddress(dll, "BinkGetRects");
-        BinkGetSummary = GetProcAddress(dll, "BinkGetSummary");
-        BinkGetTrackData = GetProcAddress(dll, "BinkGetTrackData");
-        BinkGetTrackID = GetProcAddress(dll, "BinkGetTrackID");
-        BinkGetTrackMaxSize = GetProcAddress(dll, "BinkGetTrackMaxSize");
-        BinkGetTrackType = GetProcAddress(dll, "BinkGetTrackType");
-        BinkGoto = GetProcAddress(dll, "BinkGoto");
-        BinkLogoAddress = GetProcAddress(dll, "BinkLogoAddress");
-        BinkNextFrame = GetProcAddress(dll, "BinkNextFrame");
-        BinkOpen = GetProcAddress(dll, "BinkOpen");
-        BinkOpenDirectSound = GetProcAddress(dll, "BinkOpenDirectSound");
-        BinkOpenMiles = GetProcAddress(dll, "BinkOpenMiles");
-        BinkOpenTrack = GetProcAddress(dll, "BinkOpenTrack");
-        BinkOpenWaveOut = GetProcAddress(dll, "BinkOpenWaveOut");
-        BinkOpenWithOptions = GetProcAddress(dll, "BinkOpenWithOptions");
-        BinkOpenXAudio2 = GetProcAddress(dll, "BinkOpenXAudio2");
-        BinkOpenXAudio27 = GetProcAddress(dll, "BinkOpenXAudio27");
-        BinkOpenXAudio28 = GetProcAddress(dll, "BinkOpenXAudio28");
-        BinkOpenXAudio29 = GetProcAddress(dll, "BinkOpenXAudio29");
-        BinkPause = GetProcAddress(dll, "BinkPause");
-        BinkRegisterFrameBuffers = GetProcAddress(dll, "BinkRegisterFrameBuffers");
-        BinkRegisterGPUDataBuffers = GetProcAddress(dll, "BinkRegisterGPUDataBuffers");
-        BinkRequestStopAsyncThread = GetProcAddress(dll, "BinkRequestStopAsyncThread");
-        BinkRequestStopAsyncThreadsMulti = GetProcAddress(dll, "BinkRequestStopAsyncThreadsMulti");
-        BinkService = GetProcAddress(dll, "BinkService");
-        BinkSetError = GetProcAddress(dll, "BinkSetError");
-        BinkSetFileOffset = GetProcAddress(dll, "BinkSetFileOffset");
-        BinkSetFrameRate = GetProcAddress(dll, "BinkSetFrameRate");
-        BinkSetIO = GetProcAddress(dll, "BinkSetIO");
-        BinkSetIOSize = GetProcAddress(dll, "BinkSetIOSize");
-        BinkSetMemory = GetProcAddress(dll, "BinkSetMemory");
-        BinkSetOSFileCallbacks = GetProcAddress(dll, "BinkSetOSFileCallbacks");
-        BinkSetPan = GetProcAddress(dll, "BinkSetPan");
-        BinkSetSimulate = GetProcAddress(dll, "BinkSetSimulate");
-        BinkSetSoundOnOff = GetProcAddress(dll, "BinkSetSoundOnOff");
-        BinkSetSoundSystem = GetProcAddress(dll, "BinkSetSoundSystem");
-        BinkSetSoundSystem2 = GetProcAddress(dll, "BinkSetSoundSystem2");
-        BinkSetSoundTrack = GetProcAddress(dll, "BinkSetSoundTrack");
-        BinkSetSpeakerVolumes = GetProcAddress(dll, "BinkSetSpeakerVolumes");
-        BinkSetVideoOnOff = GetProcAddress(dll, "BinkSetVideoOnOff");
-        BinkSetVolume = GetProcAddress(dll, "BinkSetVolume");
-        BinkSetWillLoop = GetProcAddress(dll, "BinkSetWillLoop");
-        BinkShouldSkip = GetProcAddress(dll, "BinkShouldSkip");
-        BinkStartAsyncThread = GetProcAddress(dll, "BinkStartAsyncThread");
-        BinkUtilCPUs = GetProcAddress(dll, "BinkUtilCPUs");
-        BinkUtilFree = GetProcAddress(dll, "BinkUtilFree");
-        BinkUtilMalloc = GetProcAddress(dll, "BinkUtilMalloc");
-        BinkUtilMutexCreate = GetProcAddress(dll, "BinkUtilMutexCreate");
-        BinkUtilMutexDestroy = GetProcAddress(dll, "BinkUtilMutexDestroy");
-        BinkUtilMutexLock = GetProcAddress(dll, "BinkUtilMutexLock");
-        BinkUtilMutexLockTimeOut = GetProcAddress(dll, "BinkUtilMutexLockTimeOut");
-        BinkUtilMutexUnlock = GetProcAddress(dll, "BinkUtilMutexUnlock");
-        BinkUtilSoundGlobalLock = GetProcAddress(dll, "BinkUtilSoundGlobalLock");
-        BinkUtilSoundGlobalUnlock = GetProcAddress(dll, "BinkUtilSoundGlobalUnlock");
-        BinkWait = GetProcAddress(dll, "BinkWait");
-        BinkWaitStopAsyncThread = GetProcAddress(dll, "BinkWaitStopAsyncThread");
-        BinkWaitStopAsyncThreadsMulti = GetProcAddress(dll, "BinkWaitStopAsyncThreadsMulti");
-        RADTimerRead = GetProcAddress(dll, "RADTimerRead");
-    }
-} bink2w64;
-#endif
-
-#if !X64
-struct dinput_dll
-{
-    HMODULE dll;
-    FARPROC DirectInputCreateA;
-    FARPROC DirectInputCreateEx;
-    FARPROC DirectInputCreateW;
-
-    void LoadOriginalLibrary(HMODULE module)
-    {
-        dll = module;
-        shared.LoadOriginalLibrary(dll);
-        DirectInputCreateA = GetProcAddress(dll, "DirectInputCreateA");
-        DirectInputCreateEx = GetProcAddress(dll, "DirectInputCreateEx");
-        DirectInputCreateW = GetProcAddress(dll, "DirectInputCreateW");
-    }
-} dinput;
-
-struct d3d8_dll
-{
-    HMODULE dll;
-    FARPROC DebugSetMute;
-    FARPROC Direct3D8EnableMaximizedWindowedModeShim;
-    FARPROC Direct3DCreate8;
-    FARPROC ValidatePixelShader;
-    FARPROC ValidateVertexShader;
-
-    void LoadOriginalLibrary(HMODULE module)
-    {
-        dll = module;
-        shared.LoadOriginalLibrary(dll);
-        DebugSetMute = GetProcAddress(dll, "DebugSetMute");
-        Direct3D8EnableMaximizedWindowedModeShim = GetProcAddress(dll, "Direct3D8EnableMaximizedWindowedModeShim");
-        Direct3DCreate8 = GetProcAddress(dll, "Direct3DCreate8");
-        ValidatePixelShader = GetProcAddress(dll, "ValidatePixelShader");
-        ValidateVertexShader = GetProcAddress(dll, "ValidateVertexShader");
-    }
-} d3d8;
-
-struct ddraw_dll
-{
-    HMODULE dll;
-    FARPROC AcquireDDThreadLock;
-    FARPROC CompleteCreateSysmemSurface;
-    FARPROC D3DParseUnknownCommand;
-    FARPROC DDGetAttachedSurfaceLcl;
-    FARPROC DDInternalLock;
-    FARPROC DDInternalUnlock;
-    FARPROC DSoundHelp;
-    FARPROC DirectDrawCreate;
-    FARPROC DirectDrawCreateClipper;
-    FARPROC DirectDrawCreateEx;
-    FARPROC DirectDrawEnumerateA;
-    FARPROC DirectDrawEnumerateExA;
-    FARPROC DirectDrawEnumerateExW;
-    FARPROC DirectDrawEnumerateW;
-    FARPROC GetDDSurfaceLocal;
-    FARPROC GetOLEThunkData;
-    FARPROC GetSurfaceFromDC;
-    FARPROC RegisterSpecialCase;
-    FARPROC ReleaseDDThreadLock;
-    FARPROC SetAppCompatData;
-
-    void LoadOriginalLibrary(HMODULE module)
-    {
-        dll = module;
-        shared.LoadOriginalLibrary(dll);
-        AcquireDDThreadLock = GetProcAddress(dll, "AcquireDDThreadLock");
-        CompleteCreateSysmemSurface = GetProcAddress(dll, "CompleteCreateSysmemSurface");
-        D3DParseUnknownCommand = GetProcAddress(dll, "D3DParseUnknownCommand");
-        DDGetAttachedSurfaceLcl = GetProcAddress(dll, "DDGetAttachedSurfaceLcl");
-        DDInternalLock = GetProcAddress(dll, "DDInternalLock");
-        DDInternalUnlock = GetProcAddress(dll, "DDInternalUnlock");
-        DSoundHelp = GetProcAddress(dll, "DSoundHelp");
-        DirectDrawCreate = GetProcAddress(dll, "DirectDrawCreate");
-        DirectDrawCreateClipper = GetProcAddress(dll, "DirectDrawCreateClipper");
-        DirectDrawCreateEx = GetProcAddress(dll, "DirectDrawCreateEx");
-        DirectDrawEnumerateA = GetProcAddress(dll, "DirectDrawEnumerateA");
-        DirectDrawEnumerateExA = GetProcAddress(dll, "DirectDrawEnumerateExA");
-        DirectDrawEnumerateExW = GetProcAddress(dll, "DirectDrawEnumerateExW");
-        DirectDrawEnumerateW = GetProcAddress(dll, "DirectDrawEnumerateW");
-        GetDDSurfaceLocal = GetProcAddress(dll, "GetDDSurfaceLocal");
-        GetOLEThunkData = GetProcAddress(dll, "GetOLEThunkData");
-        GetSurfaceFromDC = GetProcAddress(dll, "GetSurfaceFromDC");
-        RegisterSpecialCase = GetProcAddress(dll, "RegisterSpecialCase");
-        ReleaseDDThreadLock = GetProcAddress(dll, "ReleaseDDThreadLock");
-        SetAppCompatData = GetProcAddress(dll, "SetAppCompatData");
-    }
-} ddraw;
-
 #undef PlaySound
-struct winmmbase_dll
+struct winmm_dll
 {
     HMODULE dll;
     FARPROC CloseDriver;
@@ -1739,6 +1482,263 @@ struct winmmbase_dll
         wod32Message = GetProcAddress(dll, "wod32Message");
     }
 } winmm;
+
+#if X64
+struct bink2w64_dll
+{
+    HMODULE dll;
+    FARPROC BinkAllocateFrameBuffers;
+    FARPROC BinkClose;
+    FARPROC BinkCloseTrack;
+    FARPROC BinkControlBackgroundIO;
+    FARPROC BinkCopyToBuffer;
+    FARPROC BinkCopyToBufferRect;
+    FARPROC BinkDoFrame;
+    FARPROC BinkDoFrameAsync;
+    FARPROC BinkDoFrameAsyncMulti;
+    FARPROC BinkDoFrameAsyncWait;
+    FARPROC BinkDoFramePlane;
+    FARPROC BinkFindXAudio2WinDevice;
+    FARPROC BinkFreeGlobals;
+    FARPROC BinkGetError;
+    FARPROC BinkGetFrameBuffersInfo;
+    FARPROC BinkGetGPUDataBuffersInfo;
+    FARPROC BinkGetKeyFrame;
+    FARPROC BinkGetPlatformInfo;
+    FARPROC BinkGetRealtime;
+    FARPROC BinkGetRects;
+    FARPROC BinkGetSummary;
+    FARPROC BinkGetTrackData;
+    FARPROC BinkGetTrackID;
+    FARPROC BinkGetTrackMaxSize;
+    FARPROC BinkGetTrackType;
+    FARPROC BinkGoto;
+    FARPROC BinkLogoAddress;
+    FARPROC BinkNextFrame;
+    FARPROC BinkOpen;
+    FARPROC BinkOpenDirectSound;
+    FARPROC BinkOpenMiles;
+    FARPROC BinkOpenTrack;
+    FARPROC BinkOpenWaveOut;
+    FARPROC BinkOpenWithOptions;
+    FARPROC BinkOpenXAudio2;
+    FARPROC BinkOpenXAudio27;
+    FARPROC BinkOpenXAudio28;
+    FARPROC BinkOpenXAudio29;
+    FARPROC BinkPause;
+    FARPROC BinkRegisterFrameBuffers;
+    FARPROC BinkRegisterGPUDataBuffers;
+    FARPROC BinkRequestStopAsyncThread;
+    FARPROC BinkRequestStopAsyncThreadsMulti;
+    FARPROC BinkService;
+    FARPROC BinkSetError;
+    FARPROC BinkSetFileOffset;
+    FARPROC BinkSetFrameRate;
+    FARPROC BinkSetIO;
+    FARPROC BinkSetIOSize;
+    FARPROC BinkSetMemory;
+    FARPROC BinkSetOSFileCallbacks;
+    FARPROC BinkSetPan;
+    FARPROC BinkSetSimulate;
+    FARPROC BinkSetSoundOnOff;
+    FARPROC BinkSetSoundSystem;
+    FARPROC BinkSetSoundSystem2;
+    FARPROC BinkSetSoundTrack;
+    FARPROC BinkSetSpeakerVolumes;
+    FARPROC BinkSetVideoOnOff;
+    FARPROC BinkSetVolume;
+    FARPROC BinkSetWillLoop;
+    FARPROC BinkShouldSkip;
+    FARPROC BinkStartAsyncThread;
+    FARPROC BinkUtilCPUs;
+    FARPROC BinkUtilFree;
+    FARPROC BinkUtilMalloc;
+    FARPROC BinkUtilMutexCreate;
+    FARPROC BinkUtilMutexDestroy;
+    FARPROC BinkUtilMutexLock;
+    FARPROC BinkUtilMutexLockTimeOut;
+    FARPROC BinkUtilMutexUnlock;
+    FARPROC BinkUtilSoundGlobalLock;
+    FARPROC BinkUtilSoundGlobalUnlock;
+    FARPROC BinkWait;
+    FARPROC BinkWaitStopAsyncThread;
+    FARPROC BinkWaitStopAsyncThreadsMulti;
+    FARPROC RADTimerRead;
+
+    void LoadOriginalLibrary(HMODULE module)
+    {
+        dll = module;
+        shared.LoadOriginalLibrary(dll);
+        BinkAllocateFrameBuffers = GetProcAddress(dll, "BinkAllocateFrameBuffers");
+        BinkClose = GetProcAddress(dll, "BinkClose");
+        BinkCloseTrack = GetProcAddress(dll, "BinkCloseTrack");
+        BinkControlBackgroundIO = GetProcAddress(dll, "BinkControlBackgroundIO");
+        BinkCopyToBuffer = GetProcAddress(dll, "BinkCopyToBuffer");
+        BinkCopyToBufferRect = GetProcAddress(dll, "BinkCopyToBufferRect");
+        BinkDoFrame = GetProcAddress(dll, "BinkDoFrame");
+        BinkDoFrameAsync = GetProcAddress(dll, "BinkDoFrameAsync");
+        BinkDoFrameAsyncMulti = GetProcAddress(dll, "BinkDoFrameAsyncMulti");
+        BinkDoFrameAsyncWait = GetProcAddress(dll, "BinkDoFrameAsyncWait");
+        BinkDoFramePlane = GetProcAddress(dll, "BinkDoFramePlane");
+        BinkFindXAudio2WinDevice = GetProcAddress(dll, "BinkFindXAudio2WinDevice");
+        BinkFreeGlobals = GetProcAddress(dll, "BinkFreeGlobals");
+        BinkGetError = GetProcAddress(dll, "BinkGetError");
+        BinkGetFrameBuffersInfo = GetProcAddress(dll, "BinkGetFrameBuffersInfo");
+        BinkGetGPUDataBuffersInfo = GetProcAddress(dll, "BinkGetGPUDataBuffersInfo");
+        BinkGetKeyFrame = GetProcAddress(dll, "BinkGetKeyFrame");
+        BinkGetPlatformInfo = GetProcAddress(dll, "BinkGetPlatformInfo");
+        BinkGetRealtime = GetProcAddress(dll, "BinkGetRealtime");
+        BinkGetRects = GetProcAddress(dll, "BinkGetRects");
+        BinkGetSummary = GetProcAddress(dll, "BinkGetSummary");
+        BinkGetTrackData = GetProcAddress(dll, "BinkGetTrackData");
+        BinkGetTrackID = GetProcAddress(dll, "BinkGetTrackID");
+        BinkGetTrackMaxSize = GetProcAddress(dll, "BinkGetTrackMaxSize");
+        BinkGetTrackType = GetProcAddress(dll, "BinkGetTrackType");
+        BinkGoto = GetProcAddress(dll, "BinkGoto");
+        BinkLogoAddress = GetProcAddress(dll, "BinkLogoAddress");
+        BinkNextFrame = GetProcAddress(dll, "BinkNextFrame");
+        BinkOpen = GetProcAddress(dll, "BinkOpen");
+        BinkOpenDirectSound = GetProcAddress(dll, "BinkOpenDirectSound");
+        BinkOpenMiles = GetProcAddress(dll, "BinkOpenMiles");
+        BinkOpenTrack = GetProcAddress(dll, "BinkOpenTrack");
+        BinkOpenWaveOut = GetProcAddress(dll, "BinkOpenWaveOut");
+        BinkOpenWithOptions = GetProcAddress(dll, "BinkOpenWithOptions");
+        BinkOpenXAudio2 = GetProcAddress(dll, "BinkOpenXAudio2");
+        BinkOpenXAudio27 = GetProcAddress(dll, "BinkOpenXAudio27");
+        BinkOpenXAudio28 = GetProcAddress(dll, "BinkOpenXAudio28");
+        BinkOpenXAudio29 = GetProcAddress(dll, "BinkOpenXAudio29");
+        BinkPause = GetProcAddress(dll, "BinkPause");
+        BinkRegisterFrameBuffers = GetProcAddress(dll, "BinkRegisterFrameBuffers");
+        BinkRegisterGPUDataBuffers = GetProcAddress(dll, "BinkRegisterGPUDataBuffers");
+        BinkRequestStopAsyncThread = GetProcAddress(dll, "BinkRequestStopAsyncThread");
+        BinkRequestStopAsyncThreadsMulti = GetProcAddress(dll, "BinkRequestStopAsyncThreadsMulti");
+        BinkService = GetProcAddress(dll, "BinkService");
+        BinkSetError = GetProcAddress(dll, "BinkSetError");
+        BinkSetFileOffset = GetProcAddress(dll, "BinkSetFileOffset");
+        BinkSetFrameRate = GetProcAddress(dll, "BinkSetFrameRate");
+        BinkSetIO = GetProcAddress(dll, "BinkSetIO");
+        BinkSetIOSize = GetProcAddress(dll, "BinkSetIOSize");
+        BinkSetMemory = GetProcAddress(dll, "BinkSetMemory");
+        BinkSetOSFileCallbacks = GetProcAddress(dll, "BinkSetOSFileCallbacks");
+        BinkSetPan = GetProcAddress(dll, "BinkSetPan");
+        BinkSetSimulate = GetProcAddress(dll, "BinkSetSimulate");
+        BinkSetSoundOnOff = GetProcAddress(dll, "BinkSetSoundOnOff");
+        BinkSetSoundSystem = GetProcAddress(dll, "BinkSetSoundSystem");
+        BinkSetSoundSystem2 = GetProcAddress(dll, "BinkSetSoundSystem2");
+        BinkSetSoundTrack = GetProcAddress(dll, "BinkSetSoundTrack");
+        BinkSetSpeakerVolumes = GetProcAddress(dll, "BinkSetSpeakerVolumes");
+        BinkSetVideoOnOff = GetProcAddress(dll, "BinkSetVideoOnOff");
+        BinkSetVolume = GetProcAddress(dll, "BinkSetVolume");
+        BinkSetWillLoop = GetProcAddress(dll, "BinkSetWillLoop");
+        BinkShouldSkip = GetProcAddress(dll, "BinkShouldSkip");
+        BinkStartAsyncThread = GetProcAddress(dll, "BinkStartAsyncThread");
+        BinkUtilCPUs = GetProcAddress(dll, "BinkUtilCPUs");
+        BinkUtilFree = GetProcAddress(dll, "BinkUtilFree");
+        BinkUtilMalloc = GetProcAddress(dll, "BinkUtilMalloc");
+        BinkUtilMutexCreate = GetProcAddress(dll, "BinkUtilMutexCreate");
+        BinkUtilMutexDestroy = GetProcAddress(dll, "BinkUtilMutexDestroy");
+        BinkUtilMutexLock = GetProcAddress(dll, "BinkUtilMutexLock");
+        BinkUtilMutexLockTimeOut = GetProcAddress(dll, "BinkUtilMutexLockTimeOut");
+        BinkUtilMutexUnlock = GetProcAddress(dll, "BinkUtilMutexUnlock");
+        BinkUtilSoundGlobalLock = GetProcAddress(dll, "BinkUtilSoundGlobalLock");
+        BinkUtilSoundGlobalUnlock = GetProcAddress(dll, "BinkUtilSoundGlobalUnlock");
+        BinkWait = GetProcAddress(dll, "BinkWait");
+        BinkWaitStopAsyncThread = GetProcAddress(dll, "BinkWaitStopAsyncThread");
+        BinkWaitStopAsyncThreadsMulti = GetProcAddress(dll, "BinkWaitStopAsyncThreadsMulti");
+        RADTimerRead = GetProcAddress(dll, "RADTimerRead");
+    }
+} bink2w64;
+#endif
+
+#if !X64
+struct dinput_dll
+{
+    HMODULE dll;
+    FARPROC DirectInputCreateA;
+    FARPROC DirectInputCreateEx;
+    FARPROC DirectInputCreateW;
+
+    void LoadOriginalLibrary(HMODULE module)
+    {
+        dll = module;
+        shared.LoadOriginalLibrary(dll);
+        DirectInputCreateA = GetProcAddress(dll, "DirectInputCreateA");
+        DirectInputCreateEx = GetProcAddress(dll, "DirectInputCreateEx");
+        DirectInputCreateW = GetProcAddress(dll, "DirectInputCreateW");
+    }
+} dinput;
+
+struct d3d8_dll
+{
+    HMODULE dll;
+    FARPROC DebugSetMute;
+    FARPROC Direct3D8EnableMaximizedWindowedModeShim;
+    FARPROC Direct3DCreate8;
+    FARPROC ValidatePixelShader;
+    FARPROC ValidateVertexShader;
+
+    void LoadOriginalLibrary(HMODULE module)
+    {
+        dll = module;
+        shared.LoadOriginalLibrary(dll);
+        DebugSetMute = GetProcAddress(dll, "DebugSetMute");
+        Direct3D8EnableMaximizedWindowedModeShim = GetProcAddress(dll, "Direct3D8EnableMaximizedWindowedModeShim");
+        Direct3DCreate8 = GetProcAddress(dll, "Direct3DCreate8");
+        ValidatePixelShader = GetProcAddress(dll, "ValidatePixelShader");
+        ValidateVertexShader = GetProcAddress(dll, "ValidateVertexShader");
+    }
+} d3d8;
+
+struct ddraw_dll
+{
+    HMODULE dll;
+    FARPROC AcquireDDThreadLock;
+    FARPROC CompleteCreateSysmemSurface;
+    FARPROC D3DParseUnknownCommand;
+    FARPROC DDGetAttachedSurfaceLcl;
+    FARPROC DDInternalLock;
+    FARPROC DDInternalUnlock;
+    FARPROC DSoundHelp;
+    FARPROC DirectDrawCreate;
+    FARPROC DirectDrawCreateClipper;
+    FARPROC DirectDrawCreateEx;
+    FARPROC DirectDrawEnumerateA;
+    FARPROC DirectDrawEnumerateExA;
+    FARPROC DirectDrawEnumerateExW;
+    FARPROC DirectDrawEnumerateW;
+    FARPROC GetDDSurfaceLocal;
+    FARPROC GetOLEThunkData;
+    FARPROC GetSurfaceFromDC;
+    FARPROC RegisterSpecialCase;
+    FARPROC ReleaseDDThreadLock;
+    FARPROC SetAppCompatData;
+
+    void LoadOriginalLibrary(HMODULE module)
+    {
+        dll = module;
+        shared.LoadOriginalLibrary(dll);
+        AcquireDDThreadLock = GetProcAddress(dll, "AcquireDDThreadLock");
+        CompleteCreateSysmemSurface = GetProcAddress(dll, "CompleteCreateSysmemSurface");
+        D3DParseUnknownCommand = GetProcAddress(dll, "D3DParseUnknownCommand");
+        DDGetAttachedSurfaceLcl = GetProcAddress(dll, "DDGetAttachedSurfaceLcl");
+        DDInternalLock = GetProcAddress(dll, "DDInternalLock");
+        DDInternalUnlock = GetProcAddress(dll, "DDInternalUnlock");
+        DSoundHelp = GetProcAddress(dll, "DSoundHelp");
+        DirectDrawCreate = GetProcAddress(dll, "DirectDrawCreate");
+        DirectDrawCreateClipper = GetProcAddress(dll, "DirectDrawCreateClipper");
+        DirectDrawCreateEx = GetProcAddress(dll, "DirectDrawCreateEx");
+        DirectDrawEnumerateA = GetProcAddress(dll, "DirectDrawEnumerateA");
+        DirectDrawEnumerateExA = GetProcAddress(dll, "DirectDrawEnumerateExA");
+        DirectDrawEnumerateExW = GetProcAddress(dll, "DirectDrawEnumerateExW");
+        DirectDrawEnumerateW = GetProcAddress(dll, "DirectDrawEnumerateW");
+        GetDDSurfaceLocal = GetProcAddress(dll, "GetDDSurfaceLocal");
+        GetOLEThunkData = GetProcAddress(dll, "GetOLEThunkData");
+        GetSurfaceFromDC = GetProcAddress(dll, "GetSurfaceFromDC");
+        RegisterSpecialCase = GetProcAddress(dll, "RegisterSpecialCase");
+        ReleaseDDThreadLock = GetProcAddress(dll, "ReleaseDDThreadLock");
+        SetAppCompatData = GetProcAddress(dll, "SetAppCompatData");
+    }
+} ddraw;
 
 struct msacm32_dll
 {
@@ -3766,6 +3766,199 @@ void _BinkWait() { bink2w64.BinkWait(); }
 void _BinkWaitStopAsyncThread() { bink2w64.BinkWaitStopAsyncThread(); }
 void _BinkWaitStopAsyncThreadsMulti() { bink2w64.BinkWaitStopAsyncThreadsMulti(); }
 void _RADTimerRead() { bink2w64.RADTimerRead(); }
+
+void _CloseDriver() { winmm.CloseDriver(); }
+void _DefDriverProc() { winmm.DefDriverProc(); }
+void _DriverCallback() { winmm.DriverCallback(); }
+void _DrvGetModuleHandle() { winmm.DrvGetModuleHandle(); }
+void _GetDriverModuleHandle() { winmm.GetDriverModuleHandle(); }
+void _NotifyCallbackData() { winmm.NotifyCallbackData(); }
+void _OpenDriver() { winmm.OpenDriver(); }
+void _PlaySound() { winmm.PlaySound(); }
+void _PlaySoundA() { winmm.PlaySoundA(); }
+void _PlaySoundW() { winmm.PlaySoundW(); }
+void _SendDriverMessage() { winmm.SendDriverMessage(); }
+void _WOW32DriverCallback() { winmm.WOW32DriverCallback(); }
+void _WOW32ResolveMultiMediaHandle() { winmm.WOW32ResolveMultiMediaHandle(); }
+void _WOWAppExit() { winmm.WOWAppExit(); }
+void _aux32Message() { winmm.aux32Message(); }
+void _auxGetDevCapsA() { winmm.auxGetDevCapsA(); }
+void _auxGetDevCapsW() { winmm.auxGetDevCapsW(); }
+void _auxGetNumDevs() { winmm.auxGetNumDevs(); }
+void _auxGetVolume() { winmm.auxGetVolume(); }
+void _auxOutMessage() { winmm.auxOutMessage(); }
+void _auxSetVolume() { winmm.auxSetVolume(); }
+void _joy32Message() { winmm.joy32Message(); }
+void _joyConfigChanged() { winmm.joyConfigChanged(); }
+void _joyGetDevCapsA() { winmm.joyGetDevCapsA(); }
+void _joyGetDevCapsW() { winmm.joyGetDevCapsW(); }
+void _joyGetNumDevs() { winmm.joyGetNumDevs(); }
+void _joyGetPos() { winmm.joyGetPos(); }
+void _joyGetPosEx() { winmm.joyGetPosEx(); }
+void _joyGetThreshold() { winmm.joyGetThreshold(); }
+void _joyReleaseCapture() { winmm.joyReleaseCapture(); }
+void _joySetCapture() { winmm.joySetCapture(); }
+void _joySetThreshold() { winmm.joySetThreshold(); }
+void _mci32Message() { winmm.mci32Message(); }
+void _mciDriverNotify() { winmm.mciDriverNotify(); }
+void _mciDriverYield() { winmm.mciDriverYield(); }
+void _mciExecute() { winmm.mciExecute(); }
+void _mciFreeCommandResource() { winmm.mciFreeCommandResource(); }
+void _mciGetCreatorTask() { winmm.mciGetCreatorTask(); }
+void _mciGetDeviceIDA() { winmm.mciGetDeviceIDA(); }
+void _mciGetDeviceIDFromElementIDA() { winmm.mciGetDeviceIDFromElementIDA(); }
+void _mciGetDeviceIDFromElementIDW() { winmm.mciGetDeviceIDFromElementIDW(); }
+void _mciGetDeviceIDW() { winmm.mciGetDeviceIDW(); }
+void _mciGetDriverData() { winmm.mciGetDriverData(); }
+void _mciGetErrorStringA() { winmm.mciGetErrorStringA(); }
+void _mciGetErrorStringW() { winmm.mciGetErrorStringW(); }
+void _mciGetYieldProc() { winmm.mciGetYieldProc(); }
+void _mciLoadCommandResource() { winmm.mciLoadCommandResource(); }
+void _mciSendCommandA() { winmm.mciSendCommandA(); }
+void _mciSendCommandW() { winmm.mciSendCommandW(); }
+void _mciSendStringA() { winmm.mciSendStringA(); }
+void _mciSendStringW() { winmm.mciSendStringW(); }
+void _mciSetDriverData() { winmm.mciSetDriverData(); }
+void _mciSetYieldProc() { winmm.mciSetYieldProc(); }
+void _mid32Message() { winmm.mid32Message(); }
+void _midiConnect() { winmm.midiConnect(); }
+void _midiDisconnect() { winmm.midiDisconnect(); }
+void _midiInAddBuffer() { winmm.midiInAddBuffer(); }
+void _midiInClose() { winmm.midiInClose(); }
+void _midiInGetDevCapsA() { winmm.midiInGetDevCapsA(); }
+void _midiInGetDevCapsW() { winmm.midiInGetDevCapsW(); }
+void _midiInGetErrorTextA() { winmm.midiInGetErrorTextA(); }
+void _midiInGetErrorTextW() { winmm.midiInGetErrorTextW(); }
+void _midiInGetID() { winmm.midiInGetID(); }
+void _midiInGetNumDevs() { winmm.midiInGetNumDevs(); }
+void _midiInMessage() { winmm.midiInMessage(); }
+void _midiInOpen() { winmm.midiInOpen(); }
+void _midiInPrepareHeader() { winmm.midiInPrepareHeader(); }
+void _midiInReset() { winmm.midiInReset(); }
+void _midiInStart() { winmm.midiInStart(); }
+void _midiInStop() { winmm.midiInStop(); }
+void _midiInUnprepareHeader() { winmm.midiInUnprepareHeader(); }
+void _midiOutCacheDrumPatches() { winmm.midiOutCacheDrumPatches(); }
+void _midiOutCachePatches() { winmm.midiOutCachePatches(); }
+void _midiOutClose() { winmm.midiOutClose(); }
+void _midiOutGetDevCapsA() { winmm.midiOutGetDevCapsA(); }
+void _midiOutGetDevCapsW() { winmm.midiOutGetDevCapsW(); }
+void _midiOutGetErrorTextA() { winmm.midiOutGetErrorTextA(); }
+void _midiOutGetErrorTextW() { winmm.midiOutGetErrorTextW(); }
+void _midiOutGetID() { winmm.midiOutGetID(); }
+void _midiOutGetNumDevs() { winmm.midiOutGetNumDevs(); }
+void _midiOutGetVolume() { winmm.midiOutGetVolume(); }
+void _midiOutLongMsg() { winmm.midiOutLongMsg(); }
+void _midiOutMessage() { winmm.midiOutMessage(); }
+void _midiOutOpen() { winmm.midiOutOpen(); }
+void _midiOutPrepareHeader() { winmm.midiOutPrepareHeader(); }
+void _midiOutReset() { winmm.midiOutReset(); }
+void _midiOutSetVolume() { winmm.midiOutSetVolume(); }
+void _midiOutShortMsg() { winmm.midiOutShortMsg(); }
+void _midiOutUnprepareHeader() { winmm.midiOutUnprepareHeader(); }
+void _midiStreamClose() { winmm.midiStreamClose(); }
+void _midiStreamOpen() { winmm.midiStreamOpen(); }
+void _midiStreamOut() { winmm.midiStreamOut(); }
+void _midiStreamPause() { winmm.midiStreamPause(); }
+void _midiStreamPosition() { winmm.midiStreamPosition(); }
+void _midiStreamProperty() { winmm.midiStreamProperty(); }
+void _midiStreamRestart() { winmm.midiStreamRestart(); }
+void _midiStreamStop() { winmm.midiStreamStop(); }
+void _mixerClose() { winmm.mixerClose(); }
+void _mixerGetControlDetailsA() { winmm.mixerGetControlDetailsA(); }
+void _mixerGetControlDetailsW() { winmm.mixerGetControlDetailsW(); }
+void _mixerGetDevCapsA() { winmm.mixerGetDevCapsA(); }
+void _mixerGetDevCapsW() { winmm.mixerGetDevCapsW(); }
+void _mixerGetID() { winmm.mixerGetID(); }
+void _mixerGetLineControlsA() { winmm.mixerGetLineControlsA(); }
+void _mixerGetLineControlsW() { winmm.mixerGetLineControlsW(); }
+void _mixerGetLineInfoA() { winmm.mixerGetLineInfoA(); }
+void _mixerGetLineInfoW() { winmm.mixerGetLineInfoW(); }
+void _mixerGetNumDevs() { winmm.mixerGetNumDevs(); }
+void _mixerMessage() { winmm.mixerMessage(); }
+void _mixerOpen() { winmm.mixerOpen(); }
+void _mixerSetControlDetails() { winmm.mixerSetControlDetails(); }
+void _mmDrvInstall() { winmm.mmDrvInstall(); }
+void _mmGetCurrentTask() { winmm.mmGetCurrentTask(); }
+void _mmTaskBlock() { winmm.mmTaskBlock(); }
+void _mmTaskCreate() { winmm.mmTaskCreate(); }
+void _mmTaskSignal() { winmm.mmTaskSignal(); }
+void _mmTaskYield() { winmm.mmTaskYield(); }
+void _mmioAdvance() { winmm.mmioAdvance(); }
+void _mmioAscend() { winmm.mmioAscend(); }
+void _mmioClose() { winmm.mmioClose(); }
+void _mmioCreateChunk() { winmm.mmioCreateChunk(); }
+void _mmioDescend() { winmm.mmioDescend(); }
+void _mmioFlush() { winmm.mmioFlush(); }
+void _mmioGetInfo() { winmm.mmioGetInfo(); }
+void _mmioInstallIOProcA() { winmm.mmioInstallIOProcA(); }
+void _mmioInstallIOProcW() { winmm.mmioInstallIOProcW(); }
+void _mmioOpenA() { winmm.mmioOpenA(); }
+void _mmioOpenW() { winmm.mmioOpenW(); }
+void _mmioRead() { winmm.mmioRead(); }
+void _mmioRenameA() { winmm.mmioRenameA(); }
+void _mmioRenameW() { winmm.mmioRenameW(); }
+void _mmioSeek() { winmm.mmioSeek(); }
+void _mmioSendMessage() { winmm.mmioSendMessage(); }
+void _mmioSetBuffer() { winmm.mmioSetBuffer(); }
+void _mmioSetInfo() { winmm.mmioSetInfo(); }
+void _mmioStringToFOURCCA() { winmm.mmioStringToFOURCCA(); }
+void _mmioStringToFOURCCW() { winmm.mmioStringToFOURCCW(); }
+void _mmioWrite() { winmm.mmioWrite(); }
+void _mmsystemGetVersion() { winmm.mmsystemGetVersion(); }
+void _mod32Message() { winmm.mod32Message(); }
+void _mxd32Message() { winmm.mxd32Message(); }
+void _sndPlaySoundA() { winmm.sndPlaySoundA(); }
+void _sndPlaySoundW() { winmm.sndPlaySoundW(); }
+void _tid32Message() { winmm.tid32Message(); }
+void _timeBeginPeriod() { winmm.timeBeginPeriod(); }
+void _timeEndPeriod() { winmm.timeEndPeriod(); }
+void _timeGetDevCaps() { winmm.timeGetDevCaps(); }
+void _timeGetSystemTime() { winmm.timeGetSystemTime(); }
+void _timeGetTime() { winmm.timeGetTime(); }
+void _timeKillEvent() { winmm.timeKillEvent(); }
+void _timeSetEvent() { winmm.timeSetEvent(); }
+void _waveInAddBuffer() { winmm.waveInAddBuffer(); }
+void _waveInClose() { winmm.waveInClose(); }
+void _waveInGetDevCapsA() { winmm.waveInGetDevCapsA(); }
+void _waveInGetDevCapsW() { winmm.waveInGetDevCapsW(); }
+void _waveInGetErrorTextA() { winmm.waveInGetErrorTextA(); }
+void _waveInGetErrorTextW() { winmm.waveInGetErrorTextW(); }
+void _waveInGetID() { winmm.waveInGetID(); }
+void _waveInGetNumDevs() { winmm.waveInGetNumDevs(); }
+void _waveInGetPosition() { winmm.waveInGetPosition(); }
+void _waveInMessage() { winmm.waveInMessage(); }
+void _waveInOpen() { winmm.waveInOpen(); }
+void _waveInPrepareHeader() { winmm.waveInPrepareHeader(); }
+void _waveInReset() { winmm.waveInReset(); }
+void _waveInStart() { winmm.waveInStart(); }
+void _waveInStop() { winmm.waveInStop(); }
+void _waveInUnprepareHeader() { winmm.waveInUnprepareHeader(); }
+void _waveOutBreakLoop() { winmm.waveOutBreakLoop(); }
+void _waveOutClose() { winmm.waveOutClose(); }
+void _waveOutGetDevCapsA() { winmm.waveOutGetDevCapsA(); }
+void _waveOutGetDevCapsW() { winmm.waveOutGetDevCapsW(); }
+void _waveOutGetErrorTextA() { winmm.waveOutGetErrorTextA(); }
+void _waveOutGetErrorTextW() { winmm.waveOutGetErrorTextW(); }
+void _waveOutGetID() { winmm.waveOutGetID(); }
+void _waveOutGetNumDevs() { winmm.waveOutGetNumDevs(); }
+void _waveOutGetPitch() { winmm.waveOutGetPitch(); }
+void _waveOutGetPlaybackRate() { winmm.waveOutGetPlaybackRate(); }
+void _waveOutGetPosition() { winmm.waveOutGetPosition(); }
+void _waveOutGetVolume() { winmm.waveOutGetVolume(); }
+void _waveOutMessage() { winmm.waveOutMessage(); }
+void _waveOutOpen() { winmm.waveOutOpen(); }
+void _waveOutPause() { winmm.waveOutPause(); }
+void _waveOutPrepareHeader() { winmm.waveOutPrepareHeader(); }
+void _waveOutReset() { winmm.waveOutReset(); }
+void _waveOutRestart() { winmm.waveOutRestart(); }
+void _waveOutSetPitch() { winmm.waveOutSetPitch(); }
+void _waveOutSetPlaybackRate() { winmm.waveOutSetPlaybackRate(); }
+void _waveOutSetVolume() { winmm.waveOutSetVolume(); }
+void _waveOutUnprepareHeader() { winmm.waveOutUnprepareHeader(); }
+void _waveOutWrite() { winmm.waveOutWrite(); }
+void _wid32Message() { winmm.wid32Message(); }
+void _wod32Message() { winmm.wod32Message(); }
 
 #pragma runtime_checks( "", restore )
 #endif
