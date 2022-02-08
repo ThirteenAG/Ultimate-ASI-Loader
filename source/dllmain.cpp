@@ -391,7 +391,7 @@ void FindFiles(WIN32_FIND_DATAW* fd)
                         if (h == NULL)
                         {
                             auto e = GetLastError();
-                            if (e != ERROR_DLL_INIT_FAILED) // in case dllmain returns false
+                            if (e != ERROR_DLL_INIT_FAILED && e != ERROR_BAD_EXE_FORMAT) // in case dllmain returns false or IMAGE_MACHINE is not compatible
                             {
                                 std::wstring msg = L"Unable to load " + std::wstring(fd->cFileName) + L". Error: " + std::to_wstring(e);
                                 MessageBoxW(0, msg.c_str(), L"ASI Loader", MB_ICONERROR);
