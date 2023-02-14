@@ -1,5 +1,5 @@
 ![AppVeyor](https://img.shields.io/appveyor/build/ThirteenAG/Ultimate-ASI-Loader?label=AppVeyor%20Build&logo=AppVeyor&logoColor=white)
-![GitHub Workflow Status](https://img.shields.io/github/workflow/status/ThirteenAG/Ultimate-ASI-Loader/GitHub%20Actions%20Build?label=GitHub%20Actions%20Build&logo=GitHub&logoColor=white)
+[![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/ThirteenAG/Ultimate-ASI-Loader/msbuild.yml?branch=master&label=GitHub%20Actions%20Build&logo=GitHub)](https://github.com/ThirteenAG/Ultimate-ASI-Loader/actions/workflows/msbuild.yml)
 
 # Ultimate ASI Loader
 
