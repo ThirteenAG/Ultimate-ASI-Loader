@@ -5,3 +5,6 @@
 [submodule "external/MemoryModule"]
 	path = external/MemoryModule
 	url = https://github.com/fancycode/MemoryModule
+[submodule "external/minidx9"]
+	path = external/minidx9
+	url = https://github.com/hrydgard/minidx9
