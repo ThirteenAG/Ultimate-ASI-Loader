@@ -1,3 +1,8 @@
+LIBRARY "UAL"
+EXPORTS
+CustomCreateFileA = CustomCreateFileA
+CustomCreateFileW = CustomCreateFileW
+
 LIBRARY "vorbisfile"
 EXPORTS
 ov_bitrate = _ov_bitrate

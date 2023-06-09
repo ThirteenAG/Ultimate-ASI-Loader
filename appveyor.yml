@@ -1,4 +1,4 @@
-version: 4.{build}
+version: 5.{build}
 branches:
   only:
   - master
@@ -24,10 +24,16 @@ artifacts:
   name: Ultimate-ASI-Loader_x64.zip
 - path: bin\RE7Demo.InfiniteAmmo.zip
   name: RE7Demo.InfiniteAmmo.zip
-- path: bin\x86\Release\scripts\MessageBox.asi
-  name: MessageBox.asi
-- path: bin\x86\Release\scripts\ExeUnprotect.asi
-  name: ExeUnprotect.asi
+- path: bin\MessageBox_x64.zip
+  name: MessageBox_x64.zip
+- path: bin\OverloadFromFolderDLL_x64.zip
+  name: OverloadFromFolderDLL_x64.zip
+- path: bin\ExeUnprotect.zip
+  name: ExeUnprotect.zip
+- path: bin\MessageBox.zip
+  name: MessageBox.zip
+- path: bin\OverloadFromFolderDLL.zip
+  name: OverloadFromFolderDLL.zip
 deploy:
 - provider: GitHub
   tag: v$(appveyor_build_version)

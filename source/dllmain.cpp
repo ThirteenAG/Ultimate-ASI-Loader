@@ -1,6 +1,7 @@
 #include "dllmain.h"
 #include "exception.hpp"
 #include <initguid.h>
+#include <filesystem>
 
 #if !X64
 #include <d3d8to9\source\d3d8to9.hpp>
@@ -9,6 +10,8 @@ extern "C" Direct3D8 *WINAPI Direct3DCreate8(UINT SDKVersion);
 
 HMODULE hm;
 std::vector<std::wstring> iniPaths;
+std::filesystem::path sFileLoaderPath;
+std::filesystem::path gamePath;
 
 bool iequals(std::wstring_view s1, std::wstring_view s2)
 {
@@ -54,7 +57,7 @@ std::wstring GetCurrentDirectoryW()
     for (size_t iterations = 0; iterations < MAX_ITERATIONS; ++iterations)
     {
         ret.resize(bufferSize);
-        auto charsReturned = GetCurrentDirectoryW(bufferSize, &ret[0]);
+        auto charsReturned = GetCurrentDirectoryW(bufferSize, ret.data());
         if (charsReturned < ret.length())
         {
             ret.resize(charsReturned);
@@ -68,6 +71,37 @@ std::wstring GetCurrentDirectoryW()
     return L"";
 }
 
+std::wstring GetModulePath(HMODULE hModule)
+{
+    static constexpr auto INITIAL_BUFFER_SIZE = MAX_PATH;
+    static constexpr auto MAX_ITERATIONS = 7;
+    std::wstring ret;
+    auto bufferSize = INITIAL_BUFFER_SIZE;
+    for (size_t iterations = 0; iterations < MAX_ITERATIONS; ++iterations)
+    {
+        ret.resize(bufferSize);
+        size_t charsReturned = 0;
+        charsReturned = GetModuleFileNameW(hModule, ret.data(), bufferSize);
+        if (charsReturned < ret.length())
+        {
+            ret.resize(charsReturned);
+            return ret;
+        }
+        else
+        {
+            bufferSize *= 2;
+        }
+    }
+    return std::wstring();
+}
+
+std::wstring GetExeModulePath()
+{
+    std::wstring r = GetModulePath(NULL);
+    r = r.substr(0, r.find_last_of(L"/\\") + 1);
+    return r;
+}
+
 UINT GetPrivateProfileIntW(LPCWSTR lpAppName, LPCWSTR lpKeyName, INT nDefault, const std::vector<std::wstring>& fileNames)
 {
     for (const auto& file : fileNames)
@@ -75,6 +109,17 @@ UINT GetPrivateProfileIntW(LPCWSTR lpAppName, LPCWSTR lpKeyName, INT nDefault, c
         nDefault = GetPrivateProfileIntW(lpAppName, lpKeyName, nDefault, file.c_str());
     }
     return nDefault;
+}
+
+std::wstring GetPrivateProfileStringW(LPCWSTR lpAppName, LPCWSTR lpKeyName, LPCWSTR szDefault, const std::vector<std::wstring>& fileNames)
+{
+    std::wstring ret(szDefault);
+    ret.resize(MAX_PATH);
+    for (const auto& file : fileNames)
+    {
+        GetPrivateProfileStringW(lpAppName, lpKeyName, ret.data(), ret.data(), ret.size(), file.c_str());
+    }
+    return ret.data();
 }
 
 std::wstring GetSelfName()
@@ -121,6 +166,8 @@ enum Kernel32ExportsNames
     eGetSystemInfo,
     eInterlockedCompareExchange,
     eSleep,
+    eCreateFileA,
+    eCreateFileW,
 
     Kernel32ExportsNamesCount
 };
@@ -534,6 +581,9 @@ void LoadPluginsAndRestoreIAT(uintptr_t retaddr)
 
     for (size_t i = 0; i < Kernel32ExportsNamesCount; i++)
     {
+        if (!sFileLoaderPath.empty() && (i == eCreateFileA || i == eCreateFileW))
+            continue;
+
         if (Kernel32Data[i][IATPtr] && Kernel32Data[i][ProcAddress])
         {
             auto ptr = (size_t*)Kernel32Data[i][IATPtr];
@@ -645,6 +695,88 @@ void WINAPI CustomSleep(DWORD dwMilliseconds)
     return Sleep(dwMilliseconds);
 }
 
+std::filesystem::path GetFileName(auto lpFilename)
+{
+    std::error_code ec;
+
+    static auto starts_with = [](const std::filesystem::path& path, const std::filesystem::path& base) -> bool {
+        std::wstring str1(path.wstring()); std::wstring str2(base.wstring());
+        std::transform(str1.begin(), str1.end(), str1.begin(), ::tolower);
+        std::transform(str2.begin(), str2.end(), str2.begin(), ::tolower);
+        return str1.starts_with(str2);
+    };
+
+    if (gamePath.empty())
+        gamePath = std::filesystem::path(GetExeModulePath());
+
+    auto filePath = std::filesystem::path(lpFilename);
+    if (std::filesystem::is_regular_file(filePath, ec) || std::filesystem::is_directory(filePath, ec) || std::filesystem::is_symlink(filePath, ec))
+    {
+        auto absolutePath = std::filesystem::absolute(filePath, ec);
+        auto relativePath = std::filesystem::relative(absolutePath, gamePath, ec);
+        auto commonPath = gamePath;
+
+        if (starts_with(relativePath, ".."))
+        {
+            auto common = std::mismatch(absolutePath.begin(), absolutePath.end(), gamePath.begin());
+            for (auto& iter = common.second; iter != gamePath.end(); ++iter)
+                commonPath = commonPath.parent_path();
+
+            std::filesystem::path rp;
+            for (auto& p : relativePath)
+            {
+                if (p != "..")
+                    rp = rp / p;
+            }
+            relativePath = rp;
+        }
+
+        if (starts_with(std::filesystem::path(absolutePath).remove_filename(), gamePath) || starts_with(std::filesystem::path(absolutePath).remove_filename(), commonPath))
+        {
+            auto newPath = gamePath / sFileLoaderPath.make_preferred() / relativePath;
+            if (std::filesystem::exists(newPath, ec) && std::filesystem::is_regular_file(newPath, ec))
+                return newPath;
+        }
+
+    }
+
+    return lpFilename;
+}
+
+typedef HANDLE(WINAPI* tCreateFileA)(LPCSTR lpFilename, DWORD dwAccess, DWORD dwSharing, LPSECURITY_ATTRIBUTES saAttributes, DWORD dwCreation, DWORD dwAttributes, HANDLE hTemplate);
+tCreateFileA ptrCreateFileA;
+HANDLE WINAPI CustomCreateFileA(LPCSTR lpFilename, DWORD dwAccess, DWORD dwSharing, LPSECURITY_ATTRIBUTES saAttributes, DWORD dwCreation, DWORD dwAttributes, HANDLE hTemplate)
+{
+    static bool once = false;
+    if (!once)
+    {
+        LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress());
+        once = true;
+    }
+
+    if (ptrCreateFileA)
+        return ptrCreateFileA(GetFileName(lpFilename).string().c_str(), dwAccess, dwSharing, saAttributes, dwCreation, dwAttributes, hTemplate);
+    else
+        return CreateFileA(GetFileName(lpFilename).string().c_str(), dwAccess, dwSharing, saAttributes, dwCreation, dwAttributes, hTemplate);
+}
+
+typedef HANDLE(WINAPI* tCreateFileW)(LPCWSTR lpFilename, DWORD dwAccess, DWORD dwSharing, LPSECURITY_ATTRIBUTES saAttributes, DWORD dwCreation, DWORD dwAttributes, HANDLE hTemplate);
+tCreateFileW ptrCreateFileW;
+HANDLE WINAPI CustomCreateFileW(LPCWSTR lpFilename, DWORD dwAccess, DWORD dwSharing, LPSECURITY_ATTRIBUTES saAttributes, DWORD dwCreation, DWORD dwAttributes, HANDLE hTemplate)
+{
+    static bool once = false;
+    if (!once)
+    {
+        LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress());
+        once = true;
+    }
+
+    if (ptrCreateFileW)
+        return ptrCreateFileW(GetFileName(lpFilename).wstring().c_str(), dwAccess, dwSharing, saAttributes, dwCreation, dwAttributes, hTemplate);
+    else
+        return CreateFileW(GetFileName(lpFilename).wstring().c_str(), dwAccess, dwSharing, saAttributes, dwCreation, dwAttributes, hTemplate);
+}
+
 DEFINE_GUID(CLSID_DirectInput, 0x25E609E0, 0xB259, 0x11CF, 0xBF, 0xC7, 0x44, 0x45, 0x53, 0x54, 0x00, 0x00);
 DEFINE_GUID(CLSID_DirectInput8, 0x25E609E4, 0xB259, 0x11CF, 0xBF, 0xC7, 0x44, 0x45, 0x53, 0x54, 0x00, 0x00);
 DEFINE_GUID(CLSID_WinInet, 0xC39EE728, 0xD419, 0x4BD4, 0xA3, 0xEF, 0xED, 0xA0, 0x59, 0xDB, 0xD9, 0x35);
@@ -710,6 +842,8 @@ bool HookKernel32IAT(HMODULE mod, bool exe)
         Kernel32Data[eGetSystemInfo][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "GetSystemInfo");
         Kernel32Data[eInterlockedCompareExchange][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "InterlockedCompareExchange");
         Kernel32Data[eSleep][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "Sleep");
+        Kernel32Data[eCreateFileA][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "CreateFileA");
+        Kernel32Data[eCreateFileW][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "CreateFileW");
     }
 
     uint32_t matchedImports = 0;
@@ -832,6 +966,20 @@ bool HookKernel32IAT(HMODULE mod, bool exe)
             {
                 if (exe) Kernel32Data[eSleep][IATPtr] = i;
                 *(size_t*)i = (size_t)CustomSleep;
+                matchedImports++;
+            }
+            else if (ptr == Kernel32Data[eCreateFileA][ProcAddress])
+            {
+                if (exe) Kernel32Data[eCreateFileA][IATPtr] = i;
+                ptrCreateFileA = *(tCreateFileA*)i;
+                *(size_t*)i = (size_t)CustomCreateFileA;
+                matchedImports++;
+            }
+            else if (ptr == Kernel32Data[eCreateFileW][ProcAddress])
+            {
+                if (exe) Kernel32Data[eCreateFileW][IATPtr] = i;
+                ptrCreateFileW = *(tCreateFileW*)i;
+                *(size_t*)i = (size_t)CustomCreateFileW;
                 matchedImports++;
             }
 
@@ -1119,17 +1267,18 @@ void Init()
     auto nDontLoadFromDllMain = GetPrivateProfileInt(TEXT("globalsets"), TEXT("dontloadfromdllmain"), TRUE, iniPaths);
     auto nFindModule = GetPrivateProfileInt(TEXT("globalsets"), TEXT("findmodule"), FALSE, iniPaths);
     auto nDisableCrashDumps = GetPrivateProfileInt(TEXT("globalsets"), TEXT("disablecrashdumps"), FALSE, iniPaths);
+    sFileLoaderPath = GetPrivateProfileString(TEXT("fileloader"), TEXT("overloadfromfolder"), TEXT("update"), iniPaths);
+
+    auto FolderExists = [](LPCWSTR szPath) -> BOOL
+    {
+        DWORD dwAttrib = GetFileAttributes(szPath);
+        return (dwAttrib != INVALID_FILE_ATTRIBUTES && (dwAttrib & FILE_ATTRIBUTE_DIRECTORY));
+    };
 
     if (!nDisableCrashDumps)
     {
         std::wstring m = GetModuleFileNameW(NULL);
         m = m.substr(0, m.find_last_of(L"/\\") + 1) + L"CrashDumps";
-
-        auto FolderExists = [](LPCWSTR szPath) -> BOOL
-        {
-            DWORD dwAttrib = GetFileAttributes(szPath);
-            return (dwAttrib != INVALID_FILE_ATTRIBUTES && (dwAttrib & FILE_ATTRIBUTE_DIRECTORY));
-        };
 
         if (FolderExists(m.c_str()))
         {
@@ -1146,6 +1295,9 @@ void Init()
             VirtualProtect(&SetUnhandledExceptionFilter, sizeof(ret), protect[0], &protect[1]);
         }
     }
+
+    if (!FolderExists(sFileLoaderPath.wstring().c_str()))
+        sFileLoaderPath.clear();
 
     if (nForceEPHook != FALSE || nDontLoadFromDllMain != FALSE)
     {

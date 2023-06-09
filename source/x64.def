@@ -1,3 +1,8 @@
+LIBRARY "UAL"
+EXPORTS
+CustomCreateFileA = CustomCreateFileA
+CustomCreateFileW = CustomCreateFileW
+
 LIBRARY "dinput8"
 EXPORTS
 DirectInput8Create = _DirectInput8Create

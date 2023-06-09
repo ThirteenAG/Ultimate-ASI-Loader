@@ -92,6 +92,26 @@ project "ExeUnprotect"
       defines { "NDEBUG" }
       optimize "On"
       staticruntime "On"
+	  
+project "OverloadFromFolderDLL"
+   kind "SharedLib"
+   language "C++"
+   targetdir "bin/Win32/%{cfg.buildcfg}/scripts"
+   targetextension ".asi"
+   
+   files { "source/demo_plugins/OverloadFromFolderDLL.cpp" }
+   files { "source/resources/Versioninfo.rc" }
+
+   characterset ("UNICODE")
+   
+   filter "configurations:Debug"
+      defines { "DEBUG" }
+      symbols "On"
+
+   filter "configurations:Release"
+      defines { "NDEBUG" }
+      optimize "On"
+      staticruntime "On"
       
       
 -- x64
@@ -162,6 +182,26 @@ project "MessageBox_x64"
    targetextension ".asi"
    
    files { "source/demo_plugins/MessageBox.cpp" }
+   files { "source/resources/Versioninfo.rc" }
+
+   characterset ("UNICODE")
+   
+   filter "configurations:Debug"
+      defines { "DEBUG" }
+      symbols "On"
+
+   filter "configurations:Release"
+      defines { "NDEBUG" }
+      optimize "On"
+      staticruntime "On"
+	  
+project "OverloadFromFolderDLL_x64"
+   kind "SharedLib"
+   language "C++"
+   targetdir "bin/x64/%{cfg.buildcfg}/scripts"
+   targetextension ".asi"
+   
+   files { "source/demo_plugins/OverloadFromFolderDLL.cpp" }
    files { "source/resources/Versioninfo.rc" }
 
    characterset ("UNICODE")
