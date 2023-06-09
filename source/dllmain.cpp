@@ -1027,7 +1027,7 @@ LONG WINAPI CustomUnhandledExceptionFilter(LPEXCEPTION_POINTERS ExceptionInfo)
     HANDLE      hFile;
     HWND        hWnd;
 
-    wchar_t* modulenameptr;
+    wchar_t* modulenameptr = nullptr;
     if (GetModuleFileNameW(GetModuleHandle(NULL), modulename, _countof(modulename)) != 0)
     {
         modulenameptr = wcsrchr(modulename, '\\');
@@ -1036,7 +1036,7 @@ LONG WINAPI CustomUnhandledExceptionFilter(LPEXCEPTION_POINTERS ExceptionInfo)
     }
     else
     {
-        wcscpy(modulenameptr, L"err.err");
+        wcscpy_s(modulename, L"err.err");
     }
 
     _time64(&time);
