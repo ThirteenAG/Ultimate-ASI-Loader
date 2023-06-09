@@ -5,6 +5,8 @@ on:
     paths-ignore:
       - "**/*.md"
       - '**/*.txt'
+    branches:
+      - '**'
   pull_request:
     paths-ignore:
       - "**/*.md"
@@ -29,13 +31,6 @@ jobs:
 
     - name: Add msbuild to PATH
       uses: microsoft/setup-msbuild@main
-
-    - name: Setup DirectX SDK
-      run:  |
-        curl -fLOS https://download.microsoft.com/download/a/e/7/ae743f1f-632b-4809-87a9-aa1bb3458e31/DXSDK_Jun10.exe
-        7z x DXSDK_Jun10.exe DXSDK/Include -oDX
-        7z x DXSDK_Jun10.exe DXSDK/Lib/x86 -oDX
-        mv DX/DXSDK "C:/Program Files (x86)/Microsoft DirectX SDK (June 2010)"
 
     - name: Configure build
       run: ./premake5.bat
@@ -62,7 +57,7 @@ jobs:
 
     - name: Get release info (Win32)
       if: |
-        github.ref_name == 'main' &&
+        github.ref_name == 'master' &&
         github.event_name == 'push' &&
         github.repository == 'ThirteenAG/Ultimate-ASI-Loader'
       id: release_info_x86
@@ -74,7 +69,7 @@ jobs:
 
     - name: Upload Release (Win32)
       if: |
-        github.ref_name == 'main' &&
+        github.ref_name == 'master' &&
         github.event_name == 'push' &&
         github.repository == 'ThirteenAG/Ultimate-ASI-Loader'
       uses: ncipollo/release-action@main
@@ -88,7 +83,7 @@ jobs:
 
     - name: Get release info (Win64)
       if: |
-        github.ref_name == 'main' &&
+        github.ref_name == 'master' &&
         github.event_name == 'push' &&
         github.repository == 'ThirteenAG/Ultimate-ASI-Loader'
       id: release_info_x64
@@ -100,7 +95,7 @@ jobs:
 
     - name: Upload Release (Win64)
       if: |
-        github.ref_name == 'main' &&
+        github.ref_name == 'master' &&
         github.event_name == 'push' &&
         github.repository == 'ThirteenAG/Ultimate-ASI-Loader'
       uses: ncipollo/release-action@main

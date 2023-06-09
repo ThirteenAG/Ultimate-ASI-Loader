@@ -5,8 +5,6 @@ branches:
 skip_tags: true
 image: Visual Studio 2022
 configuration: Release
-init:
-- ps: "if (-not (Test-Path env:DXSDK_DIR)) \n{\nStart-FileDownload 'https://download.microsoft.com/download/A/E/7/AE743F1F-632B-4809-87A9-AA1BB3458E31/DXSDK_Jun10.exe' -FileName 'C:\\DXSDK_Jun10.exe'\nStart-FileDownload 'https://raw.githubusercontent.com/chocolatey/choco/master/src/chocolatey.resources/redirects/RefreshEnv.cmd' -FileName 'C:\\RefreshEnv.cmd'\nStart-Process \"C:\\DXSDK_Jun10.exe\" \"/F /S /O /U\" -NoNewWindow -Wait\nC:\\RefreshEnv.cmd\n}"
 install:
 - cmd: >-
     git submodule update --init --recursive
@@ -38,3 +36,5 @@ deploy:
   auth_token:
     secure: ugbti+bXX/7zqu39OyiPxgRPd2pQn2FEV/12ABees2fHfpZob0tWXzqD/zSYmibJ
   artifact: Ultimate-ASI-Loader.zip, Ultimate-ASI-Loader_x64.zip
+  on:
+    branch: master
