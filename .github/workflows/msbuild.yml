@@ -1,56 +1,113 @@
 name: GitHub Actions Build
 
 on:
-  pull_request:
   push:
+    paths-ignore:
+      - "**/*.md"
+      - '**/*.txt'
+  pull_request:
+    paths-ignore:
+      - "**/*.md"
+      - '**/*.txt'
+
+concurrency:
+  group: ${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
 
 jobs:
   build:
-    runs-on: windows-2022
-    strategy:
-      matrix:
-        platform: [Win32, x64]
-        buildtype: [Release]
+    runs-on: windows-latest
 
     steps:
-    - uses: actions/checkout@v2
-    - name: Add msbuild to PATH
-      uses: microsoft/setup-msbuild@v1.1
-    - uses: actions/checkout@v2
+    - name: Checkout Repository
+      uses: actions/checkout@v3
       with:
-        submodules: 'true'
-    - name: DX SDK
-      shell: bash
+        submodules: recursive
+
+    - name: Add msbuild to PATH
+      uses: microsoft/setup-msbuild@main
+
+    - name: Setup DirectX SDK
       run:  |
-        curl -L https://download.microsoft.com/download/a/e/7/ae743f1f-632b-4809-87a9-aa1bb3458e31/DXSDK_Jun10.exe -o DX.exe
-        7z x DX.exe DXSDK/Include -oDX
-        7z x DX.exe DXSDK/Lib/x86 -oDX
+        curl -fLOS https://download.microsoft.com/download/a/e/7/ae743f1f-632b-4809-87a9-aa1bb3458e31/DXSDK_Jun10.exe
+        7z x DXSDK_Jun10.exe DXSDK/Include -oDX
+        7z x DXSDK_Jun10.exe DXSDK/Lib/x86 -oDX
         mv DX/DXSDK "C:/Program Files (x86)/Microsoft DirectX SDK (June 2010)"
+
     - name: Configure build
-      shell: cmd
-      run: |
-        ./premake5.bat
+      run: ./premake5.bat
+
     - name: Build
-      shell: cmd
       run: |
-        msbuild -m build/Ultimate-ASI-Loader-${{matrix.platform}}.sln /property:Configuration=${{matrix.buildtype}} /property:Platform=${{matrix.platform}}
+        msbuild -m build/Ultimate-ASI-Loader-x64.sln /property:Configuration=Release /property:Platform=x64
+        msbuild -m build/Ultimate-ASI-Loader-Win32.sln /property:Configuration=Release /property:Platform=Win32
+
     - name: Pack binaries
-      shell: cmd
-      run: |
-        release-${{matrix.platform}}.bat
-    - name: Get release info
-      id: release_info
-      uses: cardinalby/git-get-release-action@1.1.1
+      run: ./release.ps1
+
+    - name: Upload artifact (Win32)
+      uses: actions/upload-artifact@v3
+      with:
+        name: Ultimate-ASI-Loader-Win32
+        path: dist/Win32/dll/*
+
+    - name: Upload artifact (x64)
+      uses: actions/upload-artifact@v3
+      with:
+        name: Ultimate-ASI-Loader-x64
+        path: dist/x64/dll/*
+
+    - name: Get release info (Win32)
+      if: |
+        github.ref_name == 'main' &&
+        github.event_name == 'push' &&
+        github.repository == 'ThirteenAG/Ultimate-ASI-Loader'
+      id: release_info_x86
+      uses: cardinalby/git-get-release-action@master
       env:
        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        tag: ${{matrix.platform}}-latest
-    - name: Upload Release
-      uses: ncipollo/release-action@v1
+        tag: Win32-latest
+
+    - name: Upload Release (Win32)
+      if: |
+        github.ref_name == 'main' &&
+        github.event_name == 'push' &&
+        github.repository == 'ThirteenAG/Ultimate-ASI-Loader'
+      uses: ncipollo/release-action@main
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
         allowUpdates: true
-        name: ${{ steps.release_info.outputs.name }}
-        body: ${{ steps.release_info.outputs.body }}
-        tag: ${{ steps.release_info.outputs.tag_name }}
-        artifacts: bin/*.zip
+        name: ${{ steps.release_info_x86.outputs.name }}
+        body: ${{ steps.release_info_x86.outputs.body }}
+        tag: ${{ steps.release_info_x86.outputs.tag_name }}
+        artifacts: dist/Win32/zip/*.zip
+
+    - name: Get release info (Win64)
+      if: |
+        github.ref_name == 'main' &&
+        github.event_name == 'push' &&
+        github.repository == 'ThirteenAG/Ultimate-ASI-Loader'
+      id: release_info_x64
+      uses: cardinalby/git-get-release-action@master
+      env:
+       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag: x64-latest
+
+    - name: Upload Release (Win64)
+      if: |
+        github.ref_name == 'main' &&
+        github.event_name == 'push' &&
+        github.repository == 'ThirteenAG/Ultimate-ASI-Loader'
+      uses: ncipollo/release-action@main
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        allowUpdates: true
+        name: ${{ steps.release_info_x64.outputs.name }}
+        body: ${{ steps.release_info_x64.outputs.body }}
+        tag: ${{ steps.release_info_x64.outputs.tag_name }}
+        artifacts: dist/x64/zip/*.zip

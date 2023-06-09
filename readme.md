@@ -1,5 +1,4 @@
-![AppVeyor](https://img.shields.io/appveyor/build/ThirteenAG/Ultimate-ASI-Loader?label=AppVeyor%20Build&logo=AppVeyor&logoColor=white)
-[![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/ThirteenAG/Ultimate-ASI-Loader/msbuild.yml?branch=master&label=GitHub%20Actions%20Build&logo=GitHub)](https://github.com/ThirteenAG/Ultimate-ASI-Loader/actions/workflows/msbuild.yml)
+[![GitHub Actions Build](https://github.com/ThirteenAG/Ultimate-ASI-Loader/actions/workflows/msbuild.yml/badge.svg)](https://github.com/ThirteenAG/Ultimate-ASI-Loader/actions/workflows/msbuild.yml)
 
 # Ultimate ASI Loader
 
@@ -22,7 +21,6 @@ This is a DLL file which adds ASI plugin loading functionality to any game, whic
 - wininet.dll ([x86](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/Win32-latest/wininet.zip) and [x64](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/x64-latest/wininet.zip))
 - winmm.dll ([x86](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/Win32-latest/winmm.zip) and [x64](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/x64-latest/winmm.zip))
 - [xlive.dll](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/Win32-latest/xlive.zip)
-
 - [bink2w64.dll](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/x64-latest/bink2w64.zip) (rename original to bink2w64Hooked.dll)
 - [vorbisFile.dll](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/Win32-latest/vorbisFile.zip) (rename original to vorbisHooked.dll, optional)
 - [binkw32.dll](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/Win32-latest/binkw32.zip) (rename original to binkw32Hooked.dll, optional)
@@ -48,7 +46,7 @@ ASI loader have built-in wndmode.dll, which can be loaded, if you create empty w
 
 Some mods, like [SkyGfx](https://github.com/aap/skygfx_vc) require [d3d8to9](https://github.com/crosire/d3d8to9). It is also a part of ASI loader, so in order to use it, create global.ini inside scripts folder with the following content:
 
-```
+```ini
 [GlobalSets]
 UseD3D8to9=1
 ```
@@ -81,7 +79,7 @@ ASI loader is now capable of generating crash minidumps and crash logs. To use t
 13. Place Ultimate ASI Loader DLL into game directory. You need to find out which name works for a specific game, in case of GTA SA I've used **d3d11.dll**, so I put **dinput8.dll** from x86 archive and renamed it to **d3d11.dll**.
 14. Create an ini file with the same name, in this case: **d3d11.ini**, with the following content:
 
-```
+```ini
 [GlobalSets]
 DontLoadFromDllMain=0
 ```
