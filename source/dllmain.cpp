@@ -710,34 +710,30 @@ std::filesystem::path GetFileName(auto lpFilename)
         gamePath = std::filesystem::path(GetExeModulePath());
 
     auto filePath = std::filesystem::path(lpFilename);
-    if (std::filesystem::is_regular_file(filePath, ec) || std::filesystem::is_directory(filePath, ec) || std::filesystem::is_symlink(filePath, ec))
+    auto absolutePath = std::filesystem::absolute(filePath, ec);
+    auto relativePath = std::filesystem::relative(absolutePath, gamePath, ec);
+    auto commonPath = gamePath;
+
+    if (starts_with(relativePath, ".."))
     {
-        auto absolutePath = std::filesystem::absolute(filePath, ec);
-        auto relativePath = std::filesystem::relative(absolutePath, gamePath, ec);
-        auto commonPath = gamePath;
+        auto common = std::mismatch(absolutePath.begin(), absolutePath.end(), gamePath.begin());
+        for (auto& iter = common.second; iter != gamePath.end(); ++iter)
+            commonPath = commonPath.parent_path();
 
-        if (starts_with(relativePath, ".."))
+        std::filesystem::path rp;
+        for (auto& p : relativePath)
         {
-            auto common = std::mismatch(absolutePath.begin(), absolutePath.end(), gamePath.begin());
-            for (auto& iter = common.second; iter != gamePath.end(); ++iter)
-                commonPath = commonPath.parent_path();
-
-            std::filesystem::path rp;
-            for (auto& p : relativePath)
-            {
-                if (p != "..")
-                    rp = rp / p;
-            }
-            relativePath = rp;
+            if (p != "..")
+                rp = rp / p;
         }
+        relativePath = rp;
+    }
 
-        if (starts_with(std::filesystem::path(absolutePath).remove_filename(), gamePath) || starts_with(std::filesystem::path(absolutePath).remove_filename(), commonPath))
-        {
-            auto newPath = gamePath / sFileLoaderPath.make_preferred() / relativePath;
-            if (std::filesystem::exists(newPath, ec) && std::filesystem::is_regular_file(newPath, ec))
-                return newPath;
-        }
-
+    if (starts_with(std::filesystem::path(absolutePath).remove_filename(), gamePath) || starts_with(std::filesystem::path(absolutePath).remove_filename(), commonPath))
+    {
+        auto newPath = gamePath / sFileLoaderPath.make_preferred() / relativePath;
+        if (std::filesystem::exists(newPath, ec) && std::filesystem::is_regular_file(newPath, ec))
+            return newPath;
     }
 
     return lpFilename;
