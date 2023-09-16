@@ -168,6 +168,10 @@ enum Kernel32ExportsNames
     eSleep,
     eCreateFileA,
     eCreateFileW,
+    eGetFileAttributesA,
+    eGetFileAttributesW,
+    eGetFileAttributesExA,
+    eGetFileAttributesExW,
 
     Kernel32ExportsNamesCount
 };
@@ -581,7 +585,9 @@ void LoadPluginsAndRestoreIAT(uintptr_t retaddr)
 
     for (size_t i = 0; i < Kernel32ExportsNamesCount; i++)
     {
-        if (!sFileLoaderPath.empty() && (i == eCreateFileA || i == eCreateFileW))
+        if (!sFileLoaderPath.empty() && 
+           (i == eCreateFileA || i == eCreateFileW || i == eGetFileAttributesA ||
+            i == eGetFileAttributesW || i == eGetFileAttributesExA || i == eGetFileAttributesExW))
             continue;
 
         if (Kernel32Data[i][IATPtr] && Kernel32Data[i][ProcAddress])
@@ -773,6 +779,74 @@ HANDLE WINAPI CustomCreateFileW(LPCWSTR lpFilename, DWORD dwAccess, DWORD dwShar
         return CreateFileW(GetFileName(lpFilename).wstring().c_str(), dwAccess, dwSharing, saAttributes, dwCreation, dwAttributes, hTemplate);
 }
 
+typedef DWORD(WINAPI* tGetFileAttributesA)(LPCSTR lpFileName);
+tGetFileAttributesA ptrGetFileAttributesA;
+DWORD WINAPI CustomGetFileAttributesA(LPCSTR lpFileName)
+{
+    static bool once = false;
+    if (!once)
+    {
+        LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress());
+        once = true;
+    }
+
+    if (ptrGetFileAttributesA)
+        return ptrGetFileAttributesA(GetFileName(lpFileName).string().c_str());
+    else
+        return GetFileAttributesA(GetFileName(lpFileName).string().c_str());
+}
+
+typedef DWORD(WINAPI* tGetFileAttributesW)(LPCWSTR lpFileName);
+tGetFileAttributesW ptrGetFileAttributesW;
+DWORD WINAPI CustomGetFileAttributesW(LPCWSTR lpFileName)
+{
+    static bool once = false;
+    if (!once)
+    {
+        LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress());
+        once = true;
+    }
+
+    if (ptrGetFileAttributesW)
+        return ptrGetFileAttributesW(GetFileName(lpFileName).wstring().c_str());
+    else
+        return GetFileAttributesW(GetFileName(lpFileName).wstring().c_str());
+}
+
+typedef BOOL(WINAPI* tGetFileAttributesExA)(LPCSTR lpFileName, GET_FILEEX_INFO_LEVELS fInfoLevelId, LPVOID lpFileInformation);
+tGetFileAttributesExA ptrGetFileAttributesExA;
+BOOL WINAPI CustomGetFileAttributesExA(LPCSTR lpFileName, GET_FILEEX_INFO_LEVELS fInfoLevelId, LPVOID lpFileInformation)
+{
+    static bool once = false;
+    if (!once)
+    {
+        LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress());
+        once = true;
+    }
+
+    if (ptrGetFileAttributesExA)
+        return ptrGetFileAttributesExA(GetFileName(lpFileName).string().c_str(), fInfoLevelId, lpFileInformation);
+    else
+        return GetFileAttributesExA(GetFileName(lpFileName).string().c_str(), fInfoLevelId, lpFileInformation);
+}
+
+typedef BOOL(WINAPI* tGetFileAttributesExW)(LPCWSTR lpFileName, GET_FILEEX_INFO_LEVELS fInfoLevelId, LPVOID lpFileInformation);
+tGetFileAttributesExW ptrGetFileAttributesExW;
+BOOL WINAPI CustomGetFileAttributesExW(LPCWSTR lpFileName, GET_FILEEX_INFO_LEVELS fInfoLevelId, LPVOID lpFileInformation)
+{
+    static bool once = false;
+    if (!once)
+    {
+        LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress());
+        once = true;
+    }
+
+    if (ptrGetFileAttributesExW)
+        return ptrGetFileAttributesExW(GetFileName(lpFileName).wstring().c_str(), fInfoLevelId, lpFileInformation);
+    else
+        return GetFileAttributesExW(GetFileName(lpFileName).wstring().c_str(), fInfoLevelId, lpFileInformation);
+}
+
 DEFINE_GUID(CLSID_DirectInput, 0x25E609E0, 0xB259, 0x11CF, 0xBF, 0xC7, 0x44, 0x45, 0x53, 0x54, 0x00, 0x00);
 DEFINE_GUID(CLSID_DirectInput8, 0x25E609E4, 0xB259, 0x11CF, 0xBF, 0xC7, 0x44, 0x45, 0x53, 0x54, 0x00, 0x00);
 DEFINE_GUID(CLSID_WinInet, 0xC39EE728, 0xD419, 0x4BD4, 0xA3, 0xEF, 0xED, 0xA0, 0x59, 0xDB, 0xD9, 0x35);
@@ -840,6 +914,10 @@ bool HookKernel32IAT(HMODULE mod, bool exe)
         Kernel32Data[eSleep][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "Sleep");
         Kernel32Data[eCreateFileA][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "CreateFileA");
         Kernel32Data[eCreateFileW][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "CreateFileW");
+        Kernel32Data[eGetFileAttributesA][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "GetFileAttributesA");
+        Kernel32Data[eGetFileAttributesW][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "GetFileAttributesW");
+        Kernel32Data[eGetFileAttributesExA][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "GetFileAttributesExA");
+        Kernel32Data[eGetFileAttributesExW][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "GetFileAttributesExW");
     }
 
     uint32_t matchedImports = 0;
@@ -976,6 +1054,34 @@ bool HookKernel32IAT(HMODULE mod, bool exe)
                 if (exe) Kernel32Data[eCreateFileW][IATPtr] = i;
                 ptrCreateFileW = *(tCreateFileW*)i;
                 *(size_t*)i = (size_t)CustomCreateFileW;
+                matchedImports++;
+            }
+            else if (ptr == Kernel32Data[eGetFileAttributesA][ProcAddress])
+            {
+                if (exe) Kernel32Data[eGetFileAttributesA][IATPtr] = i;
+                ptrGetFileAttributesA = *(tGetFileAttributesA*)i;
+                *(size_t*)i = (size_t)CustomGetFileAttributesA;
+                matchedImports++;
+            }
+            else if (ptr == Kernel32Data[eGetFileAttributesW][ProcAddress])
+            {
+                if (exe) Kernel32Data[eGetFileAttributesW][IATPtr] = i;
+                ptrGetFileAttributesW = *(tGetFileAttributesW*)i;
+                *(size_t*)i = (size_t)CustomGetFileAttributesW;
+                matchedImports++;
+            }
+            else if (ptr == Kernel32Data[eGetFileAttributesExA][ProcAddress])
+            {
+                if (exe) Kernel32Data[eGetFileAttributesExA][IATPtr] = i;
+                ptrGetFileAttributesExA = *(tGetFileAttributesExA*)i;
+                *(size_t*)i = (size_t)CustomGetFileAttributesExA;
+                matchedImports++;
+            }
+            else if (ptr == Kernel32Data[eGetFileAttributesExW][ProcAddress])
+            {
+                if (exe) Kernel32Data[eGetFileAttributesExW][IATPtr] = i;
+                ptrGetFileAttributesExW = *(tGetFileAttributesExW*)i;
+                *(size_t*)i = (size_t)CustomGetFileAttributesExW;
                 matchedImports++;
             }
 

@@ -2,6 +2,10 @@ LIBRARY "UAL"
 EXPORTS
 CustomCreateFileA = CustomCreateFileA
 CustomCreateFileW = CustomCreateFileW
+CustomGetFileAttributesA = CustomGetFileAttributesA
+CustomGetFileAttributesW = CustomGetFileAttributesW
+CustomGetFileAttributesExA = CustomGetFileAttributesExA
+CustomGetFileAttributesExW = CustomGetFileAttributesExW
 
 LIBRARY "vorbisfile"
 EXPORTS

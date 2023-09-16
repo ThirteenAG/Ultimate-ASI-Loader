@@ -125,8 +125,16 @@ private:
 
 typedef HANDLE(WINAPI* tCreateFileA)(LPCSTR lpFilename, DWORD dwAccess, DWORD dwSharing, LPSECURITY_ATTRIBUTES saAttributes, DWORD dwCreation, DWORD dwAttributes, HANDLE hTemplate);
 typedef HANDLE(WINAPI* tCreateFileW)(LPCWSTR lpFilename, DWORD dwAccess, DWORD dwSharing, LPSECURITY_ATTRIBUTES saAttributes, DWORD dwCreation, DWORD dwAttributes, HANDLE hTemplate);
+typedef DWORD(WINAPI* tGetFileAttributesA)(LPCSTR lpFileName);
+typedef DWORD(WINAPI* tGetFileAttributesW)(LPCWSTR lpFileName);
+typedef BOOL(WINAPI* tGetFileAttributesExA)(LPCSTR lpFileName, GET_FILEEX_INFO_LEVELS fInfoLevelId, LPVOID lpFileInformation);
+typedef BOOL(WINAPI* tGetFileAttributesExW)(LPCWSTR lpFileName, GET_FILEEX_INFO_LEVELS fInfoLevelId, LPVOID lpFileInformation);
 tCreateFileA ptrCreateFileA;
 tCreateFileW ptrCreateFileW;
+tGetFileAttributesA ptrGetFileAttributesA;
+tGetFileAttributesW ptrGetFileAttributesW;
+tGetFileAttributesExA ptrGetFileAttributesExA;
+tGetFileAttributesExW ptrGetFileAttributesExW;
 
 PIMAGE_SECTION_HEADER getSection(const PIMAGE_NT_HEADERS nt_headers, unsigned section)
 {
@@ -191,6 +199,26 @@ bool HookKernel32IATForOverride(HMODULE mod)
                 *(size_t*)i = (size_t)ptrCreateFileW;
                 matchedImports++;
             }
+            else if (ptr == (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "GetFileAttributesA"))
+            {
+                *(size_t*)i = (size_t)ptrGetFileAttributesA;
+                matchedImports++;
+            }
+            else if (ptr == (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "GetFileAttributesW"))
+            {
+                *(size_t*)i = (size_t)ptrGetFileAttributesW;
+                matchedImports++;
+            }
+            else if (ptr == (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "GetFileAttributesExA"))
+            {
+                *(size_t*)i = (size_t)ptrGetFileAttributesExA;
+                matchedImports++;
+            }
+            else if (ptr == (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "GetFileAttributesExW"))
+            {
+                *(size_t*)i = (size_t)ptrGetFileAttributesExW;
+                matchedImports++;
+            }
 
             VirtualProtect((size_t*)i, sizeof(size_t), dwProtect[0], &dwProtect[1]);
         }
@@ -235,11 +263,23 @@ extern "C" __declspec(dllexport) void InitializeASI()
             auto m = std::get<HMODULE>(e);
             auto pCreateFileA = (tCreateFileA)GetProcAddress(m, "CustomCreateFileA");
             auto pCreateFileW = (tCreateFileW)GetProcAddress(m, "CustomCreateFileW");
+            auto pGetFileAttributesA = (tGetFileAttributesA)GetProcAddress(m, "CustomGetFileAttributesA");
+            auto pGetFileAttributesW = (tGetFileAttributesW)GetProcAddress(m, "CustomGetFileAttributesW");
+            auto pGetFileAttributesExA = (tGetFileAttributesExA)GetProcAddress(m, "CustomGetFileAttributesExA");
+            auto pGetFileAttributesExW = (tGetFileAttributesExW)GetProcAddress(m, "CustomGetFileAttributesExW");
             if (pCreateFileA && pCreateFileW)
             {
                 ual = m;
                 ptrCreateFileA = pCreateFileA;
                 ptrCreateFileW = pCreateFileW;
+                if (pGetFileAttributesA)
+                    ptrGetFileAttributesA = pGetFileAttributesA;
+                if (pGetFileAttributesW)
+                    ptrGetFileAttributesW = pGetFileAttributesW;
+                if (pGetFileAttributesExA)
+                    ptrGetFileAttributesExA = pGetFileAttributesExA;
+                if (pGetFileAttributesExW)
+                    ptrGetFileAttributesExW = pGetFileAttributesExW;
                 break;
             }
         }
