@@ -199,22 +199,22 @@ bool HookKernel32IATForOverride(HMODULE mod)
                 *(size_t*)i = (size_t)ptrCreateFileW;
                 matchedImports++;
             }
-            else if (ptr == (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "GetFileAttributesA"))
+            else if (ptrGetFileAttributesA && ptr == (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "GetFileAttributesA"))
             {
                 *(size_t*)i = (size_t)ptrGetFileAttributesA;
                 matchedImports++;
             }
-            else if (ptr == (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "GetFileAttributesW"))
+            else if (ptrGetFileAttributesW && ptr == (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "GetFileAttributesW"))
             {
                 *(size_t*)i = (size_t)ptrGetFileAttributesW;
                 matchedImports++;
             }
-            else if (ptr == (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "GetFileAttributesExA"))
+            else if (ptrGetFileAttributesExA && ptr == (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "GetFileAttributesExA"))
             {
                 *(size_t*)i = (size_t)ptrGetFileAttributesExA;
                 matchedImports++;
             }
-            else if (ptr == (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "GetFileAttributesExW"))
+            else if (ptrGetFileAttributesExW && ptr == (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "GetFileAttributesExW"))
             {
                 *(size_t*)i = (size_t)ptrGetFileAttributesExW;
                 matchedImports++;
