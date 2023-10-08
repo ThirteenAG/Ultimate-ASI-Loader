@@ -717,7 +717,7 @@ std::filesystem::path GetFileName(auto lpFilename)
 
     auto filePath = std::filesystem::path(lpFilename);
     auto absolutePath = std::filesystem::absolute(filePath, ec);
-    auto relativePath = absolutePath.lexically_relative(gamePath);
+    auto relativePath = std::filesystem::weakly_canonical(absolutePath, ec).lexically_relative(gamePath);
     auto commonPath = gamePath;
 
     if (starts_with(relativePath, ".."))
