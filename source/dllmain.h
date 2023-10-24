@@ -1483,6 +1483,177 @@ struct winmm_dll
     }
 } winmm;
 
+struct winhttp_dll
+{
+    HMODULE dll;
+    FARPROC Private1;
+    FARPROC SvchostPushServiceGlobals;
+    FARPROC WinHttpAddRequestHeaders;
+    FARPROC WinHttpAddRequestHeadersEx;
+    FARPROC WinHttpAutoProxySvcMain;
+    FARPROC WinHttpCheckPlatform;
+    FARPROC WinHttpCloseHandle;
+    FARPROC WinHttpConnect;
+    FARPROC WinHttpConnectionDeletePolicyEntries;
+    FARPROC WinHttpConnectionDeleteProxyInfo;
+    FARPROC WinHttpConnectionFreeNameList;
+    FARPROC WinHttpConnectionFreeProxyInfo;
+    FARPROC WinHttpConnectionFreeProxyList;
+    FARPROC WinHttpConnectionGetNameList;
+    FARPROC WinHttpConnectionGetProxyInfo;
+    FARPROC WinHttpConnectionGetProxyList;
+    FARPROC WinHttpConnectionOnlyConvert;
+    FARPROC WinHttpConnectionOnlyReceive;
+    FARPROC WinHttpConnectionOnlySend;
+    FARPROC WinHttpConnectionSetPolicyEntries;
+    FARPROC WinHttpConnectionSetProxyInfo;
+    FARPROC WinHttpConnectionUpdateIfIndexTable;
+    FARPROC WinHttpCrackUrl;
+    FARPROC WinHttpCreateProxyResolver;
+    FARPROC WinHttpCreateUrl;
+    FARPROC WinHttpDetectAutoProxyConfigUrl;
+    FARPROC WinHttpFreeProxyResult;
+    FARPROC WinHttpFreeProxyResultEx;
+    FARPROC WinHttpFreeProxySettings;
+    FARPROC WinHttpFreeProxySettingsEx;
+    FARPROC WinHttpFreeQueryConnectionGroupResult;
+    FARPROC WinHttpGetDefaultProxyConfiguration;
+    FARPROC WinHttpGetIEProxyConfigForCurrentUser;
+    FARPROC WinHttpGetProxyForUrl;
+    FARPROC WinHttpGetProxyForUrlEx;
+    FARPROC WinHttpGetProxyForUrlEx2;
+    FARPROC WinHttpGetProxyForUrlHvsi;
+    FARPROC WinHttpGetProxyResult;
+    FARPROC WinHttpGetProxyResultEx;
+    FARPROC WinHttpGetProxySettingsEx;
+    FARPROC WinHttpGetProxySettingsResultEx;
+    FARPROC WinHttpGetProxySettingsVersion;
+    FARPROC WinHttpGetTunnelSocket;
+    FARPROC WinHttpOpen;
+    FARPROC WinHttpOpenRequest;
+    FARPROC WinHttpPacJsWorkerMain;
+    FARPROC WinHttpProbeConnectivity;
+    FARPROC WinHttpQueryAuthSchemes;
+    FARPROC WinHttpQueryConnectionGroup;
+    FARPROC WinHttpQueryDataAvailable;
+    FARPROC WinHttpQueryHeaders;
+    FARPROC WinHttpQueryHeadersEx;
+    FARPROC WinHttpQueryOption;
+    FARPROC WinHttpReadData;
+    FARPROC WinHttpReadDataEx;
+    FARPROC WinHttpReadProxySettings;
+    FARPROC WinHttpReadProxySettingsHvsi;
+    FARPROC WinHttpReceiveResponse;
+    FARPROC WinHttpRegisterProxyChangeNotification;
+    FARPROC WinHttpResetAutoProxy;
+    FARPROC WinHttpSaveProxyCredentials;
+    FARPROC WinHttpSendRequest;
+    FARPROC WinHttpSetCredentials;
+    FARPROC WinHttpSetDefaultProxyConfiguration;
+    FARPROC WinHttpSetOption;
+    FARPROC WinHttpSetProxySettingsPerUser;
+    FARPROC WinHttpSetSecureLegacyServersAppCompat;
+    FARPROC WinHttpSetStatusCallback;
+    FARPROC WinHttpSetTimeouts;
+    FARPROC WinHttpTimeFromSystemTime;
+    FARPROC WinHttpTimeToSystemTime;
+    FARPROC WinHttpUnregisterProxyChangeNotification;
+    FARPROC WinHttpWebSocketClose;
+    FARPROC WinHttpWebSocketCompleteUpgrade;
+    FARPROC WinHttpWebSocketQueryCloseStatus;
+    FARPROC WinHttpWebSocketReceive;
+    FARPROC WinHttpWebSocketSend;
+    FARPROC WinHttpWebSocketShutdown;
+    FARPROC WinHttpWriteData;
+    FARPROC WinHttpWriteProxySettings;
+
+    void LoadOriginalLibrary(HMODULE module)
+    {
+        dll = module;
+        shared.LoadOriginalLibrary(dll);
+        Private1 = GetProcAddress(dll, "Private1");
+        SvchostPushServiceGlobals = GetProcAddress(dll, "SvchostPushServiceGlobals");
+        WinHttpAddRequestHeaders = GetProcAddress(dll, "WinHttpAddRequestHeaders");
+        WinHttpAddRequestHeadersEx = GetProcAddress(dll, "WinHttpAddRequestHeadersEx");
+        WinHttpAutoProxySvcMain = GetProcAddress(dll, "WinHttpAutoProxySvcMain");
+        WinHttpCheckPlatform = GetProcAddress(dll, "WinHttpCheckPlatform");
+        WinHttpCloseHandle = GetProcAddress(dll, "WinHttpCloseHandle");
+        WinHttpConnect = GetProcAddress(dll, "WinHttpConnect");
+        WinHttpConnectionDeletePolicyEntries = GetProcAddress(dll, "WinHttpConnectionDeletePolicyEntries");
+        WinHttpConnectionDeleteProxyInfo = GetProcAddress(dll, "WinHttpConnectionDeleteProxyInfo");
+        WinHttpConnectionFreeNameList = GetProcAddress(dll, "WinHttpConnectionFreeNameList");
+        WinHttpConnectionFreeProxyInfo = GetProcAddress(dll, "WinHttpConnectionFreeProxyInfo");
+        WinHttpConnectionFreeProxyList = GetProcAddress(dll, "WinHttpConnectionFreeProxyList");
+        WinHttpConnectionGetNameList = GetProcAddress(dll, "WinHttpConnectionGetNameList");
+        WinHttpConnectionGetProxyInfo = GetProcAddress(dll, "WinHttpConnectionGetProxyInfo");
+        WinHttpConnectionGetProxyList = GetProcAddress(dll, "WinHttpConnectionGetProxyList");
+        WinHttpConnectionOnlyConvert = GetProcAddress(dll, "WinHttpConnectionOnlyConvert");
+        WinHttpConnectionOnlyReceive = GetProcAddress(dll, "WinHttpConnectionOnlyReceive");
+        WinHttpConnectionOnlySend = GetProcAddress(dll, "WinHttpConnectionOnlySend");
+        WinHttpConnectionSetPolicyEntries = GetProcAddress(dll, "WinHttpConnectionSetPolicyEntries");
+        WinHttpConnectionSetProxyInfo = GetProcAddress(dll, "WinHttpConnectionSetProxyInfo");
+        WinHttpConnectionUpdateIfIndexTable = GetProcAddress(dll, "WinHttpConnectionUpdateIfIndexTable");
+        WinHttpCrackUrl = GetProcAddress(dll, "WinHttpCrackUrl");
+        WinHttpCreateProxyResolver = GetProcAddress(dll, "WinHttpCreateProxyResolver");
+        WinHttpCreateUrl = GetProcAddress(dll, "WinHttpCreateUrl");
+        WinHttpDetectAutoProxyConfigUrl = GetProcAddress(dll, "WinHttpDetectAutoProxyConfigUrl");
+        WinHttpFreeProxyResult = GetProcAddress(dll, "WinHttpFreeProxyResult");
+        WinHttpFreeProxyResultEx = GetProcAddress(dll, "WinHttpFreeProxyResultEx");
+        WinHttpFreeProxySettings = GetProcAddress(dll, "WinHttpFreeProxySettings");
+        WinHttpFreeProxySettingsEx = GetProcAddress(dll, "WinHttpFreeProxySettingsEx");
+        WinHttpFreeQueryConnectionGroupResult = GetProcAddress(dll, "WinHttpFreeQueryConnectionGroupResult");
+        WinHttpGetDefaultProxyConfiguration = GetProcAddress(dll, "WinHttpGetDefaultProxyConfiguration");
+        WinHttpGetIEProxyConfigForCurrentUser = GetProcAddress(dll, "WinHttpGetIEProxyConfigForCurrentUser");
+        WinHttpGetProxyForUrl = GetProcAddress(dll, "WinHttpGetProxyForUrl");
+        WinHttpGetProxyForUrlEx = GetProcAddress(dll, "WinHttpGetProxyForUrlEx");
+        WinHttpGetProxyForUrlEx2 = GetProcAddress(dll, "WinHttpGetProxyForUrlEx2");
+        WinHttpGetProxyForUrlHvsi = GetProcAddress(dll, "WinHttpGetProxyForUrlHvsi");
+        WinHttpGetProxyResult = GetProcAddress(dll, "WinHttpGetProxyResult");
+        WinHttpGetProxyResultEx = GetProcAddress(dll, "WinHttpGetProxyResultEx");
+        WinHttpGetProxySettingsEx = GetProcAddress(dll, "WinHttpGetProxySettingsEx");
+        WinHttpGetProxySettingsResultEx = GetProcAddress(dll, "WinHttpGetProxySettingsResultEx");
+        WinHttpGetProxySettingsVersion = GetProcAddress(dll, "WinHttpGetProxySettingsVersion");
+        WinHttpGetTunnelSocket = GetProcAddress(dll, "WinHttpGetTunnelSocket");
+        WinHttpOpen = GetProcAddress(dll, "WinHttpOpen");
+        WinHttpOpenRequest = GetProcAddress(dll, "WinHttpOpenRequest");
+        WinHttpPacJsWorkerMain = GetProcAddress(dll, "WinHttpPacJsWorkerMain");
+        WinHttpProbeConnectivity = GetProcAddress(dll, "WinHttpProbeConnectivity");
+        WinHttpQueryAuthSchemes = GetProcAddress(dll, "WinHttpQueryAuthSchemes");
+        WinHttpQueryConnectionGroup = GetProcAddress(dll, "WinHttpQueryConnectionGroup");
+        WinHttpQueryDataAvailable = GetProcAddress(dll, "WinHttpQueryDataAvailable");
+        WinHttpQueryHeaders = GetProcAddress(dll, "WinHttpQueryHeaders");
+        WinHttpQueryHeadersEx = GetProcAddress(dll, "WinHttpQueryHeadersEx");
+        WinHttpQueryOption = GetProcAddress(dll, "WinHttpQueryOption");
+        WinHttpReadData = GetProcAddress(dll, "WinHttpReadData");
+        WinHttpReadDataEx = GetProcAddress(dll, "WinHttpReadDataEx");
+        WinHttpReadProxySettings = GetProcAddress(dll, "WinHttpReadProxySettings");
+        WinHttpReadProxySettingsHvsi = GetProcAddress(dll, "WinHttpReadProxySettingsHvsi");
+        WinHttpReceiveResponse = GetProcAddress(dll, "WinHttpReceiveResponse");
+        WinHttpRegisterProxyChangeNotification = GetProcAddress(dll, "WinHttpRegisterProxyChangeNotification");
+        WinHttpResetAutoProxy = GetProcAddress(dll, "WinHttpResetAutoProxy");
+        WinHttpSaveProxyCredentials = GetProcAddress(dll, "WinHttpSaveProxyCredentials");
+        WinHttpSendRequest = GetProcAddress(dll, "WinHttpSendRequest");
+        WinHttpSetCredentials = GetProcAddress(dll, "WinHttpSetCredentials");
+        WinHttpSetDefaultProxyConfiguration = GetProcAddress(dll, "WinHttpSetDefaultProxyConfiguration");
+        WinHttpSetOption = GetProcAddress(dll, "WinHttpSetOption");
+        WinHttpSetProxySettingsPerUser = GetProcAddress(dll, "WinHttpSetProxySettingsPerUser");
+        WinHttpSetSecureLegacyServersAppCompat = GetProcAddress(dll, "WinHttpSetSecureLegacyServersAppCompat");
+        WinHttpSetStatusCallback = GetProcAddress(dll, "WinHttpSetStatusCallback");
+        WinHttpSetTimeouts = GetProcAddress(dll, "WinHttpSetTimeouts");
+        WinHttpTimeFromSystemTime = GetProcAddress(dll, "WinHttpTimeFromSystemTime");
+        WinHttpTimeToSystemTime = GetProcAddress(dll, "WinHttpTimeToSystemTime");
+        WinHttpUnregisterProxyChangeNotification = GetProcAddress(dll, "WinHttpUnregisterProxyChangeNotification");
+        WinHttpWebSocketClose = GetProcAddress(dll, "WinHttpWebSocketClose");
+        WinHttpWebSocketCompleteUpgrade = GetProcAddress(dll, "WinHttpWebSocketCompleteUpgrade");
+        WinHttpWebSocketQueryCloseStatus = GetProcAddress(dll, "WinHttpWebSocketQueryCloseStatus");
+        WinHttpWebSocketReceive = GetProcAddress(dll, "WinHttpWebSocketReceive");
+        WinHttpWebSocketSend = GetProcAddress(dll, "WinHttpWebSocketSend");
+        WinHttpWebSocketShutdown = GetProcAddress(dll, "WinHttpWebSocketShutdown");
+        WinHttpWriteData = GetProcAddress(dll, "WinHttpWriteData");
+        WinHttpWriteProxySettings = GetProcAddress(dll, "WinHttpWriteProxySettings");
+    }
+} winhttp;
+
 #if X64
 struct bink2w64_dll
 {
@@ -2654,6 +2825,89 @@ __declspec(naked) void _waveOutUnprepareHeader() { _asm { jmp[winmm.waveOutUnpre
 __declspec(naked) void _waveOutWrite() { _asm { jmp[winmm.waveOutWrite] } }
 __declspec(naked) void _wid32Message() { _asm { jmp[winmm.wid32Message] } }
 __declspec(naked) void _wod32Message() { _asm { jmp[winmm.wod32Message] } }
+
+//__declspec(naked) void _DllCanUnloadNow() { _asm { jmp[winhttp.DllCanUnloadNow] } }
+//__declspec(naked) void _DllGetClassObject() { _asm { jmp[winhttp.DllGetClassObject] } }
+__declspec(naked) void _Private1() { _asm { jmp [winhttp.Private1] } }
+__declspec(naked) void _SvchostPushServiceGlobals() { _asm { jmp [winhttp.SvchostPushServiceGlobals] } }
+__declspec(naked) void _WinHttpAddRequestHeaders() { _asm { jmp [winhttp.WinHttpAddRequestHeaders] } }
+__declspec(naked) void _WinHttpAddRequestHeadersEx() { _asm { jmp [winhttp.WinHttpAddRequestHeadersEx] } }
+__declspec(naked) void _WinHttpAutoProxySvcMain() { _asm { jmp [winhttp.WinHttpAutoProxySvcMain] } }
+__declspec(naked) void _WinHttpCheckPlatform() { _asm { jmp [winhttp.WinHttpCheckPlatform] } }
+__declspec(naked) void _WinHttpCloseHandle() { _asm { jmp [winhttp.WinHttpCloseHandle] } }
+__declspec(naked) void _WinHttpConnect() { _asm { jmp [winhttp.WinHttpConnect] } }
+__declspec(naked) void _WinHttpConnectionDeletePolicyEntries() { _asm { jmp [winhttp.WinHttpConnectionDeletePolicyEntries] } }
+__declspec(naked) void _WinHttpConnectionDeleteProxyInfo() { _asm { jmp [winhttp.WinHttpConnectionDeleteProxyInfo] } }
+__declspec(naked) void _WinHttpConnectionFreeNameList() { _asm { jmp [winhttp.WinHttpConnectionFreeNameList] } }
+__declspec(naked) void _WinHttpConnectionFreeProxyInfo() { _asm { jmp [winhttp.WinHttpConnectionFreeProxyInfo] } }
+__declspec(naked) void _WinHttpConnectionFreeProxyList() { _asm { jmp [winhttp.WinHttpConnectionFreeProxyList] } }
+__declspec(naked) void _WinHttpConnectionGetNameList() { _asm { jmp [winhttp.WinHttpConnectionGetNameList] } }
+__declspec(naked) void _WinHttpConnectionGetProxyInfo() { _asm { jmp [winhttp.WinHttpConnectionGetProxyInfo] } }
+__declspec(naked) void _WinHttpConnectionGetProxyList() { _asm { jmp [winhttp.WinHttpConnectionGetProxyList] } }
+__declspec(naked) void _WinHttpConnectionOnlyConvert() { _asm { jmp [winhttp.WinHttpConnectionOnlyConvert] } }
+__declspec(naked) void _WinHttpConnectionOnlyReceive() { _asm { jmp [winhttp.WinHttpConnectionOnlyReceive] } }
+__declspec(naked) void _WinHttpConnectionOnlySend() { _asm { jmp [winhttp.WinHttpConnectionOnlySend] } }
+__declspec(naked) void _WinHttpConnectionSetPolicyEntries() { _asm { jmp [winhttp.WinHttpConnectionSetPolicyEntries] } }
+__declspec(naked) void _WinHttpConnectionSetProxyInfo() { _asm { jmp [winhttp.WinHttpConnectionSetProxyInfo] } }
+__declspec(naked) void _WinHttpConnectionUpdateIfIndexTable() { _asm { jmp [winhttp.WinHttpConnectionUpdateIfIndexTable] } }
+__declspec(naked) void _WinHttpCrackUrl() { _asm { jmp [winhttp.WinHttpCrackUrl] } }
+__declspec(naked) void _WinHttpCreateProxyResolver() { _asm { jmp [winhttp.WinHttpCreateProxyResolver] } }
+__declspec(naked) void _WinHttpCreateUrl() { _asm { jmp [winhttp.WinHttpCreateUrl] } }
+__declspec(naked) void _WinHttpDetectAutoProxyConfigUrl() { _asm { jmp [winhttp.WinHttpDetectAutoProxyConfigUrl] } }
+__declspec(naked) void _WinHttpFreeProxyResult() { _asm { jmp [winhttp.WinHttpFreeProxyResult] } }
+__declspec(naked) void _WinHttpFreeProxyResultEx() { _asm { jmp [winhttp.WinHttpFreeProxyResultEx] } }
+__declspec(naked) void _WinHttpFreeProxySettings() { _asm { jmp [winhttp.WinHttpFreeProxySettings] } }
+__declspec(naked) void _WinHttpFreeProxySettingsEx() { _asm { jmp [winhttp.WinHttpFreeProxySettingsEx] } }
+__declspec(naked) void _WinHttpFreeQueryConnectionGroupResult() { _asm { jmp [winhttp.WinHttpFreeQueryConnectionGroupResult] } }
+__declspec(naked) void _WinHttpGetDefaultProxyConfiguration() { _asm { jmp [winhttp.WinHttpGetDefaultProxyConfiguration] } }
+__declspec(naked) void _WinHttpGetIEProxyConfigForCurrentUser() { _asm { jmp [winhttp.WinHttpGetIEProxyConfigForCurrentUser] } }
+__declspec(naked) void _WinHttpGetProxyForUrl() { _asm { jmp [winhttp.WinHttpGetProxyForUrl] } }
+__declspec(naked) void _WinHttpGetProxyForUrlEx() { _asm { jmp [winhttp.WinHttpGetProxyForUrlEx] } }
+__declspec(naked) void _WinHttpGetProxyForUrlEx2() { _asm { jmp [winhttp.WinHttpGetProxyForUrlEx2] } }
+__declspec(naked) void _WinHttpGetProxyForUrlHvsi() { _asm { jmp [winhttp.WinHttpGetProxyForUrlHvsi] } }
+__declspec(naked) void _WinHttpGetProxyResult() { _asm { jmp [winhttp.WinHttpGetProxyResult] } }
+__declspec(naked) void _WinHttpGetProxyResultEx() { _asm { jmp [winhttp.WinHttpGetProxyResultEx] } }
+__declspec(naked) void _WinHttpGetProxySettingsEx() { _asm { jmp [winhttp.WinHttpGetProxySettingsEx] } }
+__declspec(naked) void _WinHttpGetProxySettingsResultEx() { _asm { jmp [winhttp.WinHttpGetProxySettingsResultEx] } }
+__declspec(naked) void _WinHttpGetProxySettingsVersion() { _asm { jmp [winhttp.WinHttpGetProxySettingsVersion] } }
+__declspec(naked) void _WinHttpGetTunnelSocket() { _asm { jmp [winhttp.WinHttpGetTunnelSocket] } }
+__declspec(naked) void _WinHttpOpen() { _asm { jmp [winhttp.WinHttpOpen] } }
+__declspec(naked) void _WinHttpOpenRequest() { _asm { jmp [winhttp.WinHttpOpenRequest] } }
+__declspec(naked) void _WinHttpPacJsWorkerMain() { _asm { jmp [winhttp.WinHttpPacJsWorkerMain] } }
+__declspec(naked) void _WinHttpProbeConnectivity() { _asm { jmp [winhttp.WinHttpProbeConnectivity] } }
+__declspec(naked) void _WinHttpQueryAuthSchemes() { _asm { jmp [winhttp.WinHttpQueryAuthSchemes] } }
+__declspec(naked) void _WinHttpQueryConnectionGroup() { _asm { jmp [winhttp.WinHttpQueryConnectionGroup] } }
+__declspec(naked) void _WinHttpQueryDataAvailable() { _asm { jmp [winhttp.WinHttpQueryDataAvailable] } }
+__declspec(naked) void _WinHttpQueryHeaders() { _asm { jmp [winhttp.WinHttpQueryHeaders] } }
+__declspec(naked) void _WinHttpQueryHeadersEx() { _asm { jmp [winhttp.WinHttpQueryHeadersEx] } }
+__declspec(naked) void _WinHttpQueryOption() { _asm { jmp [winhttp.WinHttpQueryOption] } }
+__declspec(naked) void _WinHttpReadData() { _asm { jmp [winhttp.WinHttpReadData] } }
+__declspec(naked) void _WinHttpReadDataEx() { _asm { jmp [winhttp.WinHttpReadDataEx] } }
+__declspec(naked) void _WinHttpReadProxySettings() { _asm { jmp [winhttp.WinHttpReadProxySettings] } }
+__declspec(naked) void _WinHttpReadProxySettingsHvsi() { _asm { jmp [winhttp.WinHttpReadProxySettingsHvsi] } }
+__declspec(naked) void _WinHttpReceiveResponse() { _asm { jmp [winhttp.WinHttpReceiveResponse] } }
+__declspec(naked) void _WinHttpRegisterProxyChangeNotification() { _asm { jmp [winhttp.WinHttpRegisterProxyChangeNotification] } }
+__declspec(naked) void _WinHttpResetAutoProxy() { _asm { jmp [winhttp.WinHttpResetAutoProxy] } }
+__declspec(naked) void _WinHttpSaveProxyCredentials() { _asm { jmp [winhttp.WinHttpSaveProxyCredentials] } }
+__declspec(naked) void _WinHttpSendRequest() { _asm { jmp [winhttp.WinHttpSendRequest] } }
+__declspec(naked) void _WinHttpSetCredentials() { _asm { jmp [winhttp.WinHttpSetCredentials] } }
+__declspec(naked) void _WinHttpSetDefaultProxyConfiguration() { _asm { jmp [winhttp.WinHttpSetDefaultProxyConfiguration] } }
+__declspec(naked) void _WinHttpSetOption() { _asm { jmp [winhttp.WinHttpSetOption] } }
+__declspec(naked) void _WinHttpSetProxySettingsPerUser() { _asm { jmp [winhttp.WinHttpSetProxySettingsPerUser] } }
+__declspec(naked) void _WinHttpSetSecureLegacyServersAppCompat() { _asm { jmp [winhttp.WinHttpSetSecureLegacyServersAppCompat] } }
+__declspec(naked) void _WinHttpSetStatusCallback() { _asm { jmp [winhttp.WinHttpSetStatusCallback] } }
+__declspec(naked) void _WinHttpSetTimeouts() { _asm { jmp [winhttp.WinHttpSetTimeouts] } }
+__declspec(naked) void _WinHttpTimeFromSystemTime() { _asm { jmp [winhttp.WinHttpTimeFromSystemTime] } }
+__declspec(naked) void _WinHttpTimeToSystemTime() { _asm { jmp [winhttp.WinHttpTimeToSystemTime] } }
+__declspec(naked) void _WinHttpUnregisterProxyChangeNotification() { _asm { jmp [winhttp.WinHttpUnregisterProxyChangeNotification] } }
+__declspec(naked) void _WinHttpWebSocketClose() { _asm { jmp [winhttp.WinHttpWebSocketClose] } }
+__declspec(naked) void _WinHttpWebSocketCompleteUpgrade() { _asm { jmp [winhttp.WinHttpWebSocketCompleteUpgrade] } }
+__declspec(naked) void _WinHttpWebSocketQueryCloseStatus() { _asm { jmp [winhttp.WinHttpWebSocketQueryCloseStatus] } }
+__declspec(naked) void _WinHttpWebSocketReceive() { _asm { jmp [winhttp.WinHttpWebSocketReceive] } }
+__declspec(naked) void _WinHttpWebSocketSend() { _asm { jmp [winhttp.WinHttpWebSocketSend] } }
+__declspec(naked) void _WinHttpWebSocketShutdown() { _asm { jmp [winhttp.WinHttpWebSocketShutdown] } }
+__declspec(naked) void _WinHttpWriteData() { _asm { jmp [winhttp.WinHttpWriteData] } }
+__declspec(naked) void _WinHttpWriteProxySettings() { _asm { jmp [winhttp.WinHttpWriteProxySettings] } }
 
 __declspec(naked) void _acmDriverAddA() { _asm { jmp[msacm32.acmDriverAddA] } }
 __declspec(naked) void _acmDriverAddW() { _asm { jmp[msacm32.acmDriverAddW] } }
@@ -3959,6 +4213,87 @@ void _waveOutUnprepareHeader() { winmm.waveOutUnprepareHeader(); }
 void _waveOutWrite() { winmm.waveOutWrite(); }
 void _wid32Message() { winmm.wid32Message(); }
 void _wod32Message() { winmm.wod32Message(); }
+
+void _Private1() { winhttp.Private1(); }
+void _SvchostPushServiceGlobals() { winhttp.SvchostPushServiceGlobals(); }
+void _WinHttpAddRequestHeaders() { winhttp.WinHttpAddRequestHeaders(); }
+void _WinHttpAddRequestHeadersEx() { winhttp.WinHttpAddRequestHeadersEx(); }
+void _WinHttpAutoProxySvcMain() { winhttp.WinHttpAutoProxySvcMain(); }
+void _WinHttpCheckPlatform() { winhttp.WinHttpCheckPlatform(); }
+void _WinHttpCloseHandle() { winhttp.WinHttpCloseHandle(); }
+void _WinHttpConnect() { winhttp.WinHttpConnect(); }
+void _WinHttpConnectionDeletePolicyEntries() { winhttp.WinHttpConnectionDeletePolicyEntries(); }
+void _WinHttpConnectionDeleteProxyInfo() { winhttp.WinHttpConnectionDeleteProxyInfo(); }
+void _WinHttpConnectionFreeNameList() { winhttp.WinHttpConnectionFreeNameList(); }
+void _WinHttpConnectionFreeProxyInfo() { winhttp.WinHttpConnectionFreeProxyInfo(); }
+void _WinHttpConnectionFreeProxyList() { winhttp.WinHttpConnectionFreeProxyList(); }
+void _WinHttpConnectionGetNameList() { winhttp.WinHttpConnectionGetNameList(); }
+void _WinHttpConnectionGetProxyInfo() { winhttp.WinHttpConnectionGetProxyInfo(); }
+void _WinHttpConnectionGetProxyList() { winhttp.WinHttpConnectionGetProxyList(); }
+void _WinHttpConnectionOnlyConvert() { winhttp.WinHttpConnectionOnlyConvert(); }
+void _WinHttpConnectionOnlyReceive() { winhttp.WinHttpConnectionOnlyReceive(); }
+void _WinHttpConnectionOnlySend() { winhttp.WinHttpConnectionOnlySend(); }
+void _WinHttpConnectionSetPolicyEntries() { winhttp.WinHttpConnectionSetPolicyEntries(); }
+void _WinHttpConnectionSetProxyInfo() { winhttp.WinHttpConnectionSetProxyInfo(); }
+void _WinHttpConnectionUpdateIfIndexTable() { winhttp.WinHttpConnectionUpdateIfIndexTable(); }
+void _WinHttpCrackUrl() { winhttp.WinHttpCrackUrl(); }
+void _WinHttpCreateProxyResolver() { winhttp.WinHttpCreateProxyResolver(); }
+void _WinHttpCreateUrl() { winhttp.WinHttpCreateUrl(); }
+void _WinHttpDetectAutoProxyConfigUrl() { winhttp.WinHttpDetectAutoProxyConfigUrl(); }
+void _WinHttpFreeProxyResult() { winhttp.WinHttpFreeProxyResult(); }
+void _WinHttpFreeProxyResultEx() { winhttp.WinHttpFreeProxyResultEx(); }
+void _WinHttpFreeProxySettings() { winhttp.WinHttpFreeProxySettings(); }
+void _WinHttpFreeProxySettingsEx() { winhttp.WinHttpFreeProxySettingsEx(); }
+void _WinHttpFreeQueryConnectionGroupResult() { winhttp.WinHttpFreeQueryConnectionGroupResult(); }
+void _WinHttpGetDefaultProxyConfiguration() { winhttp.WinHttpGetDefaultProxyConfiguration(); }
+void _WinHttpGetIEProxyConfigForCurrentUser() { winhttp.WinHttpGetIEProxyConfigForCurrentUser(); }
+void _WinHttpGetProxyForUrl() { winhttp.WinHttpGetProxyForUrl(); }
+void _WinHttpGetProxyForUrlEx() { winhttp.WinHttpGetProxyForUrlEx(); }
+void _WinHttpGetProxyForUrlEx2() { winhttp.WinHttpGetProxyForUrlEx2(); }
+void _WinHttpGetProxyForUrlHvsi() { winhttp.WinHttpGetProxyForUrlHvsi(); }
+void _WinHttpGetProxyResult() { winhttp.WinHttpGetProxyResult(); }
+void _WinHttpGetProxyResultEx() { winhttp.WinHttpGetProxyResultEx(); }
+void _WinHttpGetProxySettingsEx() { winhttp.WinHttpGetProxySettingsEx(); }
+void _WinHttpGetProxySettingsResultEx() { winhttp.WinHttpGetProxySettingsResultEx(); }
+void _WinHttpGetProxySettingsVersion() { winhttp.WinHttpGetProxySettingsVersion(); }
+void _WinHttpGetTunnelSocket() { winhttp.WinHttpGetTunnelSocket(); }
+void _WinHttpOpen() { winhttp.WinHttpOpen(); }
+void _WinHttpOpenRequest() { winhttp.WinHttpOpenRequest(); }
+void _WinHttpPacJsWorkerMain() { winhttp.WinHttpPacJsWorkerMain(); }
+void _WinHttpProbeConnectivity() { winhttp.WinHttpProbeConnectivity(); }
+void _WinHttpQueryAuthSchemes() { winhttp.WinHttpQueryAuthSchemes(); }
+void _WinHttpQueryConnectionGroup() { winhttp.WinHttpQueryConnectionGroup(); }
+void _WinHttpQueryDataAvailable() { winhttp.WinHttpQueryDataAvailable(); }
+void _WinHttpQueryHeaders() { winhttp.WinHttpQueryHeaders(); }
+void _WinHttpQueryHeadersEx() { winhttp.WinHttpQueryHeadersEx(); }
+void _WinHttpQueryOption() { winhttp.WinHttpQueryOption(); }
+void _WinHttpReadData() { winhttp.WinHttpReadData(); }
+void _WinHttpReadDataEx() { winhttp.WinHttpReadDataEx(); }
+void _WinHttpReadProxySettings() { winhttp.WinHttpReadProxySettings(); }
+void _WinHttpReadProxySettingsHvsi() { winhttp.WinHttpReadProxySettingsHvsi(); }
+void _WinHttpReceiveResponse() { winhttp.WinHttpReceiveResponse(); }
+void _WinHttpRegisterProxyChangeNotification() { winhttp.WinHttpRegisterProxyChangeNotification(); }
+void _WinHttpResetAutoProxy() { winhttp.WinHttpResetAutoProxy(); }
+void _WinHttpSaveProxyCredentials() { winhttp.WinHttpSaveProxyCredentials(); }
+void _WinHttpSendRequest() { winhttp.WinHttpSendRequest(); }
+void _WinHttpSetCredentials() { winhttp.WinHttpSetCredentials(); }
+void _WinHttpSetDefaultProxyConfiguration() { winhttp.WinHttpSetDefaultProxyConfiguration(); }
+void _WinHttpSetOption() { winhttp.WinHttpSetOption(); }
+void _WinHttpSetProxySettingsPerUser() { winhttp.WinHttpSetProxySettingsPerUser(); }
+void _WinHttpSetSecureLegacyServersAppCompat() { winhttp.WinHttpSetSecureLegacyServersAppCompat(); }
+void _WinHttpSetStatusCallback() { winhttp.WinHttpSetStatusCallback(); }
+void _WinHttpSetTimeouts() { winhttp.WinHttpSetTimeouts(); }
+void _WinHttpTimeFromSystemTime() { winhttp.WinHttpTimeFromSystemTime(); }
+void _WinHttpTimeToSystemTime() { winhttp.WinHttpTimeToSystemTime(); }
+void _WinHttpUnregisterProxyChangeNotification() { winhttp.WinHttpUnregisterProxyChangeNotification(); }
+void _WinHttpWebSocketClose() { winhttp.WinHttpWebSocketClose(); }
+void _WinHttpWebSocketCompleteUpgrade() { winhttp.WinHttpWebSocketCompleteUpgrade(); }
+void _WinHttpWebSocketQueryCloseStatus() { winhttp.WinHttpWebSocketQueryCloseStatus(); }
+void _WinHttpWebSocketReceive() { winhttp.WinHttpWebSocketReceive(); }
+void _WinHttpWebSocketSend() { winhttp.WinHttpWebSocketSend(); }
+void _WinHttpWebSocketShutdown() { winhttp.WinHttpWebSocketShutdown(); }
+void _WinHttpWriteData() { winhttp.WinHttpWriteData(); }
+void _WinHttpWriteProxySettings() { winhttp.WinHttpWriteProxySettings(); }
 
 #pragma runtime_checks( "", restore )
 #endif

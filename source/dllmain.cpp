@@ -8,6 +8,11 @@
 extern "C" Direct3D8 *WINAPI Direct3DCreate8(UINT SDKVersion);
 #endif
 
+bool WINAPI IsUltimateASILoader()
+{
+    return true;
+}
+
 HMODULE hm;
 std::vector<std::wstring> iniPaths;
 std::filesystem::path sFileLoaderPath;
@@ -166,6 +171,8 @@ enum Kernel32ExportsNames
     eGetSystemInfo,
     eInterlockedCompareExchange,
     eSleep,
+    eGetSystemTimeAsFileTime,
+    eGetCurrentProcessId,
     eCreateFileA,
     eCreateFileW,
     eGetFileAttributesA,
@@ -240,7 +247,12 @@ void LoadOriginalLibrary()
     else if (iequals(szSelfName, L"winmm.dll"))
     {
         winmm.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
-    } else
+    }
+    else if (iequals(szSelfName, L"winhttp.dll"))
+    {
+        winhttp.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
+    }
+    else
 #if !X64
     if (iequals(szSelfName, L"vorbisFile.dll"))
     {
@@ -701,6 +713,18 @@ void WINAPI CustomSleep(DWORD dwMilliseconds)
     return Sleep(dwMilliseconds);
 }
 
+void WINAPI CustomGetSystemTimeAsFileTime(LPFILETIME lpSystemTimeAsFileTime)
+{
+    LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress());
+    return GetSystemTimeAsFileTime(lpSystemTimeAsFileTime);
+}
+
+DWORD WINAPI CustomGetCurrentProcessId()
+{
+    LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress());
+    return GetCurrentProcessId();
+}
+
 std::filesystem::path GetFileName(auto lpFilename)
 {
     std::error_code ec;
@@ -887,6 +911,7 @@ HRESULT WINAPI CustomCoCreateInstance(REFCLSID rclsid, LPUNKNOWN pUnkOuter, DWOR
     return hr;
 }
 
+std::vector<std::string> importedModulesList;
 bool HookKernel32IAT(HMODULE mod, bool exe)
 {
     auto hExecutableInstance = (size_t)mod;
@@ -912,6 +937,8 @@ bool HookKernel32IAT(HMODULE mod, bool exe)
         Kernel32Data[eGetSystemInfo][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "GetSystemInfo");
         Kernel32Data[eInterlockedCompareExchange][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "InterlockedCompareExchange");
         Kernel32Data[eSleep][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "Sleep");
+        Kernel32Data[eGetSystemTimeAsFileTime][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "GetSystemTimeAsFileTime");
+        Kernel32Data[eGetCurrentProcessId][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "GetCurrentProcessId");
         Kernel32Data[eCreateFileA][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "CreateFileA");
         Kernel32Data[eCreateFileW][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "CreateFileW");
         Kernel32Data[eGetFileAttributesA][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "GetFileAttributesA");
@@ -1042,6 +1069,18 @@ bool HookKernel32IAT(HMODULE mod, bool exe)
                 *(size_t*)i = (size_t)CustomSleep;
                 matchedImports++;
             }
+            else if (ptr == Kernel32Data[eGetSystemTimeAsFileTime][ProcAddress])
+            {
+                if (exe) Kernel32Data[eGetSystemTimeAsFileTime][IATPtr] = i;
+                *(size_t*)i = (size_t)CustomGetSystemTimeAsFileTime;
+                matchedImports++;
+            }
+            else if (ptr == Kernel32Data[eGetCurrentProcessId][ProcAddress])
+            {
+                if (exe) Kernel32Data[eGetCurrentProcessId][IATPtr] = i;
+                *(size_t*)i = (size_t)CustomGetCurrentProcessId;
+                matchedImports++;
+            }
             else if (ptr == Kernel32Data[eCreateFileA][ProcAddress])
             {
                 if (exe) Kernel32Data[eCreateFileA][IATPtr] = i;
@@ -1155,6 +1194,7 @@ bool HookKernel32IAT(HMODULE mod, bool exe)
                 PatchIAT(hExecutableInstance + (pImports + i)->FirstThunk, 0, hExecutableInstance_end);
             else if (!_stricmp((const char*)(hExecutableInstance + (pImports + i)->Name), "OLE32.DLL"))
                 PatchCoCreateInstance(hExecutableInstance + (pImports + i)->FirstThunk, 0, hExecutableInstance_end);
+            importedModulesList.emplace_back((const char*)(hExecutableInstance + (pImports + i)->Name));
         }
     }
 
@@ -1246,6 +1286,341 @@ bool HookKernel32IAT(HMODULE mod, bool exe)
 
                                 if ((IMAGE_ORDINAL(thunk->u1.Ordinal)) == 1)
                                     p[j] = _DirectInput8Create;
+                            }
+                            else if (iequals(szSelfName, L"winhttp.dll"))
+                            {
+                                DWORD Protect;
+                                VirtualProtect(&p[j], 4, PAGE_EXECUTE_READWRITE, &Protect);
+
+                                const enum ewinhttp
+                                {
+                                    Private1 = 4,
+                                    SvchostPushServiceGlobals = 5,
+                                    WinHttpAddRequestHeaders = 6,
+                                    WinHttpAddRequestHeadersEx = 7,
+                                    WinHttpAutoProxySvcMain = 8,
+                                    WinHttpCheckPlatform = 9,
+                                    WinHttpCloseHandle = 10,
+                                    WinHttpConnect = 11,
+                                    WinHttpConnectionDeletePolicyEntries = 12,
+                                    WinHttpConnectionDeleteProxyInfo = 13,
+                                    WinHttpConnectionFreeNameList = 14,
+                                    WinHttpConnectionFreeProxyInfo = 15,
+                                    WinHttpConnectionFreeProxyList = 16,
+                                    WinHttpConnectionGetNameList = 17,
+                                    WinHttpConnectionGetProxyInfo = 18,
+                                    WinHttpConnectionGetProxyList = 19,
+                                    WinHttpConnectionOnlyConvert = 20,
+                                    WinHttpConnectionOnlyReceive = 21,
+                                    WinHttpConnectionOnlySend = 22,
+                                    WinHttpConnectionSetPolicyEntries = 23,
+                                    WinHttpConnectionSetProxyInfo = 24,
+                                    WinHttpConnectionUpdateIfIndexTable = 25,
+                                    WinHttpCrackUrl = 26,
+                                    WinHttpCreateProxyResolver = 27,
+                                    WinHttpCreateUrl = 28,
+                                    WinHttpDetectAutoProxyConfigUrl = 29,
+                                    WinHttpFreeProxyResult = 30,
+                                    WinHttpFreeProxyResultEx = 31,
+                                    WinHttpFreeProxySettings = 32,
+                                    WinHttpFreeProxySettingsEx = 33,
+                                    WinHttpFreeQueryConnectionGroupResult = 34,
+                                    WinHttpGetDefaultProxyConfiguration = 35,
+                                    WinHttpGetIEProxyConfigForCurrentUser = 36,
+                                    WinHttpGetProxyForUrl = 37,
+                                    WinHttpGetProxyForUrlEx = 38,
+                                    WinHttpGetProxyForUrlEx2 = 39,
+                                    WinHttpGetProxyForUrlHvsi = 40,
+                                    WinHttpGetProxyResult = 41,
+                                    WinHttpGetProxyResultEx = 42,
+                                    WinHttpGetProxySettingsEx = 43,
+                                    WinHttpGetProxySettingsResultEx = 44,
+                                    WinHttpGetProxySettingsVersion = 45,
+                                    WinHttpGetTunnelSocket = 46,
+                                    WinHttpOpen = 47,
+                                    WinHttpOpenRequest = 48,
+                                    WinHttpPacJsWorkerMain = 49,
+                                    WinHttpProbeConnectivity = 50,
+                                    WinHttpQueryAuthSchemes = 51,
+                                    WinHttpQueryConnectionGroup = 52,
+                                    WinHttpQueryDataAvailable = 53,
+                                    WinHttpQueryHeaders = 54,
+                                    WinHttpQueryHeadersEx = 55,
+                                    WinHttpQueryOption = 56,
+                                    WinHttpReadData = 57,
+                                    WinHttpReadDataEx = 58,
+                                    WinHttpReadProxySettings = 59,
+                                    WinHttpReadProxySettingsHvsi = 60,
+                                    WinHttpReceiveResponse = 61,
+                                    WinHttpRegisterProxyChangeNotification = 62,
+                                    WinHttpResetAutoProxy = 63,
+                                    WinHttpSaveProxyCredentials = 64,
+                                    WinHttpSendRequest = 65,
+                                    WinHttpSetCredentials = 66,
+                                    WinHttpSetDefaultProxyConfiguration = 67,
+                                    WinHttpSetOption = 68,
+                                    WinHttpSetProxySettingsPerUser = 69,
+                                    WinHttpSetSecureLegacyServersAppCompat = 1,
+                                    WinHttpSetStatusCallback = 70,
+                                    WinHttpSetTimeouts = 71,
+                                    WinHttpTimeFromSystemTime = 72,
+                                    WinHttpTimeToSystemTime = 73,
+                                    WinHttpUnregisterProxyChangeNotification = 74,
+                                    WinHttpWebSocketClose = 75,
+                                    WinHttpWebSocketCompleteUpgrade = 76,
+                                    WinHttpWebSocketQueryCloseStatus = 77,
+                                    WinHttpWebSocketReceive = 78,
+                                    WinHttpWebSocketSend = 79,
+                                    WinHttpWebSocketShutdown = 80,
+                                    WinHttpWriteData = 81,
+                                    WinHttpWriteProxySettings = 82
+                                };
+
+                                switch (IMAGE_ORDINAL(thunk->u1.Ordinal))
+                                {
+                                case ewinhttp::Private1:
+                                    p[j] = _Private1;
+                                        break;
+                                case ewinhttp::SvchostPushServiceGlobals:
+                                    p[j] = _SvchostPushServiceGlobals;
+                                        break;
+                                case ewinhttp::WinHttpAddRequestHeaders:
+                                    p[j] = _WinHttpAddRequestHeaders;
+                                        break;
+                                case ewinhttp::WinHttpAddRequestHeadersEx:
+                                    p[j] = _WinHttpAddRequestHeadersEx;
+                                        break;
+                                case ewinhttp::WinHttpAutoProxySvcMain:
+                                    p[j] = _WinHttpAutoProxySvcMain;
+                                        break;
+                                case ewinhttp::WinHttpCheckPlatform:
+                                    p[j] = _WinHttpCheckPlatform;
+                                        break;
+                                case ewinhttp::WinHttpCloseHandle:
+                                    p[j] = _WinHttpCloseHandle;
+                                        break;
+                                case ewinhttp::WinHttpConnect:
+                                    p[j] = _WinHttpConnect;
+                                        break;
+                                case ewinhttp::WinHttpConnectionDeletePolicyEntries:
+                                    p[j] = _WinHttpConnectionDeletePolicyEntries;
+                                        break;
+                                case ewinhttp::WinHttpConnectionDeleteProxyInfo:
+                                    p[j] = _WinHttpConnectionDeleteProxyInfo;
+                                        break;
+                                case ewinhttp::WinHttpConnectionFreeNameList:
+                                    p[j] = _WinHttpConnectionFreeNameList;
+                                        break;
+                                case ewinhttp::WinHttpConnectionFreeProxyInfo:
+                                    p[j] = _WinHttpConnectionFreeProxyInfo;
+                                        break;
+                                case ewinhttp::WinHttpConnectionFreeProxyList:
+                                    p[j] = _WinHttpConnectionFreeProxyList;
+                                        break;
+                                case ewinhttp::WinHttpConnectionGetNameList:
+                                    p[j] = _WinHttpConnectionGetNameList;
+                                        break;
+                                case ewinhttp::WinHttpConnectionGetProxyInfo:
+                                    p[j] = _WinHttpConnectionGetProxyInfo;
+                                        break;
+                                case ewinhttp::WinHttpConnectionGetProxyList:
+                                    p[j] = _WinHttpConnectionGetProxyList;
+                                        break;
+                                case ewinhttp::WinHttpConnectionOnlyConvert:
+                                    p[j] = _WinHttpConnectionOnlyConvert;
+                                        break;
+                                case ewinhttp::WinHttpConnectionOnlyReceive:
+                                    p[j] = _WinHttpConnectionOnlyReceive;
+                                        break;
+                                case ewinhttp::WinHttpConnectionOnlySend:
+                                    p[j] = _WinHttpConnectionOnlySend;
+                                        break;
+                                case ewinhttp::WinHttpConnectionSetPolicyEntries:
+                                    p[j] = _WinHttpConnectionSetPolicyEntries;
+                                        break;
+                                case ewinhttp::WinHttpConnectionSetProxyInfo:
+                                    p[j] = _WinHttpConnectionSetProxyInfo;
+                                        break;
+                                case ewinhttp::WinHttpConnectionUpdateIfIndexTable:
+                                    p[j] = _WinHttpConnectionUpdateIfIndexTable;
+                                        break;
+                                case ewinhttp::WinHttpCrackUrl:
+                                    p[j] = _WinHttpCrackUrl;
+                                        break;
+                                case ewinhttp::WinHttpCreateProxyResolver:
+                                    p[j] = _WinHttpCreateProxyResolver;
+                                        break;
+                                case ewinhttp::WinHttpCreateUrl:
+                                    p[j] = _WinHttpCreateUrl;
+                                        break;
+                                case ewinhttp::WinHttpDetectAutoProxyConfigUrl:
+                                    p[j] = _WinHttpDetectAutoProxyConfigUrl;
+                                        break;
+                                case ewinhttp::WinHttpFreeProxyResult:
+                                    p[j] = _WinHttpFreeProxyResult;
+                                        break;
+                                case ewinhttp::WinHttpFreeProxyResultEx:
+                                    p[j] = _WinHttpFreeProxyResultEx;
+                                        break;
+                                case ewinhttp::WinHttpFreeProxySettings:
+                                    p[j] = _WinHttpFreeProxySettings;
+                                        break;
+                                case ewinhttp::WinHttpFreeProxySettingsEx:
+                                    p[j] = _WinHttpFreeProxySettingsEx;
+                                        break;
+                                case ewinhttp::WinHttpFreeQueryConnectionGroupResult:
+                                    p[j] = _WinHttpFreeQueryConnectionGroupResult;
+                                        break;
+                                case ewinhttp::WinHttpGetDefaultProxyConfiguration:
+                                    p[j] = _WinHttpGetDefaultProxyConfiguration;
+                                        break;
+                                case ewinhttp::WinHttpGetIEProxyConfigForCurrentUser:
+                                    p[j] = _WinHttpGetIEProxyConfigForCurrentUser;
+                                        break;
+                                case ewinhttp::WinHttpGetProxyForUrl:
+                                    p[j] = _WinHttpGetProxyForUrl;
+                                        break;
+                                case ewinhttp::WinHttpGetProxyForUrlEx:
+                                    p[j] = _WinHttpGetProxyForUrlEx;
+                                        break;
+                                case ewinhttp::WinHttpGetProxyForUrlEx2:
+                                    p[j] = _WinHttpGetProxyForUrlEx2;
+                                        break;
+                                case ewinhttp::WinHttpGetProxyForUrlHvsi:
+                                    p[j] = _WinHttpGetProxyForUrlHvsi;
+                                        break;
+                                case ewinhttp::WinHttpGetProxyResult:
+                                    p[j] = _WinHttpGetProxyResult;
+                                        break;
+                                case ewinhttp::WinHttpGetProxyResultEx:
+                                    p[j] = _WinHttpGetProxyResultEx;
+                                        break;
+                                case ewinhttp::WinHttpGetProxySettingsEx:
+                                    p[j] = _WinHttpGetProxySettingsEx;
+                                        break;
+                                case ewinhttp::WinHttpGetProxySettingsResultEx:
+                                    p[j] = _WinHttpGetProxySettingsResultEx;
+                                        break;
+                                case ewinhttp::WinHttpGetProxySettingsVersion:
+                                    p[j] = _WinHttpGetProxySettingsVersion;
+                                        break;
+                                case ewinhttp::WinHttpGetTunnelSocket:
+                                    p[j] = _WinHttpGetTunnelSocket;
+                                        break;
+                                case ewinhttp::WinHttpOpen:
+                                    p[j] = _WinHttpOpen;
+                                        break;
+                                case ewinhttp::WinHttpOpenRequest:
+                                    p[j] = _WinHttpOpenRequest;
+                                        break;
+                                case ewinhttp::WinHttpPacJsWorkerMain:
+                                    p[j] = _WinHttpPacJsWorkerMain;
+                                        break;
+                                case ewinhttp::WinHttpProbeConnectivity:
+                                    p[j] = _WinHttpProbeConnectivity;
+                                        break;
+                                case ewinhttp::WinHttpQueryAuthSchemes:
+                                    p[j] = _WinHttpQueryAuthSchemes;
+                                        break;
+                                case ewinhttp::WinHttpQueryConnectionGroup:
+                                    p[j] = _WinHttpQueryConnectionGroup;
+                                        break;
+                                case ewinhttp::WinHttpQueryDataAvailable:
+                                    p[j] = _WinHttpQueryDataAvailable;
+                                        break;
+                                case ewinhttp::WinHttpQueryHeaders:
+                                    p[j] = _WinHttpQueryHeaders;
+                                        break;
+                                case ewinhttp::WinHttpQueryHeadersEx:
+                                    p[j] = _WinHttpQueryHeadersEx;
+                                        break;
+                                case ewinhttp::WinHttpQueryOption:
+                                    p[j] = _WinHttpQueryOption;
+                                        break;
+                                case ewinhttp::WinHttpReadData:
+                                    p[j] = _WinHttpReadData;
+                                        break;
+                                case ewinhttp::WinHttpReadDataEx:
+                                    p[j] = _WinHttpReadDataEx;
+                                        break;
+                                case ewinhttp::WinHttpReadProxySettings:
+                                    p[j] = _WinHttpReadProxySettings;
+                                        break;
+                                case ewinhttp::WinHttpReadProxySettingsHvsi:
+                                    p[j] = _WinHttpReadProxySettingsHvsi;
+                                        break;
+                                case ewinhttp::WinHttpReceiveResponse:
+                                    p[j] = _WinHttpReceiveResponse;
+                                        break;
+                                case ewinhttp::WinHttpRegisterProxyChangeNotification:
+                                    p[j] = _WinHttpRegisterProxyChangeNotification;
+                                        break;
+                                case ewinhttp::WinHttpResetAutoProxy:
+                                    p[j] = _WinHttpResetAutoProxy;
+                                        break;
+                                case ewinhttp::WinHttpSaveProxyCredentials:
+                                    p[j] = _WinHttpSaveProxyCredentials;
+                                        break;
+                                case ewinhttp::WinHttpSendRequest:
+                                    p[j] = _WinHttpSendRequest;
+                                        break;
+                                case ewinhttp::WinHttpSetCredentials:
+                                    p[j] = _WinHttpSetCredentials;
+                                        break;
+                                case ewinhttp::WinHttpSetDefaultProxyConfiguration:
+                                    p[j] = _WinHttpSetDefaultProxyConfiguration;
+                                        break;
+                                case ewinhttp::WinHttpSetOption:
+                                    p[j] = _WinHttpSetOption;
+                                        break;
+                                case ewinhttp::WinHttpSetProxySettingsPerUser:
+                                    p[j] = _WinHttpSetProxySettingsPerUser;
+                                        break;
+                                case ewinhttp::WinHttpSetSecureLegacyServersAppCompat:
+                                    p[j] = _WinHttpSetSecureLegacyServersAppCompat;
+                                        break;
+                                case ewinhttp::WinHttpSetStatusCallback:
+                                    p[j] = _WinHttpSetStatusCallback;
+                                        break;
+                                case ewinhttp::WinHttpSetTimeouts:
+                                    p[j] = _WinHttpSetTimeouts;
+                                        break;
+                                case ewinhttp::WinHttpTimeFromSystemTime:
+                                    p[j] = _WinHttpTimeFromSystemTime;
+                                        break;
+                                case ewinhttp::WinHttpTimeToSystemTime:
+                                    p[j] = _WinHttpTimeToSystemTime;
+                                        break;
+                                case ewinhttp::WinHttpUnregisterProxyChangeNotification:
+                                    p[j] = _WinHttpUnregisterProxyChangeNotification;
+                                        break;
+                                case ewinhttp::WinHttpWebSocketClose:
+                                    p[j] = _WinHttpWebSocketClose;
+                                        break;
+                                case ewinhttp::WinHttpWebSocketCompleteUpgrade:
+                                    p[j] = _WinHttpWebSocketCompleteUpgrade;
+                                        break;
+                                case ewinhttp::WinHttpWebSocketQueryCloseStatus:
+                                    p[j] = _WinHttpWebSocketQueryCloseStatus;
+                                        break;
+                                case ewinhttp::WinHttpWebSocketReceive:
+                                    p[j] = _WinHttpWebSocketReceive;
+                                        break;
+                                case ewinhttp::WinHttpWebSocketSend:
+                                    p[j] = _WinHttpWebSocketSend;
+                                        break;
+                                case ewinhttp::WinHttpWebSocketShutdown:
+                                    p[j] = _WinHttpWebSocketShutdown;
+                                        break;
+                                case ewinhttp::WinHttpWriteData:
+                                    p[j] = _WinHttpWriteData;
+                                        break;
+                                case ewinhttp::WinHttpWriteProxySettings:
+                                    p[j] = _WinHttpWriteProxySettings;
+                                        break;
+                                default:
+                                    break;
+                                }
                             }
                             ++j;
                         }
@@ -1410,8 +1785,11 @@ void Init()
             LoadOriginalLibrary();
         }
 
+        const auto it = std::find_if(std::begin(importedModulesList), std::end(importedModulesList), [&](const auto& str) { return iequals(L"unityplayer.dll", to_wstring(str)); } );
+        const auto bUnityPlayerImported = it != std::end(importedModulesList);
+
         HMODULE m = mainModule;
-        if (nFindModule)
+        if (nFindModule || importedModulesList.size() <= 2 || bUnityPlayerImported)
         {
             ModuleList dlls;
             dlls.Enumerate(ModuleList::SearchLocation::LocalOnly);
@@ -1427,6 +1805,9 @@ void Init()
                 auto str2 = std::get<std::wstring>(it);
                 std::transform(str1.begin(), str1.end(), str1.begin(), [](wchar_t c) { return ::towlower(c); });
                 std::transform(str2.begin(), str2.end(), str2.begin(), [](wchar_t c) { return ::towlower(c); });
+
+                if (str2 == L"unityplayer")
+                    return true;
 
                 return (str2 != str1) && (str2.find(str1) != std::wstring::npos);
             });
