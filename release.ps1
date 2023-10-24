@@ -1,5 +1,5 @@
-$aliases_array_Win32 = "d3d8", "d3d9", "d3d10", "d3d11", "d3d12", "dinput8", "ddraw", "dinput", "dsound", "msacm32", "msvfw32", "version", "wininet", "winmm", "xlive", "vorbisFile", "binkw32"
-$aliases_array_x64   = "d3d9", "d3d10", "d3d11", "d3d12", "dinput8", "dsound", "version", "wininet", "winmm", "bink2w64"
+$aliases_array_Win32 = "d3d8", "d3d9", "d3d10", "d3d11", "d3d12", "dinput8", "ddraw", "dinput", "dsound", "msacm32", "msvfw32", "version", "wininet", "winmm", "winhttp", "xlive", "vorbisFile", "binkw32"
+$aliases_array_x64   = "d3d9", "d3d10", "d3d11", "d3d12", "dinput8", "dsound", "version", "wininet", "winmm", "winhttp", "bink2w64"
 $platform_array      = "Win32", "x64"
 $hash_alrg           = "SHA512"
 

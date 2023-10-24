@@ -1,7 +1,4 @@
-version: 5.{build}
-branches:
-  only:
-  - master
+version: 6.{build}
 skip_tags: true
 image: Visual Studio 2022
 configuration: Release
@@ -22,25 +19,39 @@ artifacts:
   name: Ultimate-ASI-Loader.zip
 - path: bin\Ultimate-ASI-Loader_x64.zip
   name: Ultimate-ASI-Loader_x64.zip
-- path: bin\RE7Demo.InfiniteAmmo.zip
-  name: RE7Demo.InfiniteAmmo.zip
-- path: bin\MessageBox_x64.zip
-  name: MessageBox_x64.zip
-- path: bin\OverloadFromFolderDLL_x64.zip
-  name: OverloadFromFolderDLL_x64.zip
-- path: bin\ExeUnprotect.zip
-  name: ExeUnprotect.zip
-- path: bin\MessageBox.zip
-  name: MessageBox.zip
-- path: bin\OverloadFromFolderDLL.zip
-  name: OverloadFromFolderDLL.zip
+- path: bin\RE7Demo.InfiniteAmmo-x64.zip
+  name: RE7Demo.InfiniteAmmo-x64.zip
+- path: bin\MessageBox-x64.zip
+  name: MessageBox-x64.zip
+- path: bin\OverloadFromFolderDLL-x64.zip
+  name: OverloadFromFolderDLL-x64.zip
+- path: bin\ExeUnprotect-Win32.zip
+  name: ExeUnprotect-Win32.zip
+- path: bin\MessageBox-Win32.zip
+  name: MessageBox-Win32.zip
+- path: bin\OverloadFromFolderDLL-Win32.zip
+  name: OverloadFromFolderDLL-Win32.zip
+- path: bin\MonoLoader-Win32.zip
+  name: MonoLoader-Win32.zip
+- path: bin\MonoLoader-x64.zip
+  name: MonoLoader-x64.zip
 deploy:
 - provider: GitHub
   tag: v$(appveyor_build_version)
   release: Ultimate ASI Loader v$(appveyor_build_version)
-  description: DESCRIPTION\n------------------------\nThis is a DLL file which adds ASI plugin loading functionality to any game, which uses any of the following libraries:\n* d3d8.dll\n* d3d9.dll\n* d3d11.dll\n* ddraw.dll\n* dinput.dll\n* dinput8.dll (x86 and x64)\n* dsound.dll (x86 and x64)\n* msacm32.dll\n* msvfw32.dll\n* version.dll (x86 and x64)\n* vorbisFile.dll\n* wininet.dll (x86 and x64)\n* winmm.dll (x86 and x64)\n* xlive.dll\n\n\nINSTALLATION\n------------------------\nIn order to install it, you just need to place DLL into game directory. Usually it works as dinput8.dll, but if it's not, there is a possibility to rename it(see the list of supported names above).
+  description: DESCRIPTION\n------------------------\nThis is a DLL file which adds ASI plugin loading functionality to any game, which uses any of the following libraries:\n* d3d8.dll\n* d3d9.dll\n* d3d11.dll\n* ddraw.dll\n* dinput.dll\n* dinput8.dll (x86 and x64)\n* dsound.dll (x86 and x64)\n* msacm32.dll\n* msvfw32.dll\n* version.dll (x86 and x64)\n* vorbisFile.dll\n* wininet.dll (x86 and x64)\n* winmm.dll (x86 and x64)\n* winhttp.dll (x86 and x64)\n* xlive.dll\n\n\nINSTALLATION\n------------------------\nIn order to install it, you just need to place DLL into game directory. Usually it works as dinput8.dll, but if it's not, there is a possibility to rename it(see the list of supported names above).
   auth_token:
     secure: ugbti+bXX/7zqu39OyiPxgRPd2pQn2FEV/12ABees2fHfpZob0tWXzqD/zSYmibJ
   artifact: Ultimate-ASI-Loader.zip, Ultimate-ASI-Loader_x64.zip
   on:
     branch: master
+- provider: GitHub
+  tag: demo-plugins
+  release: Ultimate ASI Loader Demo Plugins
+  description: Demo plugins to test or extend Ultimate ASI Loader's functionality.
+  auth_token:
+    secure: ugbti+bXX/7zqu39OyiPxgRPd2pQn2FEV/12ABees2fHfpZob0tWXzqD/zSYmibJ
+  artifact: RE7Demo.InfiniteAmmo-x64.zip, MessageBox-x64.zip, OverloadFromFolderDLL-x64.zip, ExeUnprotect-Win32.zip, MessageBox-Win32.zip, OverloadFromFolderDLL-Win32.zip, MonoLoader-Win32.zip, MonoLoader-x64.zip
+  force_update: true
+  on:
+    branch: /^(master|monoloader)$/

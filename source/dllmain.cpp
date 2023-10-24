@@ -173,6 +173,8 @@ enum Kernel32ExportsNames
     eSleep,
     eGetSystemTimeAsFileTime,
     eGetCurrentProcessId,
+    eGetCommandLineA,
+    eGetCommandLineW,
     eCreateFileA,
     eCreateFileW,
     eGetFileAttributesA,
@@ -597,9 +599,8 @@ void LoadPluginsAndRestoreIAT(uintptr_t retaddr)
 
     for (size_t i = 0; i < Kernel32ExportsNamesCount; i++)
     {
-        if (!sFileLoaderPath.empty() && 
-           (i == eCreateFileA || i == eCreateFileW || i == eGetFileAttributesA ||
-            i == eGetFileAttributesW || i == eGetFileAttributesExA || i == eGetFileAttributesExW))
+        if (!sFileLoaderPath.empty() && (i == eCreateFileA || i == eCreateFileW 
+            || i == eGetFileAttributesA || i == eGetFileAttributesW || i == eGetFileAttributesExA || i == eGetFileAttributesExW))
             continue;
 
         if (Kernel32Data[i][IATPtr] && Kernel32Data[i][ProcAddress])
@@ -725,6 +726,18 @@ DWORD WINAPI CustomGetCurrentProcessId()
     return GetCurrentProcessId();
 }
 
+LPSTR WINAPI CustomGetCommandLineA()
+{
+    LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress());
+    return GetCommandLineA();
+}
+
+LPWSTR WINAPI CustomGetCommandLineW()
+{
+    LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress());
+    return GetCommandLineW();
+}
+
 std::filesystem::path GetFileName(auto lpFilename)
 {
     std::error_code ec;
@@ -741,7 +754,7 @@ std::filesystem::path GetFileName(auto lpFilename)
 
     auto filePath = std::filesystem::path(lpFilename);
     auto absolutePath = std::filesystem::absolute(filePath, ec);
-    auto relativePath = std::filesystem::weakly_canonical(absolutePath, ec).lexically_relative(gamePath);
+    auto relativePath = std::filesystem::canonical(absolutePath, ec).lexically_relative(gamePath);
     auto commonPath = gamePath;
 
     if (starts_with(relativePath, ".."))
@@ -939,6 +952,8 @@ bool HookKernel32IAT(HMODULE mod, bool exe)
         Kernel32Data[eSleep][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "Sleep");
         Kernel32Data[eGetSystemTimeAsFileTime][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "GetSystemTimeAsFileTime");
         Kernel32Data[eGetCurrentProcessId][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "GetCurrentProcessId");
+        Kernel32Data[eGetCommandLineA][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "GetCommandLineA");
+        Kernel32Data[eGetCommandLineW][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "GetCommandLineW");
         Kernel32Data[eCreateFileA][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "CreateFileA");
         Kernel32Data[eCreateFileW][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "CreateFileW");
         Kernel32Data[eGetFileAttributesA][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "GetFileAttributesA");
@@ -1079,6 +1094,18 @@ bool HookKernel32IAT(HMODULE mod, bool exe)
             {
                 if (exe) Kernel32Data[eGetCurrentProcessId][IATPtr] = i;
                 *(size_t*)i = (size_t)CustomGetCurrentProcessId;
+                matchedImports++;
+            }
+            else if (ptr == Kernel32Data[eGetCommandLineA][ProcAddress])
+            {
+                if (exe) Kernel32Data[eGetCommandLineA][IATPtr] = i;
+                *(size_t*)i = (size_t)CustomGetCommandLineA;
+                matchedImports++;
+            }
+            else if (ptr == Kernel32Data[eGetCommandLineW][ProcAddress])
+            {
+                if (exe) Kernel32Data[eGetCommandLineW][IATPtr] = i;
+                *(size_t*)i = (size_t)CustomGetCommandLineW;
                 matchedImports++;
             }
             else if (ptr == Kernel32Data[eCreateFileA][ProcAddress])
