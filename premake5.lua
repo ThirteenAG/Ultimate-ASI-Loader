@@ -14,14 +14,31 @@ workspace "Ultimate-ASI-Loader-Win32"
    
    defines { "rsc_CompanyName=\"ThirteenAG\"" }
    defines { "rsc_LegalCopyright=\"MIT License\""} 
-   if(_OPTIONS["with-version"]) then
-      defines { "rsc_FileVersion=\"" .. _OPTIONS["with-version"] .. "\"", "rsc_ProductVersion=\"" .. _OPTIONS["with-version"] .. "\"" }
-   else
-      defines { "rsc_FileVersion=\"1.0.0.0\"", "rsc_ProductVersion=\"1.0.0.0\"" }
-   end
    defines { "rsc_InternalName=\"%{prj.name}\"", "rsc_ProductName=\"%{prj.name}\"", "rsc_OriginalFilename=\"%{prj.name}.dll\"" }
    defines { "rsc_FileDescription=\"Ultimate ASI Loader\"" }
    defines { "rsc_UpdateUrl=\"https://github.com/ThirteenAG/Ultimate-ASI-Loader\"" }
+
+   local major = 1
+   local minor = 0
+   local build = 0
+   local revision = 0
+   if(_OPTIONS["with-version"]) then
+     local t = {}
+     for i in _OPTIONS["with-version"]:gmatch("([^.]+)") do
+       t[#t + 1], _ = i:gsub("%D+", "")
+     end
+     while #t < 4 do t[#t + 1] = 0 end
+     major = math.min(tonumber(t[1]), 255)
+     minor = math.min(tonumber(t[2]), 255)
+     build = math.min(tonumber(t[3]), 65535)
+     revision = math.min(tonumber(t[4]), 65535)
+   end
+   defines { "rsc_FileVersion_MAJOR=" .. major }
+   defines { "rsc_FileVersion_MINOR=" .. minor }
+   defines { "rsc_FileVersion_BUILD=" .. build }
+   defines { "rsc_FileVersion_REVISION=" .. revision }
+   defines { "rsc_FileVersion=\"" .. major .. "." .. minor .. "." .. build .. "\"" }
+   defines { "rsc_ProductVersion=\"" .. major .. "." .. minor .. "." .. build .. "\"" }
      
 project "Ultimate-ASI-Loader-Win32"
    kind "SharedLib"
@@ -159,15 +176,32 @@ workspace "Ultimate-ASI-Loader-x64"
    
    defines { "rsc_CompanyName=\"ThirteenAG\"" }
    defines { "rsc_LegalCopyright=\"MIT License\""} 
-   if(_OPTIONS["with-version"]) then
-      defines { "rsc_FileVersion=\"" .. _OPTIONS["with-version"] .. "\"", "rsc_ProductVersion=\"" .. _OPTIONS["with-version"] .. "\"" }
-   else
-      defines { "rsc_FileVersion=\"1.0.0.0\"", "rsc_ProductVersion=\"1.0.0.0\"" }
-   end
    defines { "rsc_InternalName=\"%{prj.name}\"", "rsc_ProductName=\"%{prj.name}\"", "rsc_OriginalFilename=\"%{prj.name}.dll\"" }
    defines { "rsc_FileDescription=\"Ultimate ASI Loader\"" }
    defines { "rsc_UpdateUrl=\"https://github.com/ThirteenAG/Ultimate-ASI-Loader\"" }
-   
+
+   local major = 1
+   local minor = 0
+   local build = 0
+   local revision = 0
+   if(_OPTIONS["with-version"]) then
+     local t = {}
+     for i in _OPTIONS["with-version"]:gmatch("([^.]+)") do
+       t[#t + 1], _ = i:gsub("%D+", "")
+     end
+     while #t < 4 do t[#t + 1] = 0 end
+     major = math.min(tonumber(t[1]), 255)
+     minor = math.min(tonumber(t[2]), 255)
+     build = math.min(tonumber(t[3]), 65535)
+     revision = math.min(tonumber(t[4]), 65535)
+   end
+   defines { "rsc_FileVersion_MAJOR=" .. major }
+   defines { "rsc_FileVersion_MINOR=" .. minor }
+   defines { "rsc_FileVersion_BUILD=" .. build }
+   defines { "rsc_FileVersion_REVISION=" .. revision }
+   defines { "rsc_FileVersion=\"" .. major .. "." .. minor .. "." .. build .. "\"" }
+   defines { "rsc_ProductVersion=\"" .. major .. "." .. minor .. "." .. build .. "\"" }
+
    defines { "X64" }
      
 project "Ultimate-ASI-Loader-x64"

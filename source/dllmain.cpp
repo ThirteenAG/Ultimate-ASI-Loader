@@ -193,7 +193,15 @@ enum Kernel32ExportsData
     Kernel32ExportsDataCount
 };
 
+enum OLE32ExportsNames
+{
+    eCoCreateInstance,
+
+    OLE32ExportsNamesCount
+};
+
 size_t Kernel32Data[Kernel32ExportsNamesCount][Kernel32ExportsDataCount];
+size_t OLE32Data[OLE32ExportsNamesCount][Kernel32ExportsDataCount];
 
 #if !X64
 #define IDR_VORBISF    101
@@ -749,12 +757,61 @@ std::filesystem::path GetFileName(auto lpFilename)
         return str1.starts_with(str2);
     };
 
+    static auto lexicallyRelativeCaseIns = [](const std::filesystem::path& path, const std::filesystem::path& base) -> std::filesystem::path
+    {
+        class input_iterator_range
+        {
+        public:
+            input_iterator_range(const std::filesystem::path::const_iterator& first, const std::filesystem::path::const_iterator& last)
+                : _first(first)
+                , _last(last)
+            {}
+            std::filesystem::path::const_iterator begin() const { return _first; }
+            std::filesystem::path::const_iterator end() const { return _last; }
+        private:
+            std::filesystem::path::const_iterator _first;
+            std::filesystem::path::const_iterator _last;
+        };
+
+        if (!iequals(path.root_name().wstring(), base.root_name().wstring()) || path.is_absolute() != base.is_absolute() || (!path.has_root_directory() && base.has_root_directory())) {
+            return std::filesystem::path();
+        }
+        std::filesystem::path::const_iterator a = path.begin(), b = base.begin();
+        while (a != path.end() && b != base.end() && iequals(a->wstring(), b->wstring())) {
+            ++a;
+            ++b;
+        }
+        if (a == path.end() && b == base.end()) {
+            return std::filesystem::path(".");
+        }
+        int count = 0;
+        for (const auto& element : input_iterator_range(b, base.end())) {
+            if (element != "." && element != "" && element != "..") {
+                ++count;
+            }
+            else if (element == "..") {
+                --count;
+            }
+        }
+        if (count < 0) {
+            return std::filesystem::path();
+        }
+        std::filesystem::path result;
+        for (int i = 0; i < count; ++i) {
+            result /= "..";
+        }
+        for (const auto& element : input_iterator_range(a, path.end())) {
+            result /= element;
+        }
+        return result;
+    };
+
     if (gamePath.empty())
         gamePath = std::filesystem::path(GetExeModulePath());
 
     auto filePath = std::filesystem::path(lpFilename);
     auto absolutePath = std::filesystem::absolute(filePath, ec);
-    auto relativePath = std::filesystem::canonical(absolutePath, ec).lexically_relative(gamePath);
+    auto relativePath = lexicallyRelativeCaseIns(absolutePath, gamePath);
     auto commonPath = gamePath;
 
     if (starts_with(relativePath, ".."))
@@ -899,7 +956,7 @@ HRESULT WINAPI CustomCoCreateInstance(REFCLSID rclsid, LPUNKNOWN pUnkOuter, DWOR
     else if (rclsid == CLSID_WinInet)
         hDll = ::LoadLibrary(L"wininet.dll");
 
-    if (hDll == NULL)
+    if (hDll == NULL || GetProcAddress(hDll, "IsUltimateASILoader") != NULL)
         return ::CoCreateInstance(rclsid, pUnkOuter, dwClsContext, riid, ppv);
 
     typedef HRESULT(__stdcall *pDllGetClassObject)(IN REFCLSID rclsid, IN REFIID riid, OUT LPVOID FAR* ppv);
@@ -1157,6 +1214,9 @@ bool HookKernel32IAT(HMODULE mod, bool exe)
 
     auto PatchCoCreateInstance = [&](size_t start, size_t end, size_t exe_end)
     {
+        if (iequals(GetSelfName(), L"dinput8.dll") || iequals(GetSelfName(), L"dinput.dll") || iequals(GetSelfName(), L"wininet.dll"))
+            return;
+
         for (size_t i = 0; i < nNumImports; i++)
         {
             if (hExecutableInstance + (pImports + i)->FirstThunk > start && !(end && hExecutableInstance + (pImports + i)->FirstThunk > end))
@@ -1170,6 +1230,9 @@ bool HookKernel32IAT(HMODULE mod, bool exe)
             end = exe_end;
         }
 
+        if (exe)
+            OLE32Data[eCoCreateInstance][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("OLE32.DLL")), "CoCreateInstance");
+
         for (auto i = start; i < end; i += sizeof(size_t))
         {
             DWORD dwProtect[2];
@@ -1179,8 +1242,9 @@ bool HookKernel32IAT(HMODULE mod, bool exe)
             if (!ptr)
                 continue;
 
-            if (ptr == (size_t)GetProcAddress(GetModuleHandle(TEXT("OLE32.DLL")), "CoCreateInstance"))
+            if (ptr == OLE32Data[eCoCreateInstance][ProcAddress])
             {
+                if (exe) OLE32Data[eCoCreateInstance][IATPtr] = i;
                 *(size_t*)i = (size_t)CustomCoCreateInstance;
                 VirtualProtect((size_t*)i, sizeof(size_t), dwProtect[0], &dwProtect[1]);
                 break;
@@ -1865,6 +1929,20 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID /*lpReserved*/)
     {
         hm = hModule;
         Init();
+    }
+    else if (reason == DLL_PROCESS_DETACH)
+    {
+        for (size_t i = 0; i < OLE32ExportsNamesCount; i++)
+        {
+            if (OLE32Data[i][IATPtr] && OLE32Data[i][ProcAddress])
+            {
+                auto ptr = (size_t*)OLE32Data[i][IATPtr];
+                DWORD dwProtect[2];
+                VirtualProtect(ptr, sizeof(size_t), PAGE_EXECUTE_READWRITE, &dwProtect[0]);
+                *ptr = OLE32Data[i][ProcAddress];
+                VirtualProtect(ptr, sizeof(size_t), dwProtect[0], &dwProtect[1]);
+            }
+        }
     }
     return TRUE;
 }
