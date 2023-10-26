@@ -1,3 +1,10 @@
+newoption {
+    trigger     = "with-version",
+    value       = "STRING",
+    description = "Current UAL version",
+    default     = "6.0.0",
+}
+
 -- x86
 workspace "Ultimate-ASI-Loader-Win32"
    configurations { "Release", "Debug" }
@@ -7,7 +14,11 @@ workspace "Ultimate-ASI-Loader-Win32"
    
    defines { "rsc_CompanyName=\"ThirteenAG\"" }
    defines { "rsc_LegalCopyright=\"MIT License\""} 
-   defines { "rsc_FileVersion=\"1.0.0.0\"", "rsc_ProductVersion=\"1.0.0.0\"" }
+   if(_OPTIONS["with-version"]) then
+      defines { "rsc_FileVersion=\"" .. _OPTIONS["with-version"] .. "\"", "rsc_ProductVersion=\"" .. _OPTIONS["with-version"] .. "\"" }
+   else
+      defines { "rsc_FileVersion=\"1.0.0.0\"", "rsc_ProductVersion=\"1.0.0.0\"" }
+   end
    defines { "rsc_InternalName=\"%{prj.name}\"", "rsc_ProductName=\"%{prj.name}\"", "rsc_OriginalFilename=\"%{prj.name}.dll\"" }
    defines { "rsc_FileDescription=\"Ultimate ASI Loader\"" }
    defines { "rsc_UpdateUrl=\"https://github.com/ThirteenAG/Ultimate-ASI-Loader\"" }
@@ -92,7 +103,7 @@ project "ExeUnprotect"
       defines { "NDEBUG" }
       optimize "On"
       staticruntime "On"
-	  
+      
 project "OverloadFromFolderDLL"
    kind "SharedLib"
    language "C++"
@@ -112,7 +123,32 @@ project "OverloadFromFolderDLL"
       defines { "NDEBUG" }
       optimize "On"
       staticruntime "On"
-      
+
+project "MonoLoader"
+   kind "SharedLib"
+   language "C++"
+   targetdir "bin/Win32/%{cfg.buildcfg}/scripts"
+   targetextension ".asi"
+   
+   files { "source/demo_plugins/MonoLoader.cpp" }
+   files { "source/resources/Versioninfo.rc" }
+
+   includedirs { "source/demo_plugins/minhook/include" }
+   includedirs { "source/demo_plugins/minhook/src" }
+   
+   files { "source/demo_plugins/minhook/include/**" }
+   files { "source/demo_plugins/minhook/src/**" }
+
+   characterset ("UNICODE")
+   
+   filter "configurations:Debug"
+      defines { "DEBUG" }
+      symbols "On"
+
+   filter "configurations:Release"
+      defines { "NDEBUG" }
+      optimize "On"
+      staticruntime "On"
       
 -- x64
 workspace "Ultimate-ASI-Loader-x64"
@@ -123,7 +159,11 @@ workspace "Ultimate-ASI-Loader-x64"
    
    defines { "rsc_CompanyName=\"ThirteenAG\"" }
    defines { "rsc_LegalCopyright=\"MIT License\""} 
-   defines { "rsc_FileVersion=\"1.0.0.0\"", "rsc_ProductVersion=\"1.0.0.0\"" }
+   if(_OPTIONS["with-version"]) then
+      defines { "rsc_FileVersion=\"" .. _OPTIONS["with-version"] .. "\"", "rsc_ProductVersion=\"" .. _OPTIONS["with-version"] .. "\"" }
+   else
+      defines { "rsc_FileVersion=\"1.0.0.0\"", "rsc_ProductVersion=\"1.0.0.0\"" }
+   end
    defines { "rsc_InternalName=\"%{prj.name}\"", "rsc_ProductName=\"%{prj.name}\"", "rsc_OriginalFilename=\"%{prj.name}.dll\"" }
    defines { "rsc_FileDescription=\"Ultimate ASI Loader\"" }
    defines { "rsc_UpdateUrl=\"https://github.com/ThirteenAG/Ultimate-ASI-Loader\"" }
@@ -194,7 +234,7 @@ project "MessageBox_x64"
       defines { "NDEBUG" }
       optimize "On"
       staticruntime "On"
-	  
+      
 project "OverloadFromFolderDLL_x64"
    kind "SharedLib"
    language "C++"
@@ -203,6 +243,32 @@ project "OverloadFromFolderDLL_x64"
    
    files { "source/demo_plugins/OverloadFromFolderDLL.cpp" }
    files { "source/resources/Versioninfo.rc" }
+
+   characterset ("UNICODE")
+   
+   filter "configurations:Debug"
+      defines { "DEBUG" }
+      symbols "On"
+
+   filter "configurations:Release"
+      defines { "NDEBUG" }
+      optimize "On"
+      staticruntime "On"
+
+project "MonoLoader_x64"
+   kind "SharedLib"
+   language "C++"
+   targetdir "bin/x64/%{cfg.buildcfg}/scripts"
+   targetextension ".asi"
+   
+   files { "source/demo_plugins/MonoLoader.cpp" }
+   files { "source/resources/Versioninfo.rc" }
+
+   includedirs { "source/demo_plugins/minhook/include" }
+   includedirs { "source/demo_plugins/minhook/src" }
+   
+   files { "source/demo_plugins/minhook/include/**" }
+   files { "source/demo_plugins/minhook/src/**" }
 
    characterset ("UNICODE")
    

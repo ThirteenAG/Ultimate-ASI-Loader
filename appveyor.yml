@@ -43,8 +43,9 @@ deploy:
   auth_token:
     secure: ugbti+bXX/7zqu39OyiPxgRPd2pQn2FEV/12ABees2fHfpZob0tWXzqD/zSYmibJ
   artifact: Ultimate-ASI-Loader.zip, Ultimate-ASI-Loader_x64.zip
+  prerelease: false
   on:
-    branch: master
+    branch: undefined
 - provider: GitHub
   tag: demo-plugins
   release: Ultimate ASI Loader Demo Plugins
@@ -54,4 +55,4 @@ deploy:
   artifact: RE7Demo.InfiniteAmmo-x64.zip, MessageBox-x64.zip, OverloadFromFolderDLL-x64.zip, ExeUnprotect-Win32.zip, MessageBox-Win32.zip, OverloadFromFolderDLL-Win32.zip, MonoLoader-Win32.zip, MonoLoader-x64.zip
   force_update: true
   on:
-    branch: /^(master|monoloader)$/
+    branch: master
