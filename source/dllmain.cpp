@@ -224,43 +224,83 @@ void LoadOriginalLibrary()
 
     if (iequals(szSelfName, L"dsound.dll"))
     {
-        dsound.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
+        szLocalPath += L"dsoundHooked.dll";
+        if (std::filesystem::exists(szLocalPath))
+            dsound.LoadOriginalLibrary(LoadLibraryW(szLocalPath));
+        else
+            dsound.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
     }
     else if (iequals(szSelfName, L"dinput8.dll"))
     {
-        dinput8.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
+        szLocalPath += L"dinput8Hooked.dll";
+        if (std::filesystem::exists(szLocalPath))
+            dinput8.LoadOriginalLibrary(LoadLibraryW(szLocalPath));
+        else
+            dinput8.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
     }
     else if (iequals(szSelfName, L"wininet.dll"))
     {
-        wininet.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
+        szLocalPath += L"wininetHooked.dll";
+        if (std::filesystem::exists(szLocalPath))
+            wininet.LoadOriginalLibrary(LoadLibraryW(szLocalPath));
+        else
+            wininet.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
     }
     else if (iequals(szSelfName, L"version.dll"))
     {
-        version.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
+        szLocalPath += L"versionHooked.dll";
+        if (std::filesystem::exists(szLocalPath))
+            version.LoadOriginalLibrary(LoadLibraryW(szLocalPath));
+        else
+            version.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
     }
     else if (iequals(szSelfName, L"d3d9.dll"))
     {
-        d3d9.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
+        szLocalPath += L"d3d9Hooked.dll";
+        if (std::filesystem::exists(szLocalPath))
+            d3d9.LoadOriginalLibrary(LoadLibraryW(szLocalPath));
+        else
+            d3d9.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
     }
     else if (iequals(szSelfName, L"d3d10.dll"))
     {
-        d3d10.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
+        szLocalPath += L"d3d10Hooked.dll";
+        if (std::filesystem::exists(szLocalPath))
+            d3d10.LoadOriginalLibrary(LoadLibraryW(szLocalPath));
+        else
+            d3d10.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
     }
     else if (iequals(szSelfName, L"d3d11.dll"))
     {
-        d3d11.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
+        szLocalPath += L"d3d11Hooked.dll";
+        if (std::filesystem::exists(szLocalPath))
+            d3d11.LoadOriginalLibrary(LoadLibraryW(szLocalPath));
+        else
+            d3d11.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
     }
     else if (iequals(szSelfName, L"d3d12.dll"))
     {
-        d3d12.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
+        szLocalPath += L"d3d12Hooked.dll";
+        if (std::filesystem::exists(szLocalPath))
+            d3d12.LoadOriginalLibrary(LoadLibraryW(szLocalPath));
+        else
+            d3d12.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
     } 
     else if (iequals(szSelfName, L"winmm.dll"))
     {
-        winmm.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
+        szLocalPath += L"winmmHooked.dll";
+        if (std::filesystem::exists(szLocalPath))
+            winmm.LoadOriginalLibrary(LoadLibraryW(szLocalPath));
+        else
+            winmm.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
     }
     else if (iequals(szSelfName, L"winhttp.dll"))
     {
-        winhttp.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
+        szLocalPath += L"winhttpHooked.dll";
+        if (std::filesystem::exists(szLocalPath))
+            winhttp.LoadOriginalLibrary(LoadLibraryW(szLocalPath));
+        else
+            winhttp.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
     }
     else
 #if !X64
@@ -301,25 +341,47 @@ void LoadOriginalLibrary()
     }
     else if (iequals(szSelfName, L"ddraw.dll"))
     {
-        ddraw.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
+        szLocalPath += L"ddrawHooked.dll";
+        if (std::filesystem::exists(szLocalPath))
+            ddraw.LoadOriginalLibrary(LoadLibraryW(szLocalPath));
+        else
+            ddraw.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
     }
     else if (iequals(szSelfName, L"d3d8.dll"))
     {
-        d3d8.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
-        if (GetPrivateProfileIntW(L"globalsets", L"used3d8to9", FALSE, iniPaths))
-            d3d8.Direct3DCreate8 = (FARPROC)Direct3DCreate8;
+        szLocalPath += L"d3d8Hooked.dll";
+        if (std::filesystem::exists(szLocalPath))
+            d3d8.LoadOriginalLibrary(LoadLibraryW(szLocalPath));
+        else
+        {
+            d3d8.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
+            if (GetPrivateProfileIntW(L"globalsets", L"used3d8to9", FALSE, iniPaths))
+                d3d8.Direct3DCreate8 = (FARPROC)Direct3DCreate8;
+        }
     }
     else if (iequals(szSelfName, L"msacm32.dll"))
     {
-        msacm32.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
+        szLocalPath += L"msacm32Hooked.dll";
+        if (std::filesystem::exists(szLocalPath))
+            msacm32.LoadOriginalLibrary(LoadLibraryW(szLocalPath));
+        else
+            msacm32.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
     }
     else if (iequals(szSelfName, L"dinput.dll"))
     {
-        dinput.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
+        szLocalPath += L"dinputHooked.dll";
+        if (std::filesystem::exists(szLocalPath))
+            dinput.LoadOriginalLibrary(LoadLibraryW(szLocalPath));
+        else
+            dinput.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
     }
     else if (iequals(szSelfName, L"msvfw32.dll"))
     {
-        msvfw32.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
+        szLocalPath += L"msvfw32Hooked.dll";
+        if (std::filesystem::exists(szLocalPath))
+            msvfw32.LoadOriginalLibrary(LoadLibraryW(szLocalPath));
+        else
+            msvfw32.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
     }
     else if (iequals(szSelfName, L"binkw32.dll"))
     {

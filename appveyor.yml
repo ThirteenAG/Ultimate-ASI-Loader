@@ -6,7 +6,7 @@ install:
 - cmd: >-
     git submodule update --init --recursive
 
-    premake5.bat
+    premake5.exe vs2022 --with-version=%APPVEYOR_BUILD_VERSION%
 build:
   project: build/Ultimate-ASI-Loader-Win32.sln
   verbosity: minimal
