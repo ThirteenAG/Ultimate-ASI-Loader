@@ -175,6 +175,7 @@ enum Kernel32ExportsNames
     eGetCurrentProcessId,
     eGetCommandLineA,
     eGetCommandLineW,
+    eAcquireSRWLockExclusive,
     eCreateFileA,
     eCreateFileW,
     eGetFileAttributesA,
@@ -808,6 +809,12 @@ LPWSTR WINAPI CustomGetCommandLineW()
     return GetCommandLineW();
 }
 
+void WINAPI CustomAcquireSRWLockExclusive(PSRWLOCK SRWLock)
+{
+    LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress());
+    return AcquireSRWLockExclusive(SRWLock);
+}
+
 std::filesystem::path GetFileName(auto lpFilename)
 {
     std::error_code ec;
@@ -1073,6 +1080,7 @@ bool HookKernel32IAT(HMODULE mod, bool exe)
         Kernel32Data[eGetCurrentProcessId][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "GetCurrentProcessId");
         Kernel32Data[eGetCommandLineA][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "GetCommandLineA");
         Kernel32Data[eGetCommandLineW][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "GetCommandLineW");
+        Kernel32Data[eAcquireSRWLockExclusive][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "AcquireSRWLockExclusive");
         Kernel32Data[eCreateFileA][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "CreateFileA");
         Kernel32Data[eCreateFileW][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "CreateFileW");
         Kernel32Data[eGetFileAttributesA][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "GetFileAttributesA");
@@ -1225,6 +1233,12 @@ bool HookKernel32IAT(HMODULE mod, bool exe)
             {
                 if (exe) Kernel32Data[eGetCommandLineW][IATPtr] = i;
                 *(size_t*)i = (size_t)CustomGetCommandLineW;
+                matchedImports++;
+            }
+            else if (ptr == Kernel32Data[eAcquireSRWLockExclusive][ProcAddress])
+            {
+                if (exe) Kernel32Data[eAcquireSRWLockExclusive][IATPtr] = i;
+                *(size_t*)i = (size_t)CustomAcquireSRWLockExclusive;
                 matchedImports++;
             }
             else if (ptr == Kernel32Data[eCreateFileA][ProcAddress])
