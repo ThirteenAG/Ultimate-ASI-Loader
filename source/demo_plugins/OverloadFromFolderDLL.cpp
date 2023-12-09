@@ -2,11 +2,17 @@
 #include <mutex>
 #include <functional>
 #include <vector>
+#include <map>
+#include <string>
+#include <future>
 #include <subauth.h>
 #include "../../external/ModuleList/ModuleList.hpp"
 
 HMODULE hm = NULL;
 HMODULE ual = NULL;
+std::vector<std::wstring> extraDLLs = { 
+    L"_nvngx.dll", L"dxilconv.dll" // for nvngx_dlss.dll loading
+};
 
 class DllCallbackHandler
 {
@@ -129,117 +135,259 @@ typedef DWORD(WINAPI* tGetFileAttributesA)(LPCSTR lpFileName);
 typedef DWORD(WINAPI* tGetFileAttributesW)(LPCWSTR lpFileName);
 typedef BOOL(WINAPI* tGetFileAttributesExA)(LPCSTR lpFileName, GET_FILEEX_INFO_LEVELS fInfoLevelId, LPVOID lpFileInformation);
 typedef BOOL(WINAPI* tGetFileAttributesExW)(LPCWSTR lpFileName, GET_FILEEX_INFO_LEVELS fInfoLevelId, LPVOID lpFileInformation);
+typedef HMODULE(WINAPI* tCustomLoadLibraryExA)(LPCSTR lpLibFileName, HANDLE hFile, DWORD dwFlags);
+typedef HMODULE(WINAPI* tCustomLoadLibraryExW)(LPCWSTR lpLibFileName, HANDLE hFile, DWORD dwFlags);
+typedef HMODULE(WINAPI* tCustomLoadLibraryA)(LPCSTR lpLibFileName);
+typedef HMODULE(WINAPI* tCustomLoadLibraryW)(LPCWSTR lpLibFileName);
 tCreateFileA ptrCreateFileA;
 tCreateFileW ptrCreateFileW;
 tGetFileAttributesA ptrGetFileAttributesA;
 tGetFileAttributesW ptrGetFileAttributesW;
 tGetFileAttributesExA ptrGetFileAttributesExA;
 tGetFileAttributesExW ptrGetFileAttributesExW;
+tCustomLoadLibraryExA ptrLoadLibraryExA;
+tCustomLoadLibraryExW ptrLoadLibraryExW;
+tCustomLoadLibraryA ptrLoadLibraryA;
+tCustomLoadLibraryW ptrLoadLibraryW;
 
-PIMAGE_SECTION_HEADER getSection(const PIMAGE_NT_HEADERS nt_headers, unsigned section)
+class IATHook
 {
-    return reinterpret_cast<PIMAGE_SECTION_HEADER>(
-        (UCHAR*)nt_headers->OptionalHeader.DataDirectory +
-        nt_headers->OptionalHeader.NumberOfRvaAndSizes * sizeof(IMAGE_DATA_DIRECTORY) +
-        section * sizeof(IMAGE_SECTION_HEADER));
-}
-
-auto getSectionEnd(IMAGE_NT_HEADERS* ntHeader, size_t inst)
-{
-    auto sec = getSection(ntHeader, ntHeader->FileHeader.NumberOfSections - 1);
-    // .bind section may have vanished from the executable (test case: Yakuza 4)
-    // so back to the first valid section if that happened
-    while (sec->Misc.VirtualSize == 0) sec--;
-
-    auto secSize = max(sec->SizeOfRawData, sec->Misc.VirtualSize);
-    auto end = inst + max(sec->PointerToRawData, sec->VirtualAddress) + secSize;
-    return end;
-}
-
-bool HookKernel32IATForOverride(HMODULE mod)
-{
-    auto hExecutableInstance = (size_t)mod;
-    IMAGE_NT_HEADERS* ntHeader = (IMAGE_NT_HEADERS*)(hExecutableInstance + ((IMAGE_DOS_HEADER*)hExecutableInstance)->e_lfanew);
-    IMAGE_IMPORT_DESCRIPTOR* pImports = (IMAGE_IMPORT_DESCRIPTOR*)(hExecutableInstance + ntHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress);
-    size_t nNumImports = ntHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].Size / sizeof(IMAGE_IMPORT_DESCRIPTOR) - 1;
-
-    uint32_t matchedImports = 0;
-
-    auto PatchIAT = [&](size_t start, size_t end, size_t exe_end)
+public:
+    template <class... Ts>
+    static auto Replace(HMODULE target_module, std::string_view dll_name, Ts&& ... inputs)
     {
-        for (size_t i = 0; i < nNumImports; i++)
+        std::map<std::string, std::future<void*>> originalPtrs;
+
+        const DWORD_PTR instance = reinterpret_cast<DWORD_PTR>(target_module);
+        const PIMAGE_NT_HEADERS ntHeader = reinterpret_cast<PIMAGE_NT_HEADERS>(instance + reinterpret_cast<PIMAGE_DOS_HEADER>(instance)->e_lfanew);
+        PIMAGE_IMPORT_DESCRIPTOR pImports = reinterpret_cast<PIMAGE_IMPORT_DESCRIPTOR>(instance + ntHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress);
+        DWORD dwProtect[2];
+
+        for (; pImports->Name != 0; pImports++)
         {
-            if (hExecutableInstance + (pImports + i)->FirstThunk > start && !(end && hExecutableInstance + (pImports + i)->FirstThunk > end))
-                end = hExecutableInstance + (pImports + i)->FirstThunk;
+            if (_stricmp(reinterpret_cast<const char*>(instance + pImports->Name), dll_name.data()) == 0)
+            {
+                if (pImports->OriginalFirstThunk != 0)
+                {
+                    const PIMAGE_THUNK_DATA pThunk = reinterpret_cast<PIMAGE_THUNK_DATA>(instance + pImports->OriginalFirstThunk);
+
+                    for (ptrdiff_t j = 0; pThunk[j].u1.AddressOfData != 0; j++)
+                    {
+                        auto pAddress = reinterpret_cast<void**>(instance + pImports->FirstThunk) + j;
+                        if (!pAddress) continue;
+                        VirtualProtect(pAddress, sizeof(pAddress), PAGE_EXECUTE_READWRITE, &dwProtect[0]);
+                        ([&]
+                        {
+                            auto name = std::string_view(std::get<0>(inputs));
+                            auto newAddr = std::get<1>(inputs);
+                            auto num = std::string("-1");
+                            if (name.contains("@")) {
+                                num = name.substr(name.find_last_of("@") + 1);
+                                name = name.substr(0, name.find_last_of("@"));
+                            }
+
+                            if (pThunk[j].u1.Ordinal & IMAGE_ORDINAL_FLAG)
+                            {
+                                try
+                                {
+                                    if (newAddr && IMAGE_ORDINAL(pThunk[j].u1.Ordinal) == std::stoi(num.data()))
+                                    {
+                                        originalPtrs[std::get<0>(inputs)] = std::async(std::launch::deferred, [&]() -> void* { return *pAddress; });
+                                        originalPtrs[std::get<0>(inputs)].wait();
+                                        *pAddress = newAddr;
+                                    }
+                                }
+                                catch (...) {}
+                            }
+                            else if ((newAddr && *pAddress && *pAddress == (void*)GetProcAddress(GetModuleHandleA(dll_name.data()), name.data())) ||
+                            (strcmp(reinterpret_cast<PIMAGE_IMPORT_BY_NAME>(instance + pThunk[j].u1.AddressOfData)->Name, name.data()) == 0))
+                            {
+                                originalPtrs[std::get<0>(inputs)] = std::async(std::launch::deferred, [&]() -> void* { return *pAddress; });
+                                originalPtrs[std::get<0>(inputs)].wait();
+                                *pAddress = newAddr;
+                            }
+                        } (), ...);
+                        VirtualProtect(pAddress, sizeof(pAddress), dwProtect[0], &dwProtect[1]);
+                    }
+                }
+                else
+                {
+                    auto pFunctions = reinterpret_cast<void**>(instance + pImports->FirstThunk);
+
+                    for (ptrdiff_t j = 0; pFunctions[j] != nullptr; j++)
+                    {
+                        auto pAddress = reinterpret_cast<void**>(pFunctions[j]);
+                        VirtualProtect(pAddress, sizeof(pAddress), PAGE_EXECUTE_READWRITE, &dwProtect[0]);
+                        ([&]
+                        {
+                            auto newAddr = std::get<1>(inputs);
+                            if (newAddr && *pAddress && *pAddress == (void*)GetProcAddress(GetModuleHandleA(dll_name.data()), std::get<0>(inputs)))
+                            {
+                                originalPtrs[std::get<0>(inputs)] = std::async(std::launch::deferred, [&]() -> void* { return *pAddress; });
+                                originalPtrs[std::get<0>(inputs)].wait();
+                                *pAddress = newAddr;
+                            }
+                        } (), ...);
+                        VirtualProtect(pAddress, sizeof(pAddress), dwProtect[0], &dwProtect[1]);
+                    }
+                }
+            }
         }
 
-        if (!end) { end = start + 0x100; }
-        if (end > exe_end) //for very broken exes
+        if (originalPtrs.empty())
         {
-            start = hExecutableInstance;
-            end = exe_end;
+            PIMAGE_DELAYLOAD_DESCRIPTOR pDelayed = reinterpret_cast<PIMAGE_DELAYLOAD_DESCRIPTOR>(instance + ntHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_DELAY_IMPORT].VirtualAddress);
+            if (pDelayed)
+            {
+                for (; pDelayed->DllNameRVA != 0; pDelayed++)
+                {
+                    if (_stricmp(reinterpret_cast<const char*>(instance + pDelayed->DllNameRVA), dll_name.data()) == 0)
+                    {
+                        if (pDelayed->ImportAddressTableRVA != 0)
+                        {
+                            const PIMAGE_THUNK_DATA pThunk = reinterpret_cast<PIMAGE_THUNK_DATA>(instance + pDelayed->ImportNameTableRVA);
+                            const PIMAGE_THUNK_DATA pFThunk = reinterpret_cast<PIMAGE_THUNK_DATA>(instance + pDelayed->ImportAddressTableRVA);
+
+                            for (ptrdiff_t j = 0; pThunk[j].u1.AddressOfData != 0; j++)
+                            {
+                                auto pAddress = reinterpret_cast<void**>(pFThunk[j].u1.Function);
+                                if (!pAddress) continue;
+                                if (pThunk[j].u1.Ordinal & IMAGE_ORDINAL_FLAG)
+                                    pAddress = *reinterpret_cast<void***>(pFThunk[j].u1.Function + 1); // mov     eax, offset *
+
+                                VirtualProtect(pAddress, sizeof(pAddress), PAGE_EXECUTE_READWRITE, &dwProtect[0]);
+                                ([&]
+                                {
+                                    auto name = std::string_view(std::get<0>(inputs));
+                                    auto newAddr = std::get<1>(inputs);
+                                    auto num = std::string("-1");
+                                    if (name.contains("@")) {
+                                        num = name.substr(name.find_last_of("@") + 1);
+                                        name = name.substr(0, name.find_last_of("@"));
+                                    }
+
+                                    if (pThunk[j].u1.Ordinal & IMAGE_ORDINAL_FLAG)
+                                    {
+                                        try
+                                        {
+                                            if (newAddr && IMAGE_ORDINAL(pThunk[j].u1.Ordinal) == std::stoi(num.data()))
+                                            {
+                                                originalPtrs[std::get<0>(inputs)] = std::async(std::launch::async,
+                                                [](void** pAddress, void* value, PVOID instance) -> void*
+                                                {
+                                                    DWORD dwProtect[2];
+                                                    VirtualProtect(pAddress, sizeof(pAddress), PAGE_EXECUTE_READWRITE, &dwProtect[0]);
+                                                    MEMORY_BASIC_INFORMATION mbi;
+                                                    mbi.AllocationBase = instance;
+                                                    do
+                                                    {
+                                                        VirtualQuery(*pAddress, &mbi, sizeof(MEMORY_BASIC_INFORMATION));
+                                                        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                                                    } while (mbi.AllocationBase == instance);
+                                                    auto r = *pAddress;
+                                                    *pAddress = value;
+                                                    VirtualProtect(pAddress, sizeof(pAddress), dwProtect[0], &dwProtect[1]);
+                                                    return r;
+                                                }, pAddress, newAddr, (PVOID)instance);
+                                            }
+                                        }
+                                        catch (...) {}
+                                    }
+                                    else if ((newAddr && *pAddress && *pAddress == (void*)GetProcAddress(GetModuleHandleA(dll_name.data()), name.data())) ||
+                                    (strcmp(reinterpret_cast<PIMAGE_IMPORT_BY_NAME>(instance + pThunk[j].u1.AddressOfData)->Name, name.data()) == 0))
+                                    {
+                                        originalPtrs[std::get<0>(inputs)] = std::async(std::launch::async,
+                                        [](void** pAddress, void* value, PVOID instance) -> void*
+                                        {
+                                            DWORD dwProtect[2];
+                                            VirtualProtect(pAddress, sizeof(pAddress), PAGE_EXECUTE_READWRITE, &dwProtect[0]);
+                                            MEMORY_BASIC_INFORMATION mbi;
+                                            mbi.AllocationBase = instance;
+                                            do
+                                            {
+                                                VirtualQuery(*pAddress, &mbi, sizeof(MEMORY_BASIC_INFORMATION));
+                                                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                                            } while (mbi.AllocationBase == instance);
+                                            auto r = *pAddress;
+                                            *pAddress = value;
+                                            VirtualProtect(pAddress, sizeof(pAddress), dwProtect[0], &dwProtect[1]);
+                                            return r;
+                                        }, pAddress, newAddr, (PVOID)instance);
+                                    }
+                                } (), ...);
+                                VirtualProtect(pAddress, sizeof(pAddress), dwProtect[0], &dwProtect[1]);
+                            }
+                        }
+                    }
+                }
+            }
         }
 
-        for (auto i = start; i < end; i += sizeof(size_t))
+        if (originalPtrs.empty()) // e.g. re5dx9.exe steam
         {
-            DWORD dwProtect[2];
-            VirtualProtect((size_t*)i, sizeof(size_t), PAGE_EXECUTE_READWRITE, &dwProtect[0]);
+            static auto getSection = [](const PIMAGE_NT_HEADERS nt_headers, unsigned section) -> PIMAGE_SECTION_HEADER
+            {
+                return reinterpret_cast<PIMAGE_SECTION_HEADER>(
+                    (UCHAR*)nt_headers->OptionalHeader.DataDirectory +
+                    nt_headers->OptionalHeader.NumberOfRvaAndSizes * sizeof(IMAGE_DATA_DIRECTORY) +
+                    section * sizeof(IMAGE_SECTION_HEADER));
+            };
 
-            auto ptr = *(size_t*)i;
-            if (!ptr)
-                continue;
+            for (auto i = 0; i < ntHeader->FileHeader.NumberOfSections; i++)
+            {
+                auto sec = getSection(ntHeader, i);
+                auto pFunctions = reinterpret_cast<void**>(instance + max(sec->PointerToRawData, sec->VirtualAddress));
 
-            if (ptr == (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "CreateFileA"))
-            {
-                *(size_t*)i = (size_t)ptrCreateFileA;
-                matchedImports++;
-            }
-            else if (ptr == (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "CreateFileW"))
-            {
-                *(size_t*)i = (size_t)ptrCreateFileW;
-                matchedImports++;
-            }
-            else if (ptrGetFileAttributesA && ptr == (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "GetFileAttributesA"))
-            {
-                *(size_t*)i = (size_t)ptrGetFileAttributesA;
-                matchedImports++;
-            }
-            else if (ptrGetFileAttributesW && ptr == (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "GetFileAttributesW"))
-            {
-                *(size_t*)i = (size_t)ptrGetFileAttributesW;
-                matchedImports++;
-            }
-            else if (ptrGetFileAttributesExA && ptr == (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "GetFileAttributesExA"))
-            {
-                *(size_t*)i = (size_t)ptrGetFileAttributesExA;
-                matchedImports++;
-            }
-            else if (ptrGetFileAttributesExW && ptr == (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "GetFileAttributesExW"))
-            {
-                *(size_t*)i = (size_t)ptrGetFileAttributesExW;
-                matchedImports++;
-            }
+                for (ptrdiff_t j = 0; j < 300; j++)
+                {
+                    auto pAddress = reinterpret_cast<void**>(&pFunctions[j]);
+                    VirtualProtect(pAddress, sizeof(pAddress), PAGE_EXECUTE_READWRITE, &dwProtect[0]);
+                    ([&]
+                    {
+                        auto name = std::string_view(std::get<0>(inputs));
+                        auto newAddr = std::get<1>(inputs);
+                        auto num = std::string("-1");
+                        if (name.contains("@")) {
+                            num = name.substr(name.find_last_of("@") + 1);
+                            name = name.substr(0, name.find_last_of("@"));
+                        }
 
-            VirtualProtect((size_t*)i, sizeof(size_t), dwProtect[0], &dwProtect[1]);
+                        if (newAddr && *pAddress && *pAddress == (void*)GetProcAddress(GetModuleHandleA(dll_name.data()), name.data()))
+                        {
+                            originalPtrs[std::get<0>(inputs)] = std::async(std::launch::deferred, [&]() -> void* { return *pAddress; });
+                            originalPtrs[std::get<0>(inputs)].wait();
+                            *pAddress = newAddr;
+                        }
+                    } (), ...);
+                    VirtualProtect(pAddress, sizeof(pAddress), dwProtect[0], &dwProtect[1]);
+                }
+
+                if (!originalPtrs.empty())
+                    return originalPtrs;
+            }
         }
-    };
 
-    auto hExecutableInstance_end = getSectionEnd(ntHeader, hExecutableInstance);
-
-    // Find kernel32.dll
-    for (size_t i = 0; i < nNumImports; i++)
-    {
-        if ((size_t)(hExecutableInstance + (pImports + i)->Name) < hExecutableInstance_end)
-        {
-            if (!_stricmp((const char*)(hExecutableInstance + (pImports + i)->Name), "KERNEL32.DLL"))
-                PatchIAT(hExecutableInstance + (pImports + i)->FirstThunk, 0, hExecutableInstance_end);
-        }
+        return originalPtrs;
     }
+};
 
-    return matchedImports > 0;
+void HookKernel32IATForOverride(HMODULE mod)
+{
+    IATHook::Replace(mod, "KERNEL32.DLL",
+        std::forward_as_tuple("CreateFileA", ptrCreateFileA),
+        std::forward_as_tuple("CreateFileW", ptrCreateFileW),
+        std::forward_as_tuple("GetFileAttributesA", ptrGetFileAttributesA),
+        std::forward_as_tuple("GetFileAttributesW", ptrGetFileAttributesW),
+        std::forward_as_tuple("GetFileAttributesExA", ptrGetFileAttributesExA),
+        std::forward_as_tuple("GetFileAttributesExW", ptrGetFileAttributesExW),
+        std::forward_as_tuple("LoadLibraryExA", ptrLoadLibraryExA),
+        std::forward_as_tuple("LoadLibraryExW", ptrLoadLibraryExW),
+        std::forward_as_tuple("LoadLibraryA", ptrLoadLibraryA),
+        std::forward_as_tuple("LoadLibraryW", ptrLoadLibraryW)
+    );
 }
 
-void OverrideCreateFileInDLLs(HMODULE mod)
+void OverrideInDLLs(HMODULE mod)
 {
     ModuleList dlls;
     dlls.Enumerate(ModuleList::SearchLocation::LocalOnly);
@@ -247,6 +395,12 @@ void OverrideCreateFileInDLLs(HMODULE mod)
     {
         auto m = std::get<HMODULE>(e);
         if (m == mod && m != ual && m != hm && m != GetModuleHandle(NULL))
+            HookKernel32IATForOverride(mod);
+    }
+
+    for (auto& e : extraDLLs)
+    {
+        if (mod == GetModuleHandle(e.c_str()))
             HookKernel32IATForOverride(mod);
     }
 }
@@ -267,6 +421,11 @@ extern "C" __declspec(dllexport) void InitializeASI()
             auto pGetFileAttributesW = (tGetFileAttributesW)GetProcAddress(m, "CustomGetFileAttributesW");
             auto pGetFileAttributesExA = (tGetFileAttributesExA)GetProcAddress(m, "CustomGetFileAttributesExA");
             auto pGetFileAttributesExW = (tGetFileAttributesExW)GetProcAddress(m, "CustomGetFileAttributesExW");
+            auto pLoadLibraryExA = (tCustomLoadLibraryExA)GetProcAddress(m, "CustomLoadLibraryExA");
+            auto pLoadLibraryExW = (tCustomLoadLibraryExW)GetProcAddress(m, "CustomLoadLibraryExW");
+            auto pLoadLibraryA = (tCustomLoadLibraryA)GetProcAddress(m, "CustomLoadLibraryA");
+            auto pLoadLibraryW = (tCustomLoadLibraryW)GetProcAddress(m, "CustomLoadLibraryW");
+            auto GetMemoryModule = (HMODULE(WINAPI*)())GetProcAddress(m, "GetMemoryModule");
             if (pCreateFileA && pCreateFileW)
             {
                 ual = m;
@@ -280,19 +439,49 @@ extern "C" __declspec(dllexport) void InitializeASI()
                     ptrGetFileAttributesExA = pGetFileAttributesExA;
                 if (pGetFileAttributesExW)
                     ptrGetFileAttributesExW = pGetFileAttributesExW;
+                if (pLoadLibraryExA)
+                    ptrLoadLibraryExA = pLoadLibraryExA;
+                if (pLoadLibraryExW)
+                    ptrLoadLibraryExW = pLoadLibraryExW;
+                if (pLoadLibraryA)
+                    ptrLoadLibraryA = pLoadLibraryA;
+                if (pLoadLibraryW)
+                    ptrLoadLibraryW = pLoadLibraryW;
+
+                for (auto& e : dlls.m_moduleList)
+                {
+                    auto m = std::get<HMODULE>(e);
+                    if (m != ual && m != hm && m != GetModuleHandle(NULL))
+                        HookKernel32IATForOverride(m);
+                    else if (m == ual && GetMemoryModule)
+                    {
+                        if (GetMemoryModule())
+                        {
+                            auto ptr = *reinterpret_cast<uintptr_t*>(GetMemoryModule());
+                            if (*reinterpret_cast<uint16_t*>(ptr) == 0x4550) //IMAGE_NT_SIGNATURE
+                            {
+                                for (size_t i = 0; i <= 0xF0; i++)
+                                {
+                                    auto hModule = reinterpret_cast<PIMAGE_DOS_HEADER>(ptr - i);
+                                    if (hModule->e_magic == IMAGE_DOS_SIGNATURE)
+                                        HookKernel32IATForOverride((HMODULE)hModule);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                for (auto& e : extraDLLs)
+                {
+                    auto m = GetModuleHandle(e.c_str());
+                    if (m)
+                        HookKernel32IATForOverride(m);
+                }
+
+                DllCallbackHandler::RegisterCallback(OverrideInDLLs);
+
                 break;
             }
-        }
-
-        if (ptrCreateFileA && ptrCreateFileW)
-        {
-            for (auto& e : dlls.m_moduleList)
-            {
-                auto m = std::get<HMODULE>(e);
-                if (m != ual && m != hm && m != GetModuleHandle(NULL))
-                    HookKernel32IATForOverride(m);
-            }
-            DllCallbackHandler::RegisterCallback(OverrideCreateFileInDLLs);
         }
     });
 }

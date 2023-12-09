@@ -1,12 +1,17 @@
 LIBRARY "UAL"
 EXPORTS
 IsUltimateASILoader = IsUltimateASILoader
+GetMemoryModule = GetMemoryModule
 CustomCreateFileA = CustomCreateFileA
 CustomCreateFileW = CustomCreateFileW
 CustomGetFileAttributesA = CustomGetFileAttributesA
 CustomGetFileAttributesW = CustomGetFileAttributesW
 CustomGetFileAttributesExA = CustomGetFileAttributesExA
 CustomGetFileAttributesExW = CustomGetFileAttributesExW
+CustomLoadLibraryExA = CustomLoadLibraryExA
+CustomLoadLibraryExW = CustomLoadLibraryExW
+CustomLoadLibraryA = CustomLoadLibraryA
+CustomLoadLibraryW = CustomLoadLibraryW
 
 LIBRARY "vorbisfile"
 EXPORTS

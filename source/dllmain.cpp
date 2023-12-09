@@ -5,7 +5,7 @@
 
 #if !X64
 #include <d3d8to9\source\d3d8to9.hpp>
-extern "C" Direct3D8 *WINAPI Direct3DCreate8(UINT SDKVersion);
+extern "C" Direct3D8* WINAPI Direct3DCreate8(UINT SDKVersion);
 #endif
 
 bool WINAPI IsUltimateASILoader()
@@ -13,10 +13,17 @@ bool WINAPI IsUltimateASILoader()
     return true;
 }
 
+void* ogMemModule = NULL;
+void* WINAPI GetMemoryModule()
+{
+    return ogMemModule;
+}
+
 HMODULE hm;
 std::vector<std::wstring> iniPaths;
 std::filesystem::path sFileLoaderPath;
 std::filesystem::path gamePath;
+std::wstring sLoadFromAPI;
 
 bool iequals(std::wstring_view s1, std::wstring_view s2)
 {
@@ -47,11 +54,6 @@ std::wstring SHGetKnownFolderPath(REFKNOWNFOLDERID rfid, DWORD dwFlags, HANDLE h
     CoTaskMemFree(szSystemPath);
     return r;
 };
-
-HMODULE LoadLibraryW(const std::wstring& lpLibFileName)
-{
-    return LoadLibraryW(lpLibFileName.c_str());
-}
 
 std::wstring GetCurrentDirectoryW()
 {
@@ -163,6 +165,8 @@ enum Kernel32ExportsNames
     eGetShortPathNameA,
     eFindNextFileA,
     eFindNextFileW,
+    eLoadLibraryExA,
+    eLoadLibraryExW,
     eLoadLibraryA,
     eLoadLibraryW,
     eFreeLibrary,
@@ -214,6 +218,7 @@ size_t OLE32Data[OLE32ExportsNamesCount][Kernel32ExportsDataCount];
 #define IDR_BINK01994I 108
 #endif
 
+HMODULE LoadLibraryW(const std::wstring& lpLibFileName);
 static LONG OriginalLibraryLoaded = 0;
 void LoadOriginalLibrary()
 {
@@ -326,7 +331,7 @@ void LoadOriginalLibrary()
                         size_t dwResourceSize = SizeofResource(hm, hResource);
                         if (0 != dwResourceSize)
                         {
-                            vorbisfile.LoadOriginalLibrary(MemoryLoadLibrary((const void*)pLockedResource, dwResourceSize), true);
+                            vorbisfile.LoadOriginalLibrary(ogMemModule = MemoryLoadLibrary((const void*)pLockedResource, dwResourceSize), true);
 
                             // Unprotect the module NOW (CLEO 4.1.1.30f crash fix)
                             auto hExecutableInstance = (size_t)GetModuleHandle(NULL);
@@ -424,7 +429,7 @@ void LoadOriginalLibrary()
                         size_t dwResourceSize = SizeofResource(hm, hResource);
                         if (0 != dwResourceSize)
                         {
-                            binkw32.LoadOriginalLibrary(MemoryLoadLibrary((const void*)pLockedResource, dwResourceSize), true);
+                            binkw32.LoadOriginalLibrary(ogMemModule = MemoryLoadLibrary((const void*)pLockedResource, dwResourceSize), true);
                         }
                     }
                 }
@@ -605,7 +610,7 @@ void LoadPlugins()
                     DWORD dwResourceSize = SizeofResource(hm, hResource);
                     if (0 != dwResourceSize)
                     {
-                        MemoryLoadLibrary((const void*)pLockedResource, dwResourceSize);
+                        ogMemModule = MemoryLoadLibrary((const void*)pLockedResource, dwResourceSize);
                     }
                 }
             }
@@ -631,6 +636,11 @@ void LoadPlugins()
 
         if (SetCurrentDirectoryW(L"plugins\\"))
             FindFiles(&fd);
+
+        SetCurrentDirectoryW(szSelfPath.c_str());
+
+        if (SetCurrentDirectoryW(L"update\\"))
+            FindFiles(&fd);
     }
 
     SetCurrentDirectoryW(oldDir.c_str()); // Reset the current directory
@@ -649,8 +659,11 @@ void LoadEverything()
 }
 
 static LONG RestoredOnce = 0;
-void LoadPluginsAndRestoreIAT(uintptr_t retaddr)
+void LoadPluginsAndRestoreIAT(uintptr_t retaddr, std::wstring_view calledFrom = L"")
 {
+    if (!sLoadFromAPI.empty() && calledFrom != sLoadFromAPI)
+        return;
+
     bool calledFromBind = false;
 
     //steam drm check
@@ -666,11 +679,10 @@ void LoadPluginsAndRestoreIAT(uintptr_t retaddr)
 
     if (_InterlockedCompareExchange(&RestoredOnce, 1, 0) != 0) return;
 
-    LoadEverything();
-
     for (size_t i = 0; i < Kernel32ExportsNamesCount; i++)
     {
-        if (!sFileLoaderPath.empty() && (i == eCreateFileA || i == eCreateFileW 
+        if (!sFileLoaderPath.empty() && (i == eCreateFileA || i == eCreateFileW
+            || i == eLoadLibraryExA || i == eLoadLibraryExW || i == eLoadLibraryA || i == eLoadLibraryW
             || i == eGetFileAttributesA || i == eGetFileAttributesW || i == eGetFileAttributesExA || i == eGetFileAttributesExW))
             continue;
 
@@ -683,136 +695,8 @@ void LoadPluginsAndRestoreIAT(uintptr_t retaddr)
             VirtualProtect(ptr, sizeof(size_t), dwProtect[0], &dwProtect[1]);
         }
     }
-}
 
-void WINAPI CustomGetStartupInfoA(LPSTARTUPINFOA lpStartupInfo)
-{
-    LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress());
-    return GetStartupInfoA(lpStartupInfo);
-}
-
-void WINAPI CustomGetStartupInfoW(LPSTARTUPINFOW lpStartupInfo)
-{
-    LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress());
-    return GetStartupInfoW(lpStartupInfo);
-}
-
-HMODULE WINAPI CustomGetModuleHandleA(LPCSTR lpModuleName)
-{
-    LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress());
-    return GetModuleHandleA(lpModuleName);
-}
-
-HMODULE WINAPI CustomGetModuleHandleW(LPCWSTR lpModuleName)
-{
-    LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress());
-    return GetModuleHandleW(lpModuleName);
-}
-
-FARPROC WINAPI CustomGetProcAddress(HMODULE hModule, LPCSTR lpProcName)
-{
-    LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress());
-    return GetProcAddress(hModule, lpProcName);
-}
-
-DWORD WINAPI CustomGetShortPathNameA(LPCSTR lpszLongPath, LPSTR lpszShortPath, DWORD cchBuffer)
-{
-    LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress());
-    return GetShortPathNameA(lpszLongPath, lpszShortPath, cchBuffer);
-}
-
-BOOL WINAPI CustomFindNextFileA(HANDLE hFindFile, LPWIN32_FIND_DATAA lpFindFileData)
-{
-    LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress());
-    return FindNextFileA(hFindFile, lpFindFileData);
-}
-
-BOOL WINAPI CustomFindNextFileW(HANDLE hFindFile, LPWIN32_FIND_DATAW lpFindFileData)
-{
-    LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress());
-    return FindNextFileW(hFindFile, lpFindFileData);
-}
-
-HMODULE WINAPI CustomLoadLibraryA(LPCSTR lpLibFileName)
-{
-    LoadOriginalLibrary();
-
-    return LoadLibraryA(lpLibFileName);
-}
-
-HMODULE WINAPI CustomLoadLibraryW(LPCWSTR lpLibFileName)
-{
-    LoadOriginalLibrary();
-
-    return LoadLibraryW(lpLibFileName);
-}
-
-BOOL WINAPI CustomFreeLibrary(HMODULE hLibModule)
-{
-    if (hLibModule != hm)
-        return FreeLibrary(hLibModule);
-    else
-        return !NULL;
-}
-
-HANDLE WINAPI CustomCreateEventA(LPSECURITY_ATTRIBUTES lpEventAttributes, BOOL bManualReset, BOOL bInitialState, LPCSTR lpName)
-{
-    LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress());
-    return CreateEventA(lpEventAttributes, bManualReset, bInitialState, lpName);
-}
-
-HANDLE WINAPI CustomCreateEventW(LPSECURITY_ATTRIBUTES lpEventAttributes, BOOL bManualReset, BOOL bInitialState, LPCWSTR lpName)
-{
-    LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress());
-    return CreateEventW(lpEventAttributes, bManualReset, bInitialState, lpName);
-}
-
-void WINAPI CustomGetSystemInfo(LPSYSTEM_INFO lpSystemInfo)
-{
-    LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress());
-    return GetSystemInfo(lpSystemInfo);
-}
-
-LONG WINAPI CustomInterlockedCompareExchange(LONG volatile* Destination, LONG ExChange, LONG Comperand)
-{
-    LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress());
-    return _InterlockedCompareExchange(Destination, ExChange, Comperand);
-}
-
-void WINAPI CustomSleep(DWORD dwMilliseconds)
-{
-    LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress());
-    return Sleep(dwMilliseconds);
-}
-
-void WINAPI CustomGetSystemTimeAsFileTime(LPFILETIME lpSystemTimeAsFileTime)
-{
-    LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress());
-    return GetSystemTimeAsFileTime(lpSystemTimeAsFileTime);
-}
-
-DWORD WINAPI CustomGetCurrentProcessId()
-{
-    LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress());
-    return GetCurrentProcessId();
-}
-
-LPSTR WINAPI CustomGetCommandLineA()
-{
-    LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress());
-    return GetCommandLineA();
-}
-
-LPWSTR WINAPI CustomGetCommandLineW()
-{
-    LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress());
-    return GetCommandLineW();
-}
-
-void WINAPI CustomAcquireSRWLockExclusive(PSRWLOCK SRWLock)
-{
-    LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress());
-    return AcquireSRWLockExclusive(SRWLock);
+    LoadEverything();
 }
 
 std::filesystem::path GetFileName(auto lpFilename)
@@ -908,6 +792,155 @@ std::filesystem::path GetFileName(auto lpFilename)
     return lpFilename;
 }
 
+HMODULE LoadLibraryW(const std::wstring& lpLibFileName)
+{
+    return LoadLibraryW(GetFileName(lpLibFileName).wstring().c_str());
+}
+
+void WINAPI CustomGetStartupInfoA(LPSTARTUPINFOA lpStartupInfo)
+{
+    LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress(), L"GetStartupInfoA");
+    return GetStartupInfoA(lpStartupInfo);
+}
+
+void WINAPI CustomGetStartupInfoW(LPSTARTUPINFOW lpStartupInfo)
+{
+    LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress(), L"GetStartupInfoW");
+    return GetStartupInfoW(lpStartupInfo);
+}
+
+HMODULE WINAPI CustomGetModuleHandleA(LPCSTR lpModuleName)
+{
+    LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress(), L"GetModuleHandleA");
+    return GetModuleHandleA(lpModuleName);
+}
+
+HMODULE WINAPI CustomGetModuleHandleW(LPCWSTR lpModuleName)
+{
+    LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress(), L"GetModuleHandleW");
+    return GetModuleHandleW(lpModuleName);
+}
+
+FARPROC WINAPI CustomGetProcAddress(HMODULE hModule, LPCSTR lpProcName)
+{
+    LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress(), L"GetProcAddress");
+    return GetProcAddress(hModule, lpProcName);
+}
+
+DWORD WINAPI CustomGetShortPathNameA(LPCSTR lpszLongPath, LPSTR lpszShortPath, DWORD cchBuffer)
+{
+    LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress(), L"GetShortPathNameA");
+    return GetShortPathNameA(lpszLongPath, lpszShortPath, cchBuffer);
+}
+
+BOOL WINAPI CustomFindNextFileA(HANDLE hFindFile, LPWIN32_FIND_DATAA lpFindFileData)
+{
+    LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress(), L"FindNextFileA");
+    return FindNextFileA(hFindFile, lpFindFileData);
+}
+
+BOOL WINAPI CustomFindNextFileW(HANDLE hFindFile, LPWIN32_FIND_DATAW lpFindFileData)
+{
+    LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress(), L"FindNextFileW");
+    return FindNextFileW(hFindFile, lpFindFileData);
+}
+
+HMODULE WINAPI CustomLoadLibraryExA(LPCSTR lpLibFileName, HANDLE hFile, DWORD dwFlags)
+{
+    LoadOriginalLibrary();
+
+    return LoadLibraryExA(GetFileName(lpLibFileName).string().c_str(), hFile, dwFlags);
+}
+
+HMODULE WINAPI CustomLoadLibraryExW(LPCWSTR lpLibFileName, HANDLE hFile, DWORD dwFlags)
+{
+    LoadOriginalLibrary();
+
+    return LoadLibraryExW(GetFileName(lpLibFileName).wstring().c_str(), hFile, dwFlags);
+}
+
+HMODULE WINAPI CustomLoadLibraryA(LPCSTR lpLibFileName)
+{
+    LoadOriginalLibrary();
+
+    return LoadLibraryA(GetFileName(lpLibFileName).string().c_str());
+}
+
+HMODULE WINAPI CustomLoadLibraryW(LPCWSTR lpLibFileName)
+{
+    LoadOriginalLibrary();
+
+    return LoadLibraryW(GetFileName(lpLibFileName).wstring().c_str());
+}
+
+BOOL WINAPI CustomFreeLibrary(HMODULE hLibModule)
+{
+    if (hLibModule != hm)
+        return FreeLibrary(hLibModule);
+    else
+        return !NULL;
+}
+
+HANDLE WINAPI CustomCreateEventA(LPSECURITY_ATTRIBUTES lpEventAttributes, BOOL bManualReset, BOOL bInitialState, LPCSTR lpName)
+{
+    LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress(), L"CreateEventA");
+    return CreateEventA(lpEventAttributes, bManualReset, bInitialState, lpName);
+}
+
+HANDLE WINAPI CustomCreateEventW(LPSECURITY_ATTRIBUTES lpEventAttributes, BOOL bManualReset, BOOL bInitialState, LPCWSTR lpName)
+{
+    LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress(), L"CreateEventW");
+    return CreateEventW(lpEventAttributes, bManualReset, bInitialState, lpName);
+}
+
+void WINAPI CustomGetSystemInfo(LPSYSTEM_INFO lpSystemInfo)
+{
+    LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress(), L"GetSystemInfo");
+    return GetSystemInfo(lpSystemInfo);
+}
+
+LONG WINAPI CustomInterlockedCompareExchange(LONG volatile* Destination, LONG ExChange, LONG Comperand)
+{
+    LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress(), L"InterlockedCompareExchange");
+    return _InterlockedCompareExchange(Destination, ExChange, Comperand);
+}
+
+void WINAPI CustomSleep(DWORD dwMilliseconds)
+{
+    LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress(), L"Sleep");
+    return Sleep(dwMilliseconds);
+}
+
+void WINAPI CustomGetSystemTimeAsFileTime(LPFILETIME lpSystemTimeAsFileTime)
+{
+    LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress(), L"GetSystemTimeAsFileTime");
+    return GetSystemTimeAsFileTime(lpSystemTimeAsFileTime);
+}
+
+DWORD WINAPI CustomGetCurrentProcessId()
+{
+    LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress(), L"GetCurrentProcessId");
+    return GetCurrentProcessId();
+}
+
+LPSTR WINAPI CustomGetCommandLineA()
+{
+    LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress(), L"GetCommandLineA");
+    return GetCommandLineA();
+}
+
+LPWSTR WINAPI CustomGetCommandLineW()
+{
+    LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress(), L"GetCommandLineW");
+    return GetCommandLineW();
+}
+
+void WINAPI CustomAcquireSRWLockExclusive(PSRWLOCK SRWLock)
+{
+    LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress(), L"AcquireSRWLockExclusive");
+    return AcquireSRWLockExclusive(SRWLock);
+}
+
 typedef HANDLE(WINAPI* tCreateFileA)(LPCSTR lpFilename, DWORD dwAccess, DWORD dwSharing, LPSECURITY_ATTRIBUTES saAttributes, DWORD dwCreation, DWORD dwAttributes, HANDLE hTemplate);
 tCreateFileA ptrCreateFileA;
 HANDLE WINAPI CustomCreateFileA(LPCSTR lpFilename, DWORD dwAccess, DWORD dwSharing, LPSECURITY_ATTRIBUTES saAttributes, DWORD dwCreation, DWORD dwAttributes, HANDLE hTemplate)
@@ -915,7 +948,7 @@ HANDLE WINAPI CustomCreateFileA(LPCSTR lpFilename, DWORD dwAccess, DWORD dwShari
     static bool once = false;
     if (!once)
     {
-        LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress());
+        LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress(), L"CreateFileA");
         once = true;
     }
 
@@ -932,7 +965,7 @@ HANDLE WINAPI CustomCreateFileW(LPCWSTR lpFilename, DWORD dwAccess, DWORD dwShar
     static bool once = false;
     if (!once)
     {
-        LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress());
+        LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress(), L"CreateFileW");
         once = true;
     }
 
@@ -949,7 +982,7 @@ DWORD WINAPI CustomGetFileAttributesA(LPCSTR lpFileName)
     static bool once = false;
     if (!once)
     {
-        LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress());
+        LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress(), L"GetFileAttributesA");
         once = true;
     }
 
@@ -966,7 +999,7 @@ DWORD WINAPI CustomGetFileAttributesW(LPCWSTR lpFileName)
     static bool once = false;
     if (!once)
     {
-        LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress());
+        LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress(), L"GetFileAttributesW");
         once = true;
     }
 
@@ -983,7 +1016,7 @@ BOOL WINAPI CustomGetFileAttributesExA(LPCSTR lpFileName, GET_FILEEX_INFO_LEVELS
     static bool once = false;
     if (!once)
     {
-        LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress());
+        LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress(), L"GetFileAttributesExA");
         once = true;
     }
 
@@ -1000,7 +1033,7 @@ BOOL WINAPI CustomGetFileAttributesExW(LPCWSTR lpFileName, GET_FILEEX_INFO_LEVEL
     static bool once = false;
     if (!once)
     {
-        LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress());
+        LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress(), L"GetFileAttributesExW");
         once = true;
     }
 
@@ -1068,6 +1101,8 @@ bool HookKernel32IAT(HMODULE mod, bool exe)
         Kernel32Data[eGetShortPathNameA][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "GetShortPathNameA");
         Kernel32Data[eFindNextFileA][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "FindNextFileA");
         Kernel32Data[eFindNextFileW][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "FindNextFileW");
+        Kernel32Data[eLoadLibraryExA][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "LoadLibraryExA");
+        Kernel32Data[eLoadLibraryExW][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "LoadLibraryExW");
         Kernel32Data[eLoadLibraryA][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "LoadLibraryA");
         Kernel32Data[eLoadLibraryW][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "LoadLibraryW");
         Kernel32Data[eFreeLibrary][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "FreeLibrary");
@@ -1161,6 +1196,18 @@ bool HookKernel32IAT(HMODULE mod, bool exe)
             {
                 if (exe) Kernel32Data[eFindNextFileW][IATPtr] = i;
                 *(size_t*)i = (size_t)CustomFindNextFileW;
+                matchedImports++;
+            }
+            else if (ptr == Kernel32Data[eLoadLibraryExA][ProcAddress])
+            {
+                if (exe) Kernel32Data[eLoadLibraryExA][IATPtr] = i;
+                *(size_t*)i = (size_t)CustomLoadLibraryExA;
+                matchedImports++;
+            }
+            else if (ptr == Kernel32Data[eLoadLibraryExW][ProcAddress])
+            {
+                if (exe) Kernel32Data[eLoadLibraryExW][IATPtr] = i;
+                *(size_t*)i = (size_t)CustomLoadLibraryExW;
                 matchedImports++;
             }
             else if (ptr == Kernel32Data[eLoadLibraryA][ProcAddress])
@@ -1906,12 +1953,14 @@ void Init()
     iniPaths.emplace_back(modulePath + L"global.ini");
     iniPaths.emplace_back(modulePath + L"scripts\\global.ini");
     iniPaths.emplace_back(modulePath + L"plugins\\global.ini");
+    iniPaths.emplace_back(modulePath + L"update\\global.ini");
 
-    auto nForceEPHook = GetPrivateProfileInt(TEXT("globalsets"), TEXT("forceentrypointhook"), FALSE, iniPaths);
-    auto nDontLoadFromDllMain = GetPrivateProfileInt(TEXT("globalsets"), TEXT("dontloadfromdllmain"), TRUE, iniPaths);
-    auto nFindModule = GetPrivateProfileInt(TEXT("globalsets"), TEXT("findmodule"), FALSE, iniPaths);
-    auto nDisableCrashDumps = GetPrivateProfileInt(TEXT("globalsets"), TEXT("disablecrashdumps"), FALSE, iniPaths);
-    sFileLoaderPath = GetPrivateProfileString(TEXT("fileloader"), TEXT("overloadfromfolder"), TEXT("update"), iniPaths);
+    auto nForceEPHook = GetPrivateProfileIntW(TEXT("globalsets"), TEXT("forceentrypointhook"), FALSE, iniPaths);
+    auto nDontLoadFromDllMain = GetPrivateProfileIntW(TEXT("globalsets"), TEXT("dontloadfromdllmain"), TRUE, iniPaths);
+    sLoadFromAPI = GetPrivateProfileStringW(TEXT("globalsets"), TEXT("loadfromapi"), L"", iniPaths);
+    auto nFindModule = GetPrivateProfileIntW(TEXT("globalsets"), TEXT("findmodule"), FALSE, iniPaths);
+    auto nDisableCrashDumps = GetPrivateProfileIntW(TEXT("globalsets"), TEXT("disablecrashdumps"), FALSE, iniPaths);
+    sFileLoaderPath = GetPrivateProfileStringW(TEXT("fileloader"), TEXT("overloadfromfolder"), TEXT("update"), iniPaths);
 
     auto FolderExists = [](LPCWSTR szPath) -> BOOL
     {
@@ -1945,6 +1994,13 @@ void Init()
 
     if (nForceEPHook != FALSE || nDontLoadFromDllMain != FALSE)
     {
+        if (sLoadFromAPI.empty()) // compatibility with GTAV/RDR2 plugins
+        {
+            auto exeName = std::filesystem::path(GetModulePath(NULL)).stem().wstring();
+            if (iequals(exeName, L"GTA5") || iequals(exeName, L"RDR2") || iequals(exeName, L"game_win64_master"))
+                sLoadFromAPI = L"GetSystemTimeAsFileTime";
+        }
+
         HMODULE mainModule = GetModuleHandle(NULL);
         bool hookedSuccessfully = HookKernel32IAT(mainModule, true);
         if (!hookedSuccessfully)
