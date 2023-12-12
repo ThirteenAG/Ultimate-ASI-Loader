@@ -11,6 +11,7 @@ workspace "Ultimate-ASI-Loader-Win32"
    architecture "x86"
    location "build"
    cppdialect "C++latest"
+   exceptionhandling ("SEH")
    
    defines { "rsc_CompanyName=\"ThirteenAG\"" }
    defines { "rsc_LegalCopyright=\"MIT License\""} 
@@ -173,6 +174,7 @@ workspace "Ultimate-ASI-Loader-x64"
    architecture "x86_64"
    location "build"
    cppdialect "C++latest"
+   exceptionhandling ("SEH")
    
    defines { "rsc_CompanyName=\"ThirteenAG\"" }
    defines { "rsc_LegalCopyright=\"MIT License\""} 

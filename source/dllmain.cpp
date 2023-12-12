@@ -701,100 +701,105 @@ void LoadPluginsAndRestoreIAT(uintptr_t retaddr, std::wstring_view calledFrom = 
 
 std::filesystem::path GetFileName(auto lpFilename)
 {
-    std::error_code ec;
-
-    static auto starts_with = [](const std::filesystem::path& path, const std::filesystem::path& base) -> bool {
-        std::wstring str1(path.wstring()); std::wstring str2(base.wstring());
-        std::transform(str1.begin(), str1.end(), str1.begin(), ::tolower);
-        std::transform(str2.begin(), str2.end(), str2.begin(), ::tolower);
-        return str1.starts_with(str2);
-    };
-
-    static auto lexicallyRelativeCaseIns = [](const std::filesystem::path& path, const std::filesystem::path& base) -> std::filesystem::path
+    try
     {
-        class input_iterator_range
-        {
-        public:
-            input_iterator_range(const std::filesystem::path::const_iterator& first, const std::filesystem::path::const_iterator& last)
-                : _first(first)
-                , _last(last)
-            {}
-            std::filesystem::path::const_iterator begin() const { return _first; }
-            std::filesystem::path::const_iterator end() const { return _last; }
-        private:
-            std::filesystem::path::const_iterator _first;
-            std::filesystem::path::const_iterator _last;
+        std::error_code ec;
+
+        static auto starts_with = [](const std::filesystem::path& path, const std::filesystem::path& base) -> bool {
+            std::wstring str1(path.wstring()); std::wstring str2(base.wstring());
+            std::transform(str1.begin(), str1.end(), str1.begin(), ::tolower);
+            std::transform(str2.begin(), str2.end(), str2.begin(), ::tolower);
+            return str1.starts_with(str2);
         };
 
-        if (!iequals(path.root_name().wstring(), base.root_name().wstring()) || path.is_absolute() != base.is_absolute() || (!path.has_root_directory() && base.has_root_directory())) {
-            return std::filesystem::path();
-        }
-        std::filesystem::path::const_iterator a = path.begin(), b = base.begin();
-        while (a != path.end() && b != base.end() && iequals(a->wstring(), b->wstring())) {
-            ++a;
-            ++b;
-        }
-        if (a == path.end() && b == base.end()) {
-            return std::filesystem::path(".");
-        }
-        int count = 0;
-        for (const auto& element : input_iterator_range(b, base.end())) {
-            if (element != "." && element != "" && element != "..") {
-                ++count;
-            }
-            else if (element == "..") {
-                --count;
-            }
-        }
-        if (count < 0) {
-            return std::filesystem::path();
-        }
-        std::filesystem::path result;
-        for (int i = 0; i < count; ++i) {
-            result /= "..";
-        }
-        for (const auto& element : input_iterator_range(a, path.end())) {
-            result /= element;
-        }
-        return result;
-    };
-
-    if (gamePath.empty())
-        gamePath = std::filesystem::path(GetExeModulePath());
-
-    auto filePath = std::filesystem::path(lpFilename);
-    auto absolutePath = std::filesystem::absolute(filePath, ec);
-    auto relativePath = lexicallyRelativeCaseIns(absolutePath, gamePath);
-    auto commonPath = gamePath;
-
-    if (starts_with(relativePath, ".."))
-    {
-        auto common = std::mismatch(absolutePath.begin(), absolutePath.end(), gamePath.begin());
-        for (auto& iter = common.second; iter != gamePath.end(); ++iter)
-            commonPath = commonPath.parent_path();
-
-        std::filesystem::path rp;
-        for (auto& p : relativePath)
+        static auto lexicallyRelativeCaseIns = [](const std::filesystem::path& path, const std::filesystem::path& base) -> std::filesystem::path
         {
-            if (p != "..")
-                rp = rp / p;
+            class input_iterator_range
+            {
+            public:
+                input_iterator_range(const std::filesystem::path::const_iterator& first, const std::filesystem::path::const_iterator& last)
+                    : _first(first)
+                    , _last(last)
+                {}
+                std::filesystem::path::const_iterator begin() const { return _first; }
+                std::filesystem::path::const_iterator end() const { return _last; }
+            private:
+                std::filesystem::path::const_iterator _first;
+                std::filesystem::path::const_iterator _last;
+            };
+
+            if (!iequals(path.root_name().wstring(), base.root_name().wstring()) || path.is_absolute() != base.is_absolute() || (!path.has_root_directory() && base.has_root_directory())) {
+                return std::filesystem::path();
+            }
+            std::filesystem::path::const_iterator a = path.begin(), b = base.begin();
+            while (a != path.end() && b != base.end() && iequals(a->wstring(), b->wstring())) {
+                ++a;
+                ++b;
+            }
+            if (a == path.end() && b == base.end()) {
+                return std::filesystem::path(".");
+            }
+            int count = 0;
+            for (const auto& element : input_iterator_range(b, base.end())) {
+                if (element != "." && element != "" && element != "..") {
+                    ++count;
+                }
+                else if (element == "..") {
+                    --count;
+                }
+            }
+            if (count < 0) {
+                return std::filesystem::path();
+            }
+            std::filesystem::path result;
+            for (int i = 0; i < count; ++i) {
+                result /= "..";
+            }
+            for (const auto& element : input_iterator_range(a, path.end())) {
+                result /= element;
+            }
+            return result;
+        };
+
+        if (gamePath.empty())
+            gamePath = std::filesystem::path(GetExeModulePath());
+
+        auto filePath = std::filesystem::path(lpFilename);
+        auto absolutePath = std::filesystem::absolute(filePath, ec);
+        auto relativePath = lexicallyRelativeCaseIns(absolutePath, gamePath);
+        auto commonPath = gamePath;
+
+        if (starts_with(relativePath, ".."))
+        {
+            auto common = std::mismatch(absolutePath.begin(), absolutePath.end(), gamePath.begin());
+            for (auto& iter = common.second; iter != gamePath.end(); ++iter)
+                commonPath = commonPath.parent_path();
+
+            std::filesystem::path rp;
+            for (auto& p : relativePath)
+            {
+                if (p != "..")
+                    rp = rp / p;
+            }
+            relativePath = rp;
         }
-        relativePath = rp;
-    }
 
-    if (starts_with(std::filesystem::path(absolutePath).remove_filename(), gamePath) || starts_with(std::filesystem::path(absolutePath).remove_filename(), commonPath))
-    {
-        auto newPath = gamePath / sFileLoaderPath.make_preferred() / relativePath;
-        if (std::filesystem::exists(newPath, ec) && std::filesystem::is_regular_file(newPath, ec))
-            return newPath;
+        if (starts_with(std::filesystem::path(absolutePath).remove_filename(), gamePath) || starts_with(std::filesystem::path(absolutePath).remove_filename(), commonPath))
+        {
+            auto newPath = gamePath / sFileLoaderPath.make_preferred() / relativePath;
+            if (std::filesystem::exists(newPath, ec) && std::filesystem::is_regular_file(newPath, ec))
+                return newPath;
+        }
     }
+    catch (...) {}
 
-    return lpFilename;
+    return {};
 }
 
 HMODULE LoadLibraryW(const std::wstring& lpLibFileName)
 {
-    return LoadLibraryW(GetFileName(lpLibFileName).wstring().c_str());
+    auto r = GetFileName(lpLibFileName);
+    return LoadLibraryW(r.empty() ? lpLibFileName.c_str() : r.wstring().c_str());
 }
 
 void WINAPI CustomGetStartupInfoA(LPSTARTUPINFOA lpStartupInfo)
@@ -849,28 +854,32 @@ HMODULE WINAPI CustomLoadLibraryExA(LPCSTR lpLibFileName, HANDLE hFile, DWORD dw
 {
     LoadOriginalLibrary();
 
-    return LoadLibraryExA(GetFileName(lpLibFileName).string().c_str(), hFile, dwFlags);
+    auto r = GetFileName(lpLibFileName);
+    return LoadLibraryExA(r.empty() ? lpLibFileName : r.string().c_str(), hFile, dwFlags);
 }
 
 HMODULE WINAPI CustomLoadLibraryExW(LPCWSTR lpLibFileName, HANDLE hFile, DWORD dwFlags)
 {
     LoadOriginalLibrary();
 
-    return LoadLibraryExW(GetFileName(lpLibFileName).wstring().c_str(), hFile, dwFlags);
+    auto r = GetFileName(lpLibFileName);
+    return LoadLibraryExW(r.empty() ? lpLibFileName : r.wstring().c_str(), hFile, dwFlags);
 }
 
 HMODULE WINAPI CustomLoadLibraryA(LPCSTR lpLibFileName)
 {
     LoadOriginalLibrary();
 
-    return LoadLibraryA(GetFileName(lpLibFileName).string().c_str());
+    auto r = GetFileName(lpLibFileName);
+    return LoadLibraryA(r.empty() ? lpLibFileName : r.string().c_str());
 }
 
 HMODULE WINAPI CustomLoadLibraryW(LPCWSTR lpLibFileName)
 {
     LoadOriginalLibrary();
 
-    return LoadLibraryW(GetFileName(lpLibFileName).wstring().c_str());
+    auto r = GetFileName(lpLibFileName);
+    return LoadLibraryW(r.empty() ? lpLibFileName : r.wstring().c_str());
 }
 
 BOOL WINAPI CustomFreeLibrary(HMODULE hLibModule)
@@ -952,10 +961,11 @@ HANDLE WINAPI CustomCreateFileA(LPCSTR lpFilename, DWORD dwAccess, DWORD dwShari
         once = true;
     }
 
+    auto r = GetFileName(lpFilename);
     if (ptrCreateFileA)
-        return ptrCreateFileA(GetFileName(lpFilename).string().c_str(), dwAccess, dwSharing, saAttributes, dwCreation, dwAttributes, hTemplate);
+        return ptrCreateFileA(r.empty() ? lpFilename : r.string().c_str(), dwAccess, dwSharing, saAttributes, dwCreation, dwAttributes, hTemplate);
     else
-        return CreateFileA(GetFileName(lpFilename).string().c_str(), dwAccess, dwSharing, saAttributes, dwCreation, dwAttributes, hTemplate);
+        return CreateFileA(r.empty() ? lpFilename : r.string().c_str(), dwAccess, dwSharing, saAttributes, dwCreation, dwAttributes, hTemplate);
 }
 
 typedef HANDLE(WINAPI* tCreateFileW)(LPCWSTR lpFilename, DWORD dwAccess, DWORD dwSharing, LPSECURITY_ATTRIBUTES saAttributes, DWORD dwCreation, DWORD dwAttributes, HANDLE hTemplate);
@@ -969,10 +979,11 @@ HANDLE WINAPI CustomCreateFileW(LPCWSTR lpFilename, DWORD dwAccess, DWORD dwShar
         once = true;
     }
 
+    auto r = GetFileName(lpFilename);
     if (ptrCreateFileW)
-        return ptrCreateFileW(GetFileName(lpFilename).wstring().c_str(), dwAccess, dwSharing, saAttributes, dwCreation, dwAttributes, hTemplate);
+        return ptrCreateFileW(r.empty() ? lpFilename : r.wstring().c_str(), dwAccess, dwSharing, saAttributes, dwCreation, dwAttributes, hTemplate);
     else
-        return CreateFileW(GetFileName(lpFilename).wstring().c_str(), dwAccess, dwSharing, saAttributes, dwCreation, dwAttributes, hTemplate);
+        return CreateFileW(r.empty() ? lpFilename : r.wstring().c_str(), dwAccess, dwSharing, saAttributes, dwCreation, dwAttributes, hTemplate);
 }
 
 typedef DWORD(WINAPI* tGetFileAttributesA)(LPCSTR lpFileName);
@@ -986,10 +997,11 @@ DWORD WINAPI CustomGetFileAttributesA(LPCSTR lpFileName)
         once = true;
     }
 
+    auto r = GetFileName(lpFileName);
     if (ptrGetFileAttributesA)
-        return ptrGetFileAttributesA(GetFileName(lpFileName).string().c_str());
+        return ptrGetFileAttributesA(r.empty() ? lpFileName : r.string().c_str());
     else
-        return GetFileAttributesA(GetFileName(lpFileName).string().c_str());
+        return GetFileAttributesA(r.empty() ? lpFileName : r.string().c_str());
 }
 
 typedef DWORD(WINAPI* tGetFileAttributesW)(LPCWSTR lpFileName);
@@ -1003,10 +1015,11 @@ DWORD WINAPI CustomGetFileAttributesW(LPCWSTR lpFileName)
         once = true;
     }
 
+    auto r = GetFileName(lpFileName);
     if (ptrGetFileAttributesW)
-        return ptrGetFileAttributesW(GetFileName(lpFileName).wstring().c_str());
+        return ptrGetFileAttributesW(r.empty() ? lpFileName : r.wstring().c_str());
     else
-        return GetFileAttributesW(GetFileName(lpFileName).wstring().c_str());
+        return GetFileAttributesW(r.empty() ? lpFileName : r.wstring().c_str());
 }
 
 typedef BOOL(WINAPI* tGetFileAttributesExA)(LPCSTR lpFileName, GET_FILEEX_INFO_LEVELS fInfoLevelId, LPVOID lpFileInformation);
@@ -1020,10 +1033,11 @@ BOOL WINAPI CustomGetFileAttributesExA(LPCSTR lpFileName, GET_FILEEX_INFO_LEVELS
         once = true;
     }
 
+    auto r = GetFileName(lpFileName);
     if (ptrGetFileAttributesExA)
-        return ptrGetFileAttributesExA(GetFileName(lpFileName).string().c_str(), fInfoLevelId, lpFileInformation);
+        return ptrGetFileAttributesExA(r.empty() ? lpFileName : r.string().c_str(), fInfoLevelId, lpFileInformation);
     else
-        return GetFileAttributesExA(GetFileName(lpFileName).string().c_str(), fInfoLevelId, lpFileInformation);
+        return GetFileAttributesExA(r.empty() ? lpFileName : r.string().c_str(), fInfoLevelId, lpFileInformation);
 }
 
 typedef BOOL(WINAPI* tGetFileAttributesExW)(LPCWSTR lpFileName, GET_FILEEX_INFO_LEVELS fInfoLevelId, LPVOID lpFileInformation);
@@ -1037,10 +1051,11 @@ BOOL WINAPI CustomGetFileAttributesExW(LPCWSTR lpFileName, GET_FILEEX_INFO_LEVEL
         once = true;
     }
 
+    auto r = GetFileName(lpFileName);
     if (ptrGetFileAttributesExW)
-        return ptrGetFileAttributesExW(GetFileName(lpFileName).wstring().c_str(), fInfoLevelId, lpFileInformation);
+        return ptrGetFileAttributesExW(r.empty() ? lpFileName : r.wstring().c_str(), fInfoLevelId, lpFileInformation);
     else
-        return GetFileAttributesExW(GetFileName(lpFileName).wstring().c_str(), fInfoLevelId, lpFileInformation);
+        return GetFileAttributesExW(r.empty() ? lpFileName : r.wstring().c_str(), fInfoLevelId, lpFileInformation);
 }
 
 DEFINE_GUID(CLSID_DirectInput, 0x25E609E0, 0xB259, 0x11CF, 0xBF, 0xC7, 0x44, 0x45, 0x53, 0x54, 0x00, 0x00);
