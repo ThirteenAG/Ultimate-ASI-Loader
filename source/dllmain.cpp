@@ -699,7 +699,7 @@ void LoadPluginsAndRestoreIAT(uintptr_t retaddr, std::wstring_view calledFrom = 
     LoadEverything();
 }
 
-std::filesystem::path GetFileName(auto lpFilename)
+std::filesystem::path WINAPI GetOverloadedFilePath(std::filesystem::path lpFilename)
 {
     try
     {
@@ -764,7 +764,7 @@ std::filesystem::path GetFileName(auto lpFilename)
         if (gamePath.empty())
             gamePath = std::filesystem::path(GetExeModulePath());
 
-        auto filePath = std::filesystem::path(lpFilename);
+        auto filePath = lpFilename;
         auto absolutePath = std::filesystem::absolute(filePath, ec);
         auto relativePath = lexicallyRelativeCaseIns(absolutePath, gamePath);
         auto commonPath = gamePath;
@@ -787,7 +787,7 @@ std::filesystem::path GetFileName(auto lpFilename)
         if (starts_with(std::filesystem::path(absolutePath).remove_filename(), gamePath) || starts_with(std::filesystem::path(absolutePath).remove_filename(), commonPath))
         {
             auto newPath = gamePath / sFileLoaderPath.make_preferred() / relativePath;
-            if (std::filesystem::exists(newPath, ec) && std::filesystem::is_regular_file(newPath, ec))
+            if (std::filesystem::exists(newPath, ec))
                 return newPath;
         }
     }
@@ -796,9 +796,20 @@ std::filesystem::path GetFileName(auto lpFilename)
     return {};
 }
 
+std::filesystem::path GetFilePathForOverload(auto path)
+{
+    try
+    {
+        return GetOverloadedFilePath(path);
+    }
+    catch (...) {}
+
+    return {};
+}
+
 HMODULE LoadLibraryW(const std::wstring& lpLibFileName)
 {
-    auto r = GetFileName(lpLibFileName);
+    auto r = GetFilePathForOverload(lpLibFileName);
     return LoadLibraryW(r.empty() ? lpLibFileName.c_str() : r.wstring().c_str());
 }
 
@@ -854,7 +865,7 @@ HMODULE WINAPI CustomLoadLibraryExA(LPCSTR lpLibFileName, HANDLE hFile, DWORD dw
 {
     LoadOriginalLibrary();
 
-    auto r = GetFileName(lpLibFileName);
+    auto r = GetFilePathForOverload(lpLibFileName);
     return LoadLibraryExA(r.empty() ? lpLibFileName : r.string().c_str(), hFile, dwFlags);
 }
 
@@ -862,7 +873,7 @@ HMODULE WINAPI CustomLoadLibraryExW(LPCWSTR lpLibFileName, HANDLE hFile, DWORD d
 {
     LoadOriginalLibrary();
 
-    auto r = GetFileName(lpLibFileName);
+    auto r = GetFilePathForOverload(lpLibFileName);
     return LoadLibraryExW(r.empty() ? lpLibFileName : r.wstring().c_str(), hFile, dwFlags);
 }
 
@@ -870,7 +881,7 @@ HMODULE WINAPI CustomLoadLibraryA(LPCSTR lpLibFileName)
 {
     LoadOriginalLibrary();
 
-    auto r = GetFileName(lpLibFileName);
+    auto r = GetFilePathForOverload(lpLibFileName);
     return LoadLibraryA(r.empty() ? lpLibFileName : r.string().c_str());
 }
 
@@ -878,7 +889,7 @@ HMODULE WINAPI CustomLoadLibraryW(LPCWSTR lpLibFileName)
 {
     LoadOriginalLibrary();
 
-    auto r = GetFileName(lpLibFileName);
+    auto r = GetFilePathForOverload(lpLibFileName);
     return LoadLibraryW(r.empty() ? lpLibFileName : r.wstring().c_str());
 }
 
@@ -961,7 +972,7 @@ HANDLE WINAPI CustomCreateFileA(LPCSTR lpFilename, DWORD dwAccess, DWORD dwShari
         once = true;
     }
 
-    auto r = GetFileName(lpFilename);
+    auto r = GetFilePathForOverload(lpFilename);
     if (ptrCreateFileA)
         return ptrCreateFileA(r.empty() ? lpFilename : r.string().c_str(), dwAccess, dwSharing, saAttributes, dwCreation, dwAttributes, hTemplate);
     else
@@ -979,7 +990,7 @@ HANDLE WINAPI CustomCreateFileW(LPCWSTR lpFilename, DWORD dwAccess, DWORD dwShar
         once = true;
     }
 
-    auto r = GetFileName(lpFilename);
+    auto r = GetFilePathForOverload(lpFilename);
     if (ptrCreateFileW)
         return ptrCreateFileW(r.empty() ? lpFilename : r.wstring().c_str(), dwAccess, dwSharing, saAttributes, dwCreation, dwAttributes, hTemplate);
     else
@@ -997,7 +1008,7 @@ DWORD WINAPI CustomGetFileAttributesA(LPCSTR lpFileName)
         once = true;
     }
 
-    auto r = GetFileName(lpFileName);
+    auto r = GetFilePathForOverload(lpFileName);
     if (ptrGetFileAttributesA)
         return ptrGetFileAttributesA(r.empty() ? lpFileName : r.string().c_str());
     else
@@ -1015,7 +1026,7 @@ DWORD WINAPI CustomGetFileAttributesW(LPCWSTR lpFileName)
         once = true;
     }
 
-    auto r = GetFileName(lpFileName);
+    auto r = GetFilePathForOverload(lpFileName);
     if (ptrGetFileAttributesW)
         return ptrGetFileAttributesW(r.empty() ? lpFileName : r.wstring().c_str());
     else
@@ -1033,7 +1044,7 @@ BOOL WINAPI CustomGetFileAttributesExA(LPCSTR lpFileName, GET_FILEEX_INFO_LEVELS
         once = true;
     }
 
-    auto r = GetFileName(lpFileName);
+    auto r = GetFilePathForOverload(lpFileName);
     if (ptrGetFileAttributesExA)
         return ptrGetFileAttributesExA(r.empty() ? lpFileName : r.string().c_str(), fInfoLevelId, lpFileInformation);
     else
@@ -1051,7 +1062,7 @@ BOOL WINAPI CustomGetFileAttributesExW(LPCWSTR lpFileName, GET_FILEEX_INFO_LEVEL
         once = true;
     }
 
-    auto r = GetFileName(lpFileName);
+    auto r = GetFilePathForOverload(lpFileName);
     if (ptrGetFileAttributesExW)
         return ptrGetFileAttributesExW(r.empty() ? lpFileName : r.wstring().c_str(), fInfoLevelId, lpFileInformation);
     else
