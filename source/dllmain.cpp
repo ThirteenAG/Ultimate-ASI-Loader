@@ -789,8 +789,8 @@ std::filesystem::path WINAPI GetOverloadedFilePath(std::filesystem::path lpFilen
             auto newPath = gamePath / sFileLoaderPath.make_preferred() / relativePath;
             if (std::filesystem::exists(newPath, ec))
                 return newPath;
+            }
         }
-    }
     catch (...) {}
 
     return {};
@@ -1988,18 +1988,24 @@ void Init()
     auto nDisableCrashDumps = GetPrivateProfileIntW(TEXT("globalsets"), TEXT("disablecrashdumps"), FALSE, iniPaths);
     sFileLoaderPath = GetPrivateProfileStringW(TEXT("fileloader"), TEXT("overloadfromfolder"), TEXT("update"), iniPaths);
 
-    auto FolderExists = [](LPCWSTR szPath) -> BOOL
+    auto FolderExists = [](auto szPath) -> bool
     {
-        DWORD dwAttrib = GetFileAttributes(szPath);
-        return (dwAttrib != INVALID_FILE_ATTRIBUTES && (dwAttrib & FILE_ATTRIBUTE_DIRECTORY));
+        try
+        {
+            auto path = std::filesystem::path(szPath);
+            if (path.is_absolute())
+                return std::filesystem::is_directory(path);
+            else
+                return std::filesystem::is_directory(std::filesystem::path(GetModuleFileNameW(NULL)).parent_path() / path);
+        }
+        catch (...) {}
+        
+        return false;
     };
 
     if (!nDisableCrashDumps)
     {
-        std::wstring m = GetModuleFileNameW(NULL);
-        m = m.substr(0, m.find_last_of(L"/\\") + 1) + L"CrashDumps";
-
-        if (FolderExists(m.c_str()))
+        if (FolderExists(L"CrashDumps"))
         {
             SetUnhandledExceptionFilter(CustomUnhandledExceptionFilter);
             // Now stub out CustomUnhandledExceptionFilter so NO ONE ELSE can set it!
@@ -2015,7 +2021,7 @@ void Init()
         }
     }
 
-    if (!FolderExists(sFileLoaderPath.wstring().c_str()))
+    if (!FolderExists(sFileLoaderPath))
         sFileLoaderPath.clear();
 
     if (nForceEPHook != FALSE || nDontLoadFromDllMain != FALSE)
