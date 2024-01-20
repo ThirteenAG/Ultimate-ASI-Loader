@@ -787,7 +787,7 @@ std::filesystem::path WINAPI GetOverloadedFilePath(std::filesystem::path lpFilen
         if (starts_with(std::filesystem::path(absolutePath).remove_filename(), gamePath) || starts_with(std::filesystem::path(absolutePath).remove_filename(), commonPath))
         {
             auto newPath = gamePath / sFileLoaderPath.make_preferred() / relativePath;
-            if (std::filesystem::exists(newPath, ec))
+            if (std::filesystem::exists(newPath, ec) && !std::filesystem::is_directory(newPath, ec))
                 return newPath;
             }
         }
