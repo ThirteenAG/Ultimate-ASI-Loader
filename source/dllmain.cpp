@@ -24,6 +24,7 @@ std::vector<std::wstring> iniPaths;
 std::filesystem::path sFileLoaderPath;
 std::filesystem::path gamePath;
 std::wstring sLoadFromAPI;
+bool bPatchFindFile = false;
 
 bool iequals(std::wstring_view s1, std::wstring_view s2)
 {
@@ -163,8 +164,12 @@ enum Kernel32ExportsNames
     eGetModuleHandleW,
     eGetProcAddress,
     eGetShortPathNameA,
+    eFindFirstFileA,
     eFindNextFileA,
+    eFindFirstFileW,
     eFindNextFileW,
+    eFindFirstFileExA,
+    eFindFirstFileExW,
     eLoadLibraryExA,
     eLoadLibraryExW,
     eLoadLibraryA,
@@ -686,6 +691,10 @@ void LoadPluginsAndRestoreIAT(uintptr_t retaddr, std::wstring_view calledFrom = 
             || i == eGetFileAttributesA || i == eGetFileAttributesW || i == eGetFileAttributesExA || i == eGetFileAttributesExW))
             continue;
 
+        if (!sFileLoaderPath.empty() && bPatchFindFile && (i == eFindFirstFileA || i == eFindNextFileA || i == eFindFirstFileW
+            || i == eFindNextFileW || i == eFindFirstFileExA || i == eFindFirstFileExW))
+            continue;
+
         if (Kernel32Data[i][IATPtr] && Kernel32Data[i][ProcAddress])
         {
             auto ptr = (size_t*)Kernel32Data[i][IATPtr];
@@ -849,18 +858,6 @@ DWORD WINAPI CustomGetShortPathNameA(LPCSTR lpszLongPath, LPSTR lpszShortPath, D
     return GetShortPathNameA(lpszLongPath, lpszShortPath, cchBuffer);
 }
 
-BOOL WINAPI CustomFindNextFileA(HANDLE hFindFile, LPWIN32_FIND_DATAA lpFindFileData)
-{
-    LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress(), L"FindNextFileA");
-    return FindNextFileA(hFindFile, lpFindFileData);
-}
-
-BOOL WINAPI CustomFindNextFileW(HANDLE hFindFile, LPWIN32_FIND_DATAW lpFindFileData)
-{
-    LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress(), L"FindNextFileW");
-    return FindNextFileW(hFindFile, lpFindFileData);
-}
-
 HMODULE WINAPI CustomLoadLibraryExA(LPCSTR lpLibFileName, HANDLE hFile, DWORD dwFlags)
 {
     LoadOriginalLibrary();
@@ -962,7 +959,6 @@ void WINAPI CustomAcquireSRWLockExclusive(PSRWLOCK SRWLock)
 }
 
 typedef HANDLE(WINAPI* tCreateFileA)(LPCSTR lpFilename, DWORD dwAccess, DWORD dwSharing, LPSECURITY_ATTRIBUTES saAttributes, DWORD dwCreation, DWORD dwAttributes, HANDLE hTemplate);
-tCreateFileA ptrCreateFileA;
 HANDLE WINAPI CustomCreateFileA(LPCSTR lpFilename, DWORD dwAccess, DWORD dwSharing, LPSECURITY_ATTRIBUTES saAttributes, DWORD dwCreation, DWORD dwAttributes, HANDLE hTemplate)
 {
     static bool once = false;
@@ -973,14 +969,10 @@ HANDLE WINAPI CustomCreateFileA(LPCSTR lpFilename, DWORD dwAccess, DWORD dwShari
     }
 
     auto r = GetFilePathForOverload(lpFilename);
-    if (ptrCreateFileA)
-        return ptrCreateFileA(r.empty() ? lpFilename : r.string().c_str(), dwAccess, dwSharing, saAttributes, dwCreation, dwAttributes, hTemplate);
-    else
-        return CreateFileA(r.empty() ? lpFilename : r.string().c_str(), dwAccess, dwSharing, saAttributes, dwCreation, dwAttributes, hTemplate);
+    return CreateFileA(r.empty() ? lpFilename : r.string().c_str(), dwAccess, dwSharing, saAttributes, dwCreation, dwAttributes, hTemplate);
 }
 
 typedef HANDLE(WINAPI* tCreateFileW)(LPCWSTR lpFilename, DWORD dwAccess, DWORD dwSharing, LPSECURITY_ATTRIBUTES saAttributes, DWORD dwCreation, DWORD dwAttributes, HANDLE hTemplate);
-tCreateFileW ptrCreateFileW;
 HANDLE WINAPI CustomCreateFileW(LPCWSTR lpFilename, DWORD dwAccess, DWORD dwSharing, LPSECURITY_ATTRIBUTES saAttributes, DWORD dwCreation, DWORD dwAttributes, HANDLE hTemplate)
 {
     static bool once = false;
@@ -991,14 +983,10 @@ HANDLE WINAPI CustomCreateFileW(LPCWSTR lpFilename, DWORD dwAccess, DWORD dwShar
     }
 
     auto r = GetFilePathForOverload(lpFilename);
-    if (ptrCreateFileW)
-        return ptrCreateFileW(r.empty() ? lpFilename : r.wstring().c_str(), dwAccess, dwSharing, saAttributes, dwCreation, dwAttributes, hTemplate);
-    else
-        return CreateFileW(r.empty() ? lpFilename : r.wstring().c_str(), dwAccess, dwSharing, saAttributes, dwCreation, dwAttributes, hTemplate);
+    return CreateFileW(r.empty() ? lpFilename : r.wstring().c_str(), dwAccess, dwSharing, saAttributes, dwCreation, dwAttributes, hTemplate);
 }
 
 typedef DWORD(WINAPI* tGetFileAttributesA)(LPCSTR lpFileName);
-tGetFileAttributesA ptrGetFileAttributesA;
 DWORD WINAPI CustomGetFileAttributesA(LPCSTR lpFileName)
 {
     static bool once = false;
@@ -1009,14 +997,10 @@ DWORD WINAPI CustomGetFileAttributesA(LPCSTR lpFileName)
     }
 
     auto r = GetFilePathForOverload(lpFileName);
-    if (ptrGetFileAttributesA)
-        return ptrGetFileAttributesA(r.empty() ? lpFileName : r.string().c_str());
-    else
-        return GetFileAttributesA(r.empty() ? lpFileName : r.string().c_str());
+    return GetFileAttributesA(r.empty() ? lpFileName : r.string().c_str());
 }
 
 typedef DWORD(WINAPI* tGetFileAttributesW)(LPCWSTR lpFileName);
-tGetFileAttributesW ptrGetFileAttributesW;
 DWORD WINAPI CustomGetFileAttributesW(LPCWSTR lpFileName)
 {
     static bool once = false;
@@ -1027,14 +1011,10 @@ DWORD WINAPI CustomGetFileAttributesW(LPCWSTR lpFileName)
     }
 
     auto r = GetFilePathForOverload(lpFileName);
-    if (ptrGetFileAttributesW)
-        return ptrGetFileAttributesW(r.empty() ? lpFileName : r.wstring().c_str());
-    else
-        return GetFileAttributesW(r.empty() ? lpFileName : r.wstring().c_str());
+    return GetFileAttributesW(r.empty() ? lpFileName : r.wstring().c_str());
 }
 
 typedef BOOL(WINAPI* tGetFileAttributesExA)(LPCSTR lpFileName, GET_FILEEX_INFO_LEVELS fInfoLevelId, LPVOID lpFileInformation);
-tGetFileAttributesExA ptrGetFileAttributesExA;
 BOOL WINAPI CustomGetFileAttributesExA(LPCSTR lpFileName, GET_FILEEX_INFO_LEVELS fInfoLevelId, LPVOID lpFileInformation)
 {
     static bool once = false;
@@ -1045,14 +1025,10 @@ BOOL WINAPI CustomGetFileAttributesExA(LPCSTR lpFileName, GET_FILEEX_INFO_LEVELS
     }
 
     auto r = GetFilePathForOverload(lpFileName);
-    if (ptrGetFileAttributesExA)
-        return ptrGetFileAttributesExA(r.empty() ? lpFileName : r.string().c_str(), fInfoLevelId, lpFileInformation);
-    else
-        return GetFileAttributesExA(r.empty() ? lpFileName : r.string().c_str(), fInfoLevelId, lpFileInformation);
+    return GetFileAttributesExA(r.empty() ? lpFileName : r.string().c_str(), fInfoLevelId, lpFileInformation);
 }
 
 typedef BOOL(WINAPI* tGetFileAttributesExW)(LPCWSTR lpFileName, GET_FILEEX_INFO_LEVELS fInfoLevelId, LPVOID lpFileInformation);
-tGetFileAttributesExW ptrGetFileAttributesExW;
 BOOL WINAPI CustomGetFileAttributesExW(LPCWSTR lpFileName, GET_FILEEX_INFO_LEVELS fInfoLevelId, LPVOID lpFileInformation)
 {
     static bool once = false;
@@ -1063,10 +1039,133 @@ BOOL WINAPI CustomGetFileAttributesExW(LPCWSTR lpFileName, GET_FILEEX_INFO_LEVEL
     }
 
     auto r = GetFilePathForOverload(lpFileName);
-    if (ptrGetFileAttributesExW)
-        return ptrGetFileAttributesExW(r.empty() ? lpFileName : r.wstring().c_str(), fInfoLevelId, lpFileInformation);
-    else
-        return GetFileAttributesExW(r.empty() ? lpFileName : r.wstring().c_str(), fInfoLevelId, lpFileInformation);
+    return GetFileAttributesExW(r.empty() ? lpFileName : r.wstring().c_str(), fInfoLevelId, lpFileInformation);
+}
+
+typedef HANDLE(WINAPI* tFindFirstFileA)(LPCSTR lpFileName, LPWIN32_FIND_DATAA lpFindFileData);
+HANDLE WINAPI CustomFindFirstFileA(LPCSTR lpFileName, LPWIN32_FIND_DATAA lpFindFileData)
+{
+    static bool once = false;
+    if (!once)
+    {
+        LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress(), L"FindFirstFileA");
+        once = true;
+    }
+
+    auto ret = FindFirstFileA(lpFileName, lpFindFileData);
+
+    if (bPatchFindFile)
+    {
+        lpFindFileData->nFileSizeHigh = 0;
+        lpFindFileData->nFileSizeLow = 0;
+    }
+
+    return ret;
+}
+
+typedef BOOL(WINAPI* tFindNextFileA)(HANDLE hFindFile, LPWIN32_FIND_DATAA lpFindFileData);
+BOOL WINAPI CustomFindNextFileA(HANDLE hFindFile, LPWIN32_FIND_DATAA lpFindFileData)
+{
+    static bool once = false;
+    if (!once)
+    {
+        LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress(), L"FindNextFileA");
+        once = true;
+    }
+
+    auto ret = FindNextFileA(hFindFile, lpFindFileData);
+
+    if (bPatchFindFile)
+    {
+        lpFindFileData->nFileSizeHigh = 0;
+        lpFindFileData->nFileSizeLow = 0;
+    }
+
+    return ret;
+}
+
+typedef HANDLE(WINAPI* tFindFirstFileW)(LPCWSTR lpFileName, LPWIN32_FIND_DATAW lpFindFileData);
+HANDLE WINAPI CustomFindFirstFileW(LPCWSTR lpFileName, LPWIN32_FIND_DATAW lpFindFileData)
+{
+    static bool once = false;
+    if (!once)
+    {
+        LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress(), L"FindFirstFileW");
+        once = true;
+    }
+
+    auto ret = FindFirstFileW(lpFileName, lpFindFileData);
+
+    if (bPatchFindFile)
+    {
+        lpFindFileData->nFileSizeHigh = 0;
+        lpFindFileData->nFileSizeLow = 0;
+    }
+
+    return ret;
+}
+
+typedef BOOL(WINAPI* tFindNextFileW)(HANDLE hFindFile, LPWIN32_FIND_DATAW lpFindFileData);
+BOOL WINAPI CustomFindNextFileW(HANDLE hFindFile, LPWIN32_FIND_DATAW lpFindFileData)
+{
+    static bool once = false;
+    if (!once)
+    {
+        LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress(), L"FindNextFileW");
+        once = true;
+    }
+
+    auto ret = FindNextFileW(hFindFile, lpFindFileData);
+
+    if (bPatchFindFile)
+    {
+        lpFindFileData->nFileSizeHigh = 0;
+        lpFindFileData->nFileSizeLow = 0;
+    }
+
+    return ret;
+}
+
+typedef HANDLE(WINAPI* tFindFirstFileExA)(LPCSTR lpFileName, FINDEX_INFO_LEVELS fInfoLevelId, WIN32_FIND_DATAA* lpFindFileData, FINDEX_SEARCH_OPS fSearchOp, LPVOID lpSearchFilter, DWORD dwAdditionalFlags);
+HANDLE WINAPI CustomFindFirstFileExA(LPCSTR lpFileName, FINDEX_INFO_LEVELS fInfoLevelId, WIN32_FIND_DATAA* lpFindFileData, FINDEX_SEARCH_OPS fSearchOp, LPVOID lpSearchFilter, DWORD dwAdditionalFlags)
+{
+    static bool once = false;
+    if (!once)
+    {
+        LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress(), L"FindFirstFileExA");
+        once = true;
+    }
+
+    auto ret = FindFirstFileExA(lpFileName, fInfoLevelId, lpFindFileData, fSearchOp, lpSearchFilter, dwAdditionalFlags);
+
+    if (fInfoLevelId != FindExInfoMaxInfoLevel && bPatchFindFile)
+    {
+        lpFindFileData->nFileSizeHigh = 0;
+        lpFindFileData->nFileSizeLow = 0;
+    }
+
+    return ret;
+}
+
+typedef HANDLE(WINAPI* tFindFirstFileExW)(LPCWSTR lpFileName, FINDEX_INFO_LEVELS fInfoLevelId, WIN32_FIND_DATAW* lpFindFileData, FINDEX_SEARCH_OPS fSearchOp, LPVOID lpSearchFilter, DWORD dwAdditionalFlags);
+HANDLE WINAPI CustomFindFirstFileExW(LPCWSTR lpFileName, FINDEX_INFO_LEVELS fInfoLevelId, WIN32_FIND_DATAW* lpFindFileData, FINDEX_SEARCH_OPS fSearchOp, LPVOID lpSearchFilter, DWORD dwAdditionalFlags)
+{
+    static bool once = false;
+    if (!once)
+    {
+        LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress(), L"FindFirstFileExW");
+        once = true;
+    }
+
+    auto ret = FindFirstFileExW(lpFileName, fInfoLevelId, lpFindFileData, fSearchOp, lpSearchFilter, dwAdditionalFlags);
+
+    if (fInfoLevelId != FindExInfoMaxInfoLevel && bPatchFindFile)
+    {
+        lpFindFileData->nFileSizeHigh = 0;
+        lpFindFileData->nFileSizeLow = 0;
+    }
+
+    return ret;
 }
 
 DEFINE_GUID(CLSID_DirectInput, 0x25E609E0, 0xB259, 0x11CF, 0xBF, 0xC7, 0x44, 0x45, 0x53, 0x54, 0x00, 0x00);
@@ -1125,8 +1224,12 @@ bool HookKernel32IAT(HMODULE mod, bool exe)
         Kernel32Data[eGetModuleHandleW][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "GetModuleHandleW");
         Kernel32Data[eGetProcAddress][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "GetProcAddress");
         Kernel32Data[eGetShortPathNameA][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "GetShortPathNameA");
+        Kernel32Data[eFindFirstFileA][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "FindFirstFileA");
         Kernel32Data[eFindNextFileA][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "FindNextFileA");
+        Kernel32Data[eFindFirstFileW][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "FindFirstFileW");
         Kernel32Data[eFindNextFileW][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "FindNextFileW");
+        Kernel32Data[eFindFirstFileExA][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "FindFirstFileExA");
+        Kernel32Data[eFindFirstFileExW][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "FindFirstFileExW");
         Kernel32Data[eLoadLibraryExA][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "LoadLibraryExA");
         Kernel32Data[eLoadLibraryExW][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "LoadLibraryExW");
         Kernel32Data[eLoadLibraryA][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "LoadLibraryA");
@@ -1212,16 +1315,40 @@ bool HookKernel32IAT(HMODULE mod, bool exe)
                 *(size_t*)i = (size_t)CustomGetShortPathNameA;
                 matchedImports++;
             }
+            else if (ptr == Kernel32Data[eFindFirstFileA][ProcAddress])
+            {
+                if (exe) Kernel32Data[eFindFirstFileA][IATPtr] = i;
+                *(size_t*)i = (size_t)CustomFindFirstFileA;
+                matchedImports++;
+            }
             else if (ptr == Kernel32Data[eFindNextFileA][ProcAddress])
             {
                 if (exe) Kernel32Data[eFindNextFileA][IATPtr] = i;
                 *(size_t*)i = (size_t)CustomFindNextFileA;
                 matchedImports++;
             }
+            else if (ptr == Kernel32Data[eFindFirstFileW][ProcAddress])
+            {
+                if (exe) Kernel32Data[eFindFirstFileW][IATPtr] = i;
+                *(size_t*)i = (size_t)CustomFindFirstFileW;
+                matchedImports++;
+            }
             else if (ptr == Kernel32Data[eFindNextFileW][ProcAddress])
             {
                 if (exe) Kernel32Data[eFindNextFileW][IATPtr] = i;
                 *(size_t*)i = (size_t)CustomFindNextFileW;
+                matchedImports++;
+            }
+            else if (ptr == Kernel32Data[eFindFirstFileExA][ProcAddress])
+            {
+                if (exe) Kernel32Data[eFindFirstFileExA][IATPtr] = i;
+                *(size_t*)i = (size_t)CustomFindFirstFileExA;
+                matchedImports++;
+            }
+            else if (ptr == Kernel32Data[eFindFirstFileExW][ProcAddress])
+            {
+                if (exe) Kernel32Data[eFindFirstFileExW][IATPtr] = i;
+                *(size_t*)i = (size_t)CustomFindFirstFileExW;
                 matchedImports++;
             }
             else if (ptr == Kernel32Data[eLoadLibraryExA][ProcAddress])
@@ -1317,42 +1444,36 @@ bool HookKernel32IAT(HMODULE mod, bool exe)
             else if (ptr == Kernel32Data[eCreateFileA][ProcAddress])
             {
                 if (exe) Kernel32Data[eCreateFileA][IATPtr] = i;
-                ptrCreateFileA = *(tCreateFileA*)i;
                 *(size_t*)i = (size_t)CustomCreateFileA;
                 matchedImports++;
             }
             else if (ptr == Kernel32Data[eCreateFileW][ProcAddress])
             {
                 if (exe) Kernel32Data[eCreateFileW][IATPtr] = i;
-                ptrCreateFileW = *(tCreateFileW*)i;
                 *(size_t*)i = (size_t)CustomCreateFileW;
                 matchedImports++;
             }
             else if (ptr == Kernel32Data[eGetFileAttributesA][ProcAddress])
             {
                 if (exe) Kernel32Data[eGetFileAttributesA][IATPtr] = i;
-                ptrGetFileAttributesA = *(tGetFileAttributesA*)i;
                 *(size_t*)i = (size_t)CustomGetFileAttributesA;
                 matchedImports++;
             }
             else if (ptr == Kernel32Data[eGetFileAttributesW][ProcAddress])
             {
                 if (exe) Kernel32Data[eGetFileAttributesW][IATPtr] = i;
-                ptrGetFileAttributesW = *(tGetFileAttributesW*)i;
                 *(size_t*)i = (size_t)CustomGetFileAttributesW;
                 matchedImports++;
             }
             else if (ptr == Kernel32Data[eGetFileAttributesExA][ProcAddress])
             {
                 if (exe) Kernel32Data[eGetFileAttributesExA][IATPtr] = i;
-                ptrGetFileAttributesExA = *(tGetFileAttributesExA*)i;
                 *(size_t*)i = (size_t)CustomGetFileAttributesExA;
                 matchedImports++;
             }
             else if (ptr == Kernel32Data[eGetFileAttributesExW][ProcAddress])
             {
                 if (exe) Kernel32Data[eGetFileAttributesExW][IATPtr] = i;
-                ptrGetFileAttributesExW = *(tGetFileAttributesExW*)i;
                 *(size_t*)i = (size_t)CustomGetFileAttributesExW;
                 matchedImports++;
             }
@@ -1987,6 +2108,7 @@ void Init()
     auto nFindModule = GetPrivateProfileIntW(TEXT("globalsets"), TEXT("findmodule"), FALSE, iniPaths);
     auto nDisableCrashDumps = GetPrivateProfileIntW(TEXT("globalsets"), TEXT("disablecrashdumps"), FALSE, iniPaths);
     sFileLoaderPath = GetPrivateProfileStringW(TEXT("fileloader"), TEXT("overloadfromfolder"), TEXT("update"), iniPaths);
+    bPatchFindFile = GetPrivateProfileIntW(TEXT("fileloader"), TEXT("patchfindfile"), FALSE, iniPaths);
 
     auto FolderExists = [](auto szPath) -> bool
     {
@@ -2026,12 +2148,25 @@ void Init()
 
     if (nForceEPHook != FALSE || nDontLoadFromDllMain != FALSE)
     {
-        if (sLoadFromAPI.empty()) // compatibility with GTAV/RDR2 plugins
+        try
         {
             auto exeName = std::filesystem::path(GetModulePath(NULL)).stem().wstring();
-            if (iequals(exeName, L"GTA5") || iequals(exeName, L"RDR2") || iequals(exeName, L"game_win64_master"))
-                sLoadFromAPI = L"GetSystemTimeAsFileTime";
+
+            if (sLoadFromAPI.empty()) // compatibility with GTAV/RDR2 plugins
+            {
+                if (iequals(exeName, L"GTA5") || iequals(exeName, L"RDR2") || iequals(exeName, L"game_win64_master"))
+                    sLoadFromAPI = L"GetSystemTimeAsFileTime";
+            }
+
+            if (!sFileLoaderPath.empty())
+            {
+                if (iequals(exeName, L"deadrising2"))
+                {
+                    bPatchFindFile = true;
+                }
+            }
         }
+        catch (...) {}
 
         HMODULE mainModule = GetModuleHandle(NULL);
         bool hookedSuccessfully = HookKernel32IAT(mainModule, true);
