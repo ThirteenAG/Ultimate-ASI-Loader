@@ -135,20 +135,32 @@ typedef DWORD(WINAPI* tGetFileAttributesA)(LPCSTR lpFileName);
 typedef DWORD(WINAPI* tGetFileAttributesW)(LPCWSTR lpFileName);
 typedef BOOL(WINAPI* tGetFileAttributesExA)(LPCSTR lpFileName, GET_FILEEX_INFO_LEVELS fInfoLevelId, LPVOID lpFileInformation);
 typedef BOOL(WINAPI* tGetFileAttributesExW)(LPCWSTR lpFileName, GET_FILEEX_INFO_LEVELS fInfoLevelId, LPVOID lpFileInformation);
-typedef HMODULE(WINAPI* tCustomLoadLibraryExA)(LPCSTR lpLibFileName, HANDLE hFile, DWORD dwFlags);
-typedef HMODULE(WINAPI* tCustomLoadLibraryExW)(LPCWSTR lpLibFileName, HANDLE hFile, DWORD dwFlags);
-typedef HMODULE(WINAPI* tCustomLoadLibraryA)(LPCSTR lpLibFileName);
-typedef HMODULE(WINAPI* tCustomLoadLibraryW)(LPCWSTR lpLibFileName);
-tCreateFileA ptrCreateFileA;
-tCreateFileW ptrCreateFileW;
-tGetFileAttributesA ptrGetFileAttributesA;
-tGetFileAttributesW ptrGetFileAttributesW;
-tGetFileAttributesExA ptrGetFileAttributesExA;
-tGetFileAttributesExW ptrGetFileAttributesExW;
-tCustomLoadLibraryExA ptrLoadLibraryExA;
-tCustomLoadLibraryExW ptrLoadLibraryExW;
-tCustomLoadLibraryA ptrLoadLibraryA;
-tCustomLoadLibraryW ptrLoadLibraryW;
+typedef HMODULE(WINAPI* tLoadLibraryExA)(LPCSTR lpLibFileName, HANDLE hFile, DWORD dwFlags);
+typedef HMODULE(WINAPI* tLoadLibraryExW)(LPCWSTR lpLibFileName, HANDLE hFile, DWORD dwFlags);
+typedef HMODULE(WINAPI* tLoadLibraryA)(LPCSTR lpLibFileName);
+typedef HMODULE(WINAPI* tLoadLibraryW)(LPCWSTR lpLibFileName);
+typedef HANDLE(WINAPI* tFindFirstFileA)(LPCSTR lpFileName, LPWIN32_FIND_DATAA lpFindFileData);
+typedef BOOL(WINAPI* tFindNextFileA)(HANDLE hFindFile, LPWIN32_FIND_DATAA lpFindFileData);
+typedef HANDLE(WINAPI* tFindFirstFileW)(LPCWSTR lpFileName, LPWIN32_FIND_DATAW lpFindFileData);
+typedef BOOL(WINAPI* tFindNextFileW)(HANDLE hFindFile, LPWIN32_FIND_DATAW lpFindFileData);
+typedef HANDLE(WINAPI* tFindFirstFileExA)(LPCSTR lpFileName, FINDEX_INFO_LEVELS fInfoLevelId, WIN32_FIND_DATAA* lpFindFileData, FINDEX_SEARCH_OPS fSearchOp, LPVOID lpSearchFilter, DWORD dwAdditionalFlags);
+typedef HANDLE(WINAPI* tFindFirstFileExW)(LPCWSTR lpFileName, FINDEX_INFO_LEVELS fInfoLevelId, WIN32_FIND_DATAW* lpFindFileData, FINDEX_SEARCH_OPS fSearchOp, LPVOID lpSearchFilter, DWORD dwAdditionalFlags);
+tCreateFileA pCreateFileA;
+tCreateFileW pCreateFileW;
+tGetFileAttributesA pGetFileAttributesA;
+tGetFileAttributesW pGetFileAttributesW;
+tGetFileAttributesExA pGetFileAttributesExA;
+tGetFileAttributesExW pGetFileAttributesExW;
+tLoadLibraryExA pLoadLibraryExA;
+tLoadLibraryExW pLoadLibraryExW;
+tLoadLibraryA pLoadLibraryA;
+tLoadLibraryW pLoadLibraryW;
+tFindFirstFileA pFindFirstFileA;
+tFindNextFileA pFindNextFileA;
+tFindFirstFileW pFindFirstFileW;
+tFindNextFileW pFindNextFileW;
+tFindFirstFileExA pFindFirstFileExA;
+tFindFirstFileExW pFindFirstFileExW;
 
 class IATHook
 {
@@ -374,16 +386,22 @@ public:
 void HookKernel32IATForOverride(HMODULE mod)
 {
     IATHook::Replace(mod, "KERNEL32.DLL",
-        std::forward_as_tuple("CreateFileA", ptrCreateFileA),
-        std::forward_as_tuple("CreateFileW", ptrCreateFileW),
-        std::forward_as_tuple("GetFileAttributesA", ptrGetFileAttributesA),
-        std::forward_as_tuple("GetFileAttributesW", ptrGetFileAttributesW),
-        std::forward_as_tuple("GetFileAttributesExA", ptrGetFileAttributesExA),
-        std::forward_as_tuple("GetFileAttributesExW", ptrGetFileAttributesExW),
-        std::forward_as_tuple("LoadLibraryExA", ptrLoadLibraryExA),
-        std::forward_as_tuple("LoadLibraryExW", ptrLoadLibraryExW),
-        std::forward_as_tuple("LoadLibraryA", ptrLoadLibraryA),
-        std::forward_as_tuple("LoadLibraryW", ptrLoadLibraryW)
+        std::forward_as_tuple("CreateFileA", pCreateFileA),
+        std::forward_as_tuple("CreateFileW", pCreateFileW),
+        std::forward_as_tuple("GetFileAttributesA", pGetFileAttributesA),
+        std::forward_as_tuple("GetFileAttributesW", pGetFileAttributesW),
+        std::forward_as_tuple("GetFileAttributesExA", pGetFileAttributesExA),
+        std::forward_as_tuple("GetFileAttributesExW", pGetFileAttributesExW),
+        std::forward_as_tuple("LoadLibraryExA", pLoadLibraryExA),
+        std::forward_as_tuple("LoadLibraryExW", pLoadLibraryExW),
+        std::forward_as_tuple("LoadLibraryA", pLoadLibraryA),
+        std::forward_as_tuple("LoadLibraryW", pLoadLibraryW),
+        std::forward_as_tuple("FindFirstFileA", pFindFirstFileA),
+        std::forward_as_tuple("FindNextFileA", pFindNextFileA),
+        std::forward_as_tuple("FindFirstFileW", pFindFirstFileW),
+        std::forward_as_tuple("FindNextFileW", pFindNextFileW),
+        std::forward_as_tuple("FindFirstFileExA", pFindFirstFileExA),
+        std::forward_as_tuple("FindFirstFileExW", pFindFirstFileExW)
     );
 }
 
@@ -415,39 +433,27 @@ extern "C" __declspec(dllexport) void InitializeASI()
         for (auto& e : dlls.m_moduleList)
         {
             auto m = std::get<HMODULE>(e);
-            auto pCreateFileA = (tCreateFileA)GetProcAddress(m, "CustomCreateFileA");
-            auto pCreateFileW = (tCreateFileW)GetProcAddress(m, "CustomCreateFileW");
-            auto pGetFileAttributesA = (tGetFileAttributesA)GetProcAddress(m, "CustomGetFileAttributesA");
-            auto pGetFileAttributesW = (tGetFileAttributesW)GetProcAddress(m, "CustomGetFileAttributesW");
-            auto pGetFileAttributesExA = (tGetFileAttributesExA)GetProcAddress(m, "CustomGetFileAttributesExA");
-            auto pGetFileAttributesExW = (tGetFileAttributesExW)GetProcAddress(m, "CustomGetFileAttributesExW");
-            auto pLoadLibraryExA = (tCustomLoadLibraryExA)GetProcAddress(m, "CustomLoadLibraryExA");
-            auto pLoadLibraryExW = (tCustomLoadLibraryExW)GetProcAddress(m, "CustomLoadLibraryExW");
-            auto pLoadLibraryA = (tCustomLoadLibraryA)GetProcAddress(m, "CustomLoadLibraryA");
-            auto pLoadLibraryW = (tCustomLoadLibraryW)GetProcAddress(m, "CustomLoadLibraryW");
+            pCreateFileA = (tCreateFileA)GetProcAddress(m, "CustomCreateFileA");
+            pCreateFileW = (tCreateFileW)GetProcAddress(m, "CustomCreateFileW");
+            pGetFileAttributesA = (tGetFileAttributesA)GetProcAddress(m, "CustomGetFileAttributesA");
+            pGetFileAttributesW = (tGetFileAttributesW)GetProcAddress(m, "CustomGetFileAttributesW");
+            pGetFileAttributesExA = (tGetFileAttributesExA)GetProcAddress(m, "CustomGetFileAttributesExA");
+            pGetFileAttributesExW = (tGetFileAttributesExW)GetProcAddress(m, "CustomGetFileAttributesExW");
+            pLoadLibraryExA = (tLoadLibraryExA)GetProcAddress(m, "CustomLoadLibraryExA");
+            pLoadLibraryExW = (tLoadLibraryExW)GetProcAddress(m, "CustomLoadLibraryExW");
+            pLoadLibraryA = (tLoadLibraryA)GetProcAddress(m, "CustomLoadLibraryA");
+            pLoadLibraryW = (tLoadLibraryW)GetProcAddress(m, "CustomLoadLibraryW");
+            pFindFirstFileA = (tFindFirstFileA)GetProcAddress(m, "CustomFindFirstFileA");
+            pFindNextFileA = (tFindNextFileA)GetProcAddress(m, "CustomFindNextFileA");
+            pFindFirstFileW = (tFindFirstFileW)GetProcAddress(m, "CustomFindFirstFileW");
+            pFindNextFileW = (tFindNextFileW)GetProcAddress(m, "CustomFindNextFileW");
+            pFindFirstFileExA = (tFindFirstFileExA)GetProcAddress(m, "CustomFindFirstFileExA");
+            pFindFirstFileExW = (tFindFirstFileExW)GetProcAddress(m, "CustomFindFirstFileExW");
             auto GetMemoryModule = (HMODULE(WINAPI*)())GetProcAddress(m, "GetMemoryModule");
+
             if (pCreateFileA && pCreateFileW)
             {
                 ual = m;
-                ptrCreateFileA = pCreateFileA;
-                ptrCreateFileW = pCreateFileW;
-                if (pGetFileAttributesA)
-                    ptrGetFileAttributesA = pGetFileAttributesA;
-                if (pGetFileAttributesW)
-                    ptrGetFileAttributesW = pGetFileAttributesW;
-                if (pGetFileAttributesExA)
-                    ptrGetFileAttributesExA = pGetFileAttributesExA;
-                if (pGetFileAttributesExW)
-                    ptrGetFileAttributesExW = pGetFileAttributesExW;
-                if (pLoadLibraryExA)
-                    ptrLoadLibraryExA = pLoadLibraryExA;
-                if (pLoadLibraryExW)
-                    ptrLoadLibraryExW = pLoadLibraryExW;
-                if (pLoadLibraryA)
-                    ptrLoadLibraryA = pLoadLibraryA;
-                if (pLoadLibraryW)
-                    ptrLoadLibraryW = pLoadLibraryW;
-
                 for (auto& e : dlls.m_moduleList)
                 {
                     auto m = std::get<HMODULE>(e);
@@ -463,8 +469,10 @@ extern "C" __declspec(dllexport) void InitializeASI()
                                 for (size_t i = 0; i <= 0xF0; i++)
                                 {
                                     auto hModule = reinterpret_cast<PIMAGE_DOS_HEADER>(ptr - i);
-                                    if (hModule->e_magic == IMAGE_DOS_SIGNATURE)
+                                    if (hModule->e_magic == IMAGE_DOS_SIGNATURE) {
                                         HookKernel32IATForOverride((HMODULE)hModule);
+                                        break;
+                                    }
                                 }
                             }
                         }

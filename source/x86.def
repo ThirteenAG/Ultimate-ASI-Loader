@@ -13,6 +13,12 @@ CustomLoadLibraryExA = CustomLoadLibraryExA
 CustomLoadLibraryExW = CustomLoadLibraryExW
 CustomLoadLibraryA = CustomLoadLibraryA
 CustomLoadLibraryW = CustomLoadLibraryW
+CustomFindFirstFileA = CustomFindFirstFileA
+CustomFindNextFileA = CustomFindNextFileA
+CustomFindFirstFileW = CustomFindFirstFileW
+CustomFindNextFileW = CustomFindNextFileW
+CustomFindFirstFileExA = CustomFindFirstFileExA
+CustomFindFirstFileExW = CustomFindFirstFileExW
 
 LIBRARY "vorbisfile"
 EXPORTS

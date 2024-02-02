@@ -2160,7 +2160,7 @@ void Init()
 
             if (!sFileLoaderPath.empty())
             {
-                if (iequals(exeName, L"deadrising2"))
+                if (iequals(exeName, L"deadrising2") || iequals(exeName, L"deadrising2otr") || iequals(exeName, L"deadrising3") || iequals(exeName, L"deadrising4"))
                 {
                     bPatchFindFile = true;
                 }
