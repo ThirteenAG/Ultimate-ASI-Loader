@@ -25,6 +25,9 @@ std::filesystem::path sFileLoaderPath;
 std::filesystem::path gamePath;
 std::wstring sLoadFromAPI;
 bool bPatchFindFile = false;
+std::vector<std::pair<std::filesystem::path, LARGE_INTEGER>> updateFilenames;
+std::string sCurrentFindFileDirA;
+std::wstring sCurrentFindFileDirW;
 
 bool iequals(std::wstring_view s1, std::wstring_view s2)
 {
@@ -33,6 +36,110 @@ bool iequals(std::wstring_view s1, std::wstring_view s2)
     std::transform(str1.begin(), str1.end(), str1.begin(), [](wchar_t c) { return ::towlower(c); });
     std::transform(str2.begin(), str2.end(), str2.begin(), [](wchar_t c) { return ::towlower(c); });
     return (str1 == str2);
+}
+
+std::filesystem::path lexicallyRelativeCaseIns(const std::filesystem::path& path, const std::filesystem::path& base)
+{
+    class input_iterator_range
+    {
+    public:
+        input_iterator_range(const std::filesystem::path::const_iterator& first, const std::filesystem::path::const_iterator& last)
+            : _first(first)
+            , _last(last)
+        {}
+        std::filesystem::path::const_iterator begin() const { return _first; }
+        std::filesystem::path::const_iterator end() const { return _last; }
+    private:
+        std::filesystem::path::const_iterator _first;
+        std::filesystem::path::const_iterator _last;
+    };
+
+    if (!iequals(path.root_name().wstring(), base.root_name().wstring()) || path.is_absolute() != base.is_absolute() || (!path.has_root_directory() && base.has_root_directory())) {
+        return std::filesystem::path();
+    }
+    std::filesystem::path::const_iterator a = path.begin(), b = base.begin();
+    while (a != path.end() && b != base.end() && iequals(a->wstring(), b->wstring())) {
+        ++a;
+        ++b;
+    }
+    if (a == path.end() && b == base.end()) {
+        return std::filesystem::path(".");
+    }
+    int count = 0;
+    for (const auto& element : input_iterator_range(b, base.end())) {
+        if (element != "." && element != "" && element != "..") {
+            ++count;
+        }
+        else if (element == "..") {
+            --count;
+        }
+    }
+    if (count < 0) {
+        return std::filesystem::path();
+    }
+    std::filesystem::path result;
+    for (int i = 0; i < count; ++i) {
+        result /= "..";
+    }
+    for (const auto& element : input_iterator_range(a, path.end())) {
+        result /= element;
+    }
+    return result;
+}
+
+void FillUpdateFilenames()
+{
+    if (updateFilenames.empty())
+    {
+        auto path = gamePath / sFileLoaderPath;
+        std::error_code ec;
+        constexpr auto perms = std::filesystem::directory_options::skip_permission_denied | std::filesystem::directory_options::follow_directory_symlink;
+        for (const auto& it : std::filesystem::recursive_directory_iterator(path, perms, ec))
+        {
+            if (!it.is_directory(ec))
+            {
+                LARGE_INTEGER Integer;
+                Integer.QuadPart = std::filesystem::file_size(it, ec);
+                updateFilenames.emplace_back(lexicallyRelativeCaseIns(it.path(), path), Integer);
+            }
+        }
+    }
+}
+
+LARGE_INTEGER FindFileCheckOverloadedPath(CHAR* filename)
+{
+    FillUpdateFilenames();
+
+    if (!updateFilenames.empty())
+    {
+        auto it = std::find_if(updateFilenames.begin(), updateFilenames.end(), [&](const auto& val)
+        {
+            return (sCurrentFindFileDirA.starts_with(val.first.parent_path().string()) && val.first.string().ends_with(filename));
+        });
+
+        if (it != updateFilenames.end())
+            return it->second;
+    }
+
+    return {};
+}
+
+LARGE_INTEGER FindFileCheckOverloadedPath(WCHAR* filename)
+{
+    FillUpdateFilenames();
+
+    if (!updateFilenames.empty())
+    {
+        auto it = std::find_if(updateFilenames.begin(), updateFilenames.end(), [&](const auto& val)
+        {
+            return (sCurrentFindFileDirW.starts_with(val.first.parent_path().wstring()) && val.first.wstring().ends_with(filename));
+        });
+
+        if (it != updateFilenames.end())
+            return it->second;
+    }
+
+    return {};
 }
 
 std::wstring to_wstring(std::string_view cstr)
@@ -721,55 +828,6 @@ std::filesystem::path WINAPI GetOverloadedFilePath(std::filesystem::path lpFilen
             return str1.starts_with(str2);
         };
 
-        static auto lexicallyRelativeCaseIns = [](const std::filesystem::path& path, const std::filesystem::path& base) -> std::filesystem::path
-        {
-            class input_iterator_range
-            {
-            public:
-                input_iterator_range(const std::filesystem::path::const_iterator& first, const std::filesystem::path::const_iterator& last)
-                    : _first(first)
-                    , _last(last)
-                {}
-                std::filesystem::path::const_iterator begin() const { return _first; }
-                std::filesystem::path::const_iterator end() const { return _last; }
-            private:
-                std::filesystem::path::const_iterator _first;
-                std::filesystem::path::const_iterator _last;
-            };
-
-            if (!iequals(path.root_name().wstring(), base.root_name().wstring()) || path.is_absolute() != base.is_absolute() || (!path.has_root_directory() && base.has_root_directory())) {
-                return std::filesystem::path();
-            }
-            std::filesystem::path::const_iterator a = path.begin(), b = base.begin();
-            while (a != path.end() && b != base.end() && iequals(a->wstring(), b->wstring())) {
-                ++a;
-                ++b;
-            }
-            if (a == path.end() && b == base.end()) {
-                return std::filesystem::path(".");
-            }
-            int count = 0;
-            for (const auto& element : input_iterator_range(b, base.end())) {
-                if (element != "." && element != "" && element != "..") {
-                    ++count;
-                }
-                else if (element == "..") {
-                    --count;
-                }
-            }
-            if (count < 0) {
-                return std::filesystem::path();
-            }
-            std::filesystem::path result;
-            for (int i = 0; i < count; ++i) {
-                result /= "..";
-            }
-            for (const auto& element : input_iterator_range(a, path.end())) {
-                result /= element;
-            }
-            return result;
-        };
-
         if (gamePath.empty())
             gamePath = std::filesystem::path(GetExeModulePath());
 
@@ -795,7 +853,7 @@ std::filesystem::path WINAPI GetOverloadedFilePath(std::filesystem::path lpFilen
 
         if (starts_with(std::filesystem::path(absolutePath).remove_filename(), gamePath) || starts_with(std::filesystem::path(absolutePath).remove_filename(), commonPath))
         {
-            auto newPath = gamePath / sFileLoaderPath.make_preferred() / relativePath;
+            auto newPath = gamePath / sFileLoaderPath / relativePath;
             if (std::filesystem::exists(newPath, ec) && !std::filesystem::is_directory(newPath, ec))
                 return newPath;
             }
@@ -809,7 +867,8 @@ std::filesystem::path GetFilePathForOverload(auto path)
 {
     try
     {
-        return GetOverloadedFilePath(path);
+        if (!sFileLoaderPath.empty())
+            return GetOverloadedFilePath(path);
     }
     catch (...) {}
 
@@ -1056,8 +1115,14 @@ HANDLE WINAPI CustomFindFirstFileA(LPCSTR lpFileName, LPWIN32_FIND_DATAA lpFindF
 
     if (bPatchFindFile)
     {
-        lpFindFileData->nFileSizeHigh = 0;
-        lpFindFileData->nFileSizeLow = 0;
+        sCurrentFindFileDirA = lpFileName;
+
+        auto i = FindFileCheckOverloadedPath(lpFindFileData->cFileName);
+        if (i.QuadPart)
+        {
+            lpFindFileData->nFileSizeHigh = i.HighPart;
+            lpFindFileData->nFileSizeLow = i.LowPart;
+        }
     }
 
     return ret;
@@ -1077,8 +1142,12 @@ BOOL WINAPI CustomFindNextFileA(HANDLE hFindFile, LPWIN32_FIND_DATAA lpFindFileD
 
     if (bPatchFindFile)
     {
-        lpFindFileData->nFileSizeHigh = 0;
-        lpFindFileData->nFileSizeLow = 0;
+        auto i = FindFileCheckOverloadedPath(lpFindFileData->cFileName);
+        if (i.QuadPart)
+        {
+            lpFindFileData->nFileSizeHigh = i.HighPart;
+            lpFindFileData->nFileSizeLow = i.LowPart;
+        }
     }
 
     return ret;
@@ -1098,8 +1167,14 @@ HANDLE WINAPI CustomFindFirstFileW(LPCWSTR lpFileName, LPWIN32_FIND_DATAW lpFind
 
     if (bPatchFindFile)
     {
-        lpFindFileData->nFileSizeHigh = 0;
-        lpFindFileData->nFileSizeLow = 0;
+        sCurrentFindFileDirW = lpFileName;
+
+        auto i = FindFileCheckOverloadedPath(lpFindFileData->cFileName);
+        if (i.QuadPart)
+        {
+            lpFindFileData->nFileSizeHigh = i.HighPart;
+            lpFindFileData->nFileSizeLow = i.LowPart;
+        }
     }
 
     return ret;
@@ -1119,8 +1194,12 @@ BOOL WINAPI CustomFindNextFileW(HANDLE hFindFile, LPWIN32_FIND_DATAW lpFindFileD
 
     if (bPatchFindFile)
     {
-        lpFindFileData->nFileSizeHigh = 0;
-        lpFindFileData->nFileSizeLow = 0;
+        auto i = FindFileCheckOverloadedPath(lpFindFileData->cFileName);
+        if (i.QuadPart)
+        {
+            lpFindFileData->nFileSizeHigh = i.HighPart;
+            lpFindFileData->nFileSizeLow = i.LowPart;
+        }
     }
 
     return ret;
@@ -1140,8 +1219,14 @@ HANDLE WINAPI CustomFindFirstFileExA(LPCSTR lpFileName, FINDEX_INFO_LEVELS fInfo
 
     if (fInfoLevelId != FindExInfoMaxInfoLevel && bPatchFindFile)
     {
-        lpFindFileData->nFileSizeHigh = 0;
-        lpFindFileData->nFileSizeLow = 0;
+        sCurrentFindFileDirA = lpFileName;
+
+        auto i = FindFileCheckOverloadedPath(lpFindFileData->cFileName);
+        if (i.QuadPart)
+        {
+            lpFindFileData->nFileSizeHigh = i.HighPart;
+            lpFindFileData->nFileSizeLow = i.LowPart;
+        }
     }
 
     return ret;
@@ -1161,8 +1246,14 @@ HANDLE WINAPI CustomFindFirstFileExW(LPCWSTR lpFileName, FINDEX_INFO_LEVELS fInf
 
     if (fInfoLevelId != FindExInfoMaxInfoLevel && bPatchFindFile)
     {
-        lpFindFileData->nFileSizeHigh = 0;
-        lpFindFileData->nFileSizeLow = 0;
+        sCurrentFindFileDirW = lpFileName;
+
+        auto i = FindFileCheckOverloadedPath(lpFindFileData->cFileName);
+        if (i.QuadPart)
+        {
+            lpFindFileData->nFileSizeHigh = i.HighPart;
+            lpFindFileData->nFileSizeLow = i.LowPart;
+        }
     }
 
     return ret;
@@ -2145,6 +2236,8 @@ void Init()
 
     if (!FolderExists(sFileLoaderPath))
         sFileLoaderPath.clear();
+    else
+        sFileLoaderPath = sFileLoaderPath.make_preferred();
 
     if (nForceEPHook != FALSE || nDontLoadFromDllMain != FALSE)
     {
