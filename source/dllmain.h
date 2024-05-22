@@ -1664,6 +1664,7 @@ struct bink2w64_dll
     FARPROC BinkControlBackgroundIO;
     FARPROC BinkCopyToBuffer;
     FARPROC BinkCopyToBufferRect;
+    FARPROC BinkCurrentSubtitle;
     FARPROC BinkDoFrame;
     FARPROC BinkDoFrameAsync;
     FARPROC BinkDoFrameAsyncMulti;
@@ -1678,12 +1679,14 @@ struct bink2w64_dll
     FARPROC BinkGetPlatformInfo;
     FARPROC BinkGetRealtime;
     FARPROC BinkGetRects;
+    FARPROC BinkGetSubtitleByIndex;
     FARPROC BinkGetSummary;
     FARPROC BinkGetTrackData;
     FARPROC BinkGetTrackID;
     FARPROC BinkGetTrackMaxSize;
     FARPROC BinkGetTrackType;
     FARPROC BinkGoto;
+    FARPROC BinkLoadSubtitles;
     FARPROC BinkLogoAddress;
     FARPROC BinkNextFrame;
     FARPROC BinkOpen;
@@ -1746,6 +1749,7 @@ struct bink2w64_dll
         BinkControlBackgroundIO = GetProcAddress(dll, "BinkControlBackgroundIO");
         BinkCopyToBuffer = GetProcAddress(dll, "BinkCopyToBuffer");
         BinkCopyToBufferRect = GetProcAddress(dll, "BinkCopyToBufferRect");
+        BinkCurrentSubtitle = GetProcAddress(dll, "BinkCurrentSubtitle");
         BinkDoFrame = GetProcAddress(dll, "BinkDoFrame");
         BinkDoFrameAsync = GetProcAddress(dll, "BinkDoFrameAsync");
         BinkDoFrameAsyncMulti = GetProcAddress(dll, "BinkDoFrameAsyncMulti");
@@ -1760,12 +1764,14 @@ struct bink2w64_dll
         BinkGetPlatformInfo = GetProcAddress(dll, "BinkGetPlatformInfo");
         BinkGetRealtime = GetProcAddress(dll, "BinkGetRealtime");
         BinkGetRects = GetProcAddress(dll, "BinkGetRects");
+        BinkGetSubtitleByIndex = GetProcAddress(dll, "BinkGetSubtitleByIndex");
         BinkGetSummary = GetProcAddress(dll, "BinkGetSummary");
         BinkGetTrackData = GetProcAddress(dll, "BinkGetTrackData");
         BinkGetTrackID = GetProcAddress(dll, "BinkGetTrackID");
         BinkGetTrackMaxSize = GetProcAddress(dll, "BinkGetTrackMaxSize");
         BinkGetTrackType = GetProcAddress(dll, "BinkGetTrackType");
         BinkGoto = GetProcAddress(dll, "BinkGoto");
+        BinkLoadSubtitles = GetProcAddress(dll, "BinkLoadSubtitles");
         BinkLogoAddress = GetProcAddress(dll, "BinkLogoAddress");
         BinkNextFrame = GetProcAddress(dll, "BinkNextFrame");
         BinkOpen = GetProcAddress(dll, "BinkOpen");
@@ -2114,6 +2120,7 @@ struct msvfw32_dll
 struct binkw32_dll
 {
     HMEMORYMODULE dll;
+    FARPROC BinkAllocateFrameBuffers;
     FARPROC BinkBufferBlit;
     FARPROC BinkBufferCheckWinPos;
     FARPROC BinkBufferClear;
@@ -2135,28 +2142,36 @@ struct binkw32_dll
     FARPROC BinkControlPlatformFeatures;
     FARPROC BinkCopyToBuffer;
     FARPROC BinkCopyToBufferRect;
+    FARPROC BinkCurrentSubtitle;
     FARPROC BinkDDSurfaceType;
     FARPROC BinkDX8SurfaceType;
     FARPROC BinkDX9SurfaceType;
     FARPROC BinkDoFrame;
     FARPROC BinkDoFrameAsync;
+    FARPROC BinkDoFrameAsyncMulti;
     FARPROC BinkDoFrameAsyncWait;
     FARPROC BinkDoFramePlane;
+    FARPROC BinkFindXAudio2WinDevice;
     FARPROC BinkFreeGlobals;
     FARPROC BinkGetError;
     FARPROC BinkGetFrameBuffersInfo;
+    FARPROC BinkGetGPUDataBuffersInfo;
     FARPROC BinkGetKeyFrame;
     FARPROC BinkGetPalette;
     FARPROC BinkGetPlatformInfo;
     FARPROC BinkGetRealtime;
     FARPROC BinkGetRects;
+    FARPROC BinkGetRects4;
+    FARPROC BinkGetSubtitleByIndex;
     FARPROC BinkGetSummary;
     FARPROC BinkGetTrackData;
+    FARPROC BinkGetTrackData12;
     FARPROC BinkGetTrackID;
     FARPROC BinkGetTrackMaxSize;
     FARPROC BinkGetTrackType;
     FARPROC BinkGoto;
     FARPROC BinkIsSoftwareCursor;
+    FARPROC BinkLoadSubtitles;
     FARPROC BinkLogoAddress;
     FARPROC BinkNextFrame;
     FARPROC BinkOpen;
@@ -2165,10 +2180,16 @@ struct binkw32_dll
     FARPROC BinkOpenTrack;
     FARPROC BinkOpenWaveOut;
     FARPROC BinkOpenWithOptions;
+    FARPROC BinkOpenXAudio27;
+    FARPROC BinkOpenXAudio28;
+    FARPROC BinkOpenXAudio29;
     FARPROC BinkOpenXAudio2;
+    FARPROC BinkOpenXAudio2_8;
     FARPROC BinkPause;
     FARPROC BinkRegisterFrameBuffers;
+    FARPROC BinkRegisterGPUDataBuffers;
     FARPROC BinkRequestStopAsyncThread;
+    FARPROC BinkRequestStopAsyncThreadsMulti;
     FARPROC BinkRestoreCursor;
     FARPROC BinkService;
     FARPROC BinkServiceSound;
@@ -2177,12 +2198,15 @@ struct binkw32_dll
     FARPROC BinkSetFrameRate;
     FARPROC BinkSetIO;
     FARPROC BinkSetIOSize;
+    FARPROC BinkSetIOSize8;
     FARPROC BinkSetMemory;
     FARPROC BinkSetMixBinVolumes;
     FARPROC BinkSetMixBins;
+    FARPROC BinkSetOSFileCallbacks;
     FARPROC BinkSetPan;
     FARPROC BinkSetSimulate;
     FARPROC BinkSetSoundOnOff;
+    FARPROC BinkSetSoundSystem2;
     FARPROC BinkSetSoundSystem;
     FARPROC BinkSetSoundTrack;
     FARPROC BinkSetSpeakerVolumes;
@@ -2193,8 +2217,19 @@ struct binkw32_dll
     FARPROC BinkStartAsyncThread;
     FARPROC BinkUseTelemetry;
     FARPROC BinkUseTmLite;
+    FARPROC BinkUtilCPUs;
+    FARPROC BinkUtilFree;
+    FARPROC BinkUtilMalloc;
+    FARPROC BinkUtilMutexCreate;
+    FARPROC BinkUtilMutexDestroy;
+    FARPROC BinkUtilMutexLock;
+    FARPROC BinkUtilMutexLockTimeOut;
+    FARPROC BinkUtilMutexUnlock;
+    FARPROC BinkUtilSoundGlobalLock;
+    FARPROC BinkUtilSoundGlobalUnlock;
     FARPROC BinkWait;
     FARPROC BinkWaitStopAsyncThread;
+    FARPROC BinkWaitStopAsyncThreadsMulti;
     FARPROC RADSetMemory;
     FARPROC RADTimerRead;
     FARPROC YUV_blit_16a1bpp40;
@@ -2274,6 +2309,7 @@ struct binkw32_dll
                 return GetProcAddress((HMODULE)lib, s);
         };
 
+        BinkAllocateFrameBuffers = AutoGetProcAddress(dll, "_BinkAllocateFrameBuffers@12");
         BinkBufferBlit = AutoGetProcAddress(dll, "_BinkBufferBlit@12");
         BinkBufferCheckWinPos = AutoGetProcAddress(dll, "_BinkBufferCheckWinPos@12");
         BinkBufferClear = AutoGetProcAddress(dll, "_BinkBufferClear@8");
@@ -2295,28 +2331,36 @@ struct binkw32_dll
         BinkControlPlatformFeatures = AutoGetProcAddress(dll, "_BinkControlPlatformFeatures@8");
         BinkCopyToBuffer = AutoGetProcAddress(dll, "_BinkCopyToBuffer@28");
         BinkCopyToBufferRect = AutoGetProcAddress(dll, "_BinkCopyToBufferRect@44");
+        BinkCurrentSubtitle = AutoGetProcAddress(dll, "_BinkCurrentSubtitle@16");
         BinkDDSurfaceType = AutoGetProcAddress(dll, "_BinkDDSurfaceType@4");
         BinkDX8SurfaceType = AutoGetProcAddress(dll, "_BinkDX8SurfaceType@4");
         BinkDX9SurfaceType = AutoGetProcAddress(dll, "_BinkDX9SurfaceType@4");
         BinkDoFrame = AutoGetProcAddress(dll, "_BinkDoFrame@4");
         BinkDoFrameAsync = AutoGetProcAddress(dll, "_BinkDoFrameAsync@12");
+        BinkDoFrameAsyncMulti = AutoGetProcAddress(dll, "_BinkDoFrameAsyncMulti@12");
         BinkDoFrameAsyncWait = AutoGetProcAddress(dll, "_BinkDoFrameAsyncWait@8");
         BinkDoFramePlane = AutoGetProcAddress(dll, "_BinkDoFramePlane@8");
+        BinkFindXAudio2WinDevice = AutoGetProcAddress(dll, "_BinkFindXAudio2WinDevice@8");
         BinkFreeGlobals = AutoGetProcAddress(dll, "_BinkFreeGlobals@0");
         BinkGetError = AutoGetProcAddress(dll, "_BinkGetError@0");
         BinkGetFrameBuffersInfo = AutoGetProcAddress(dll, "_BinkGetFrameBuffersInfo@8");
+        BinkGetGPUDataBuffersInfo = AutoGetProcAddress(dll, "_BinkGetGPUDataBuffersInfo@8");
         BinkGetKeyFrame = AutoGetProcAddress(dll, "_BinkGetKeyFrame@12");
         BinkGetPalette = AutoGetProcAddress(dll, "_BinkGetPalette@4");
         BinkGetPlatformInfo = AutoGetProcAddress(dll, "_BinkGetPlatformInfo@8");
         BinkGetRealtime = AutoGetProcAddress(dll, "_BinkGetRealtime@12");
         BinkGetRects = AutoGetProcAddress(dll, "_BinkGetRects@8");
+        BinkGetRects4 = AutoGetProcAddress(dll, "_BinkGetRects@4");
+        BinkGetSubtitleByIndex = AutoGetProcAddress(dll, "_BinkGetSubtitleByIndex@16");
         BinkGetSummary = AutoGetProcAddress(dll, "_BinkGetSummary@8");
         BinkGetTrackData = AutoGetProcAddress(dll, "_BinkGetTrackData@8");
+        BinkGetTrackData12 = AutoGetProcAddress(dll, "_BinkGetTrackData@12");
         BinkGetTrackID = AutoGetProcAddress(dll, "_BinkGetTrackID@8");
         BinkGetTrackMaxSize = AutoGetProcAddress(dll, "_BinkGetTrackMaxSize@8");
         BinkGetTrackType = AutoGetProcAddress(dll, "_BinkGetTrackType@8");
         BinkGoto = AutoGetProcAddress(dll, "_BinkGoto@12");
         BinkIsSoftwareCursor = AutoGetProcAddress(dll, "_BinkIsSoftwareCursor@8");
+        BinkLoadSubtitles = AutoGetProcAddress(dll, "_BinkLoadSubtitles@8");
         BinkLogoAddress = AutoGetProcAddress(dll, "_BinkLogoAddress@0");
         BinkNextFrame = AutoGetProcAddress(dll, "_BinkNextFrame@4");
         BinkOpen = AutoGetProcAddress(dll, "_BinkOpen@8");
@@ -2326,9 +2370,15 @@ struct binkw32_dll
         BinkOpenWaveOut = AutoGetProcAddress(dll, "_BinkOpenWaveOut@4");
         BinkOpenWithOptions = AutoGetProcAddress(dll, "_BinkOpenWithOptions@12");
         BinkOpenXAudio2 = AutoGetProcAddress(dll, "_BinkOpenXAudio2@4");
+        BinkOpenXAudio2_8 = AutoGetProcAddress(dll, "_BinkOpenXAudio2@8");
+        BinkOpenXAudio27 = AutoGetProcAddress(dll, "_BinkOpenXAudio27@8");
+        BinkOpenXAudio28 = AutoGetProcAddress(dll, "_BinkOpenXAudio28@8");
+        BinkOpenXAudio29 = AutoGetProcAddress(dll, "_BinkOpenXAudio29@8");
         BinkPause = AutoGetProcAddress(dll, "_BinkPause@8");
         BinkRegisterFrameBuffers = AutoGetProcAddress(dll, "_BinkRegisterFrameBuffers@8");
+        BinkRegisterGPUDataBuffers = AutoGetProcAddress(dll, "_BinkRegisterGPUDataBuffers@8");
         BinkRequestStopAsyncThread = AutoGetProcAddress(dll, "_BinkRequestStopAsyncThread@4");
+        BinkRequestStopAsyncThreadsMulti = AutoGetProcAddress(dll, "_BinkRequestStopAsyncThreadsMulti@8");
         BinkRestoreCursor = AutoGetProcAddress(dll, "_BinkRestoreCursor@4");
         BinkService = AutoGetProcAddress(dll, "_BinkService@4");
         BinkServiceSound = AutoGetProcAddress(dll, "_BinkServiceSound@0");
@@ -2337,13 +2387,16 @@ struct binkw32_dll
         BinkSetFrameRate = AutoGetProcAddress(dll, "_BinkSetFrameRate@8");
         BinkSetIO = AutoGetProcAddress(dll, "_BinkSetIO@4");
         BinkSetIOSize = AutoGetProcAddress(dll, "_BinkSetIOSize@4");
+        BinkSetIOSize8 = AutoGetProcAddress(dll, "_BinkSetIOSize@8");
         BinkSetMemory = AutoGetProcAddress(dll, "_BinkSetMemory@8");
         BinkSetMixBinVolumes = AutoGetProcAddress(dll, "_BinkSetMixBinVolumes@20");
         BinkSetMixBins = AutoGetProcAddress(dll, "_BinkSetMixBins@16");
+        BinkSetOSFileCallbacks = AutoGetProcAddress(dll, "_BinkSetOSFileCallbacks@16");
         BinkSetPan = AutoGetProcAddress(dll, "_BinkSetPan@12");
         BinkSetSimulate = AutoGetProcAddress(dll, "_BinkSetSimulate@4");
         BinkSetSoundOnOff = AutoGetProcAddress(dll, "_BinkSetSoundOnOff@8");
         BinkSetSoundSystem = AutoGetProcAddress(dll, "_BinkSetSoundSystem@8");
+        BinkSetSoundSystem2 = AutoGetProcAddress(dll, "_BinkSetSoundSystem2@12");
         BinkSetSoundTrack = AutoGetProcAddress(dll, "_BinkSetSoundTrack@8");
         BinkSetSpeakerVolumes = AutoGetProcAddress(dll, "_BinkSetSpeakerVolumes@20");
         BinkSetVideoOnOff = AutoGetProcAddress(dll, "_BinkSetVideoOnOff@8");
@@ -2353,8 +2406,19 @@ struct binkw32_dll
         BinkStartAsyncThread = AutoGetProcAddress(dll, "_BinkStartAsyncThread@8");
         BinkUseTelemetry = AutoGetProcAddress(dll, "_BinkUseTelemetry@4");
         BinkUseTmLite = AutoGetProcAddress(dll, "_BinkUseTmLite@4");
+        BinkUtilCPUs = AutoGetProcAddress(dll, "_BinkUtilCPUs@0");
+        BinkUtilFree = AutoGetProcAddress(dll, "_BinkUtilFree@4");
+        BinkUtilMalloc = AutoGetProcAddress(dll, "_BinkUtilMalloc@8");
+        BinkUtilMutexCreate = AutoGetProcAddress(dll, "_BinkUtilMutexCreate@8");
+        BinkUtilMutexDestroy = AutoGetProcAddress(dll, "_BinkUtilMutexDestroy@4");
+        BinkUtilMutexLock = AutoGetProcAddress(dll, "_BinkUtilMutexLock@4");
+        BinkUtilMutexLockTimeOut = AutoGetProcAddress(dll, "_BinkUtilMutexLockTimeOut@8");
+        BinkUtilMutexUnlock = AutoGetProcAddress(dll, "_BinkUtilMutexUnlock@4");
+        BinkUtilSoundGlobalLock = AutoGetProcAddress(dll, "_BinkUtilSoundGlobalLock@0");
+        BinkUtilSoundGlobalUnlock = AutoGetProcAddress(dll, "_BinkUtilSoundGlobalUnlock@0");
         BinkWait = AutoGetProcAddress(dll, "_BinkWait@4");
         BinkWaitStopAsyncThread = AutoGetProcAddress(dll, "_BinkWaitStopAsyncThread@4");
+        BinkWaitStopAsyncThreadsMulti = AutoGetProcAddress(dll, "_BinkWaitStopAsyncThreadsMulti@8");
         RADSetMemory = AutoGetProcAddress(dll, "_RADSetMemory@8");
         RADTimerRead = AutoGetProcAddress(dll, "_RADTimerRead@0");
         YUV_blit_16a1bpp40 = AutoGetProcAddress(dll, "_YUV_blit_16a1bpp@40");
@@ -3316,6 +3380,7 @@ __declspec(naked) void _VerLanguageNameW() { _asm { jmp[version.VerLanguageNameW
 __declspec(naked) void _VerQueryValueA() { _asm { jmp[version.VerQueryValueA] } }
 __declspec(naked) void _VerQueryValueW() { _asm { jmp[version.VerQueryValueW] } }
 
+extern "C" __declspec(naked) void __stdcall _BinkAllocateFrameBuffers(int, int, int) { _asm { jmp[binkw32.BinkAllocateFrameBuffers] } }
 extern "C" __declspec(naked) void __stdcall _BinkBufferBlit(int, int, int) { _asm { jmp[binkw32.BinkBufferBlit] } }
 extern "C" __declspec(naked) void __stdcall _BinkBufferCheckWinPos(int, int, int) { _asm { jmp[binkw32.BinkBufferCheckWinPos] } }
 extern "C" __declspec(naked) void __stdcall _BinkBufferClear(int, int) { _asm { jmp[binkw32.BinkBufferClear] } }
@@ -3337,28 +3402,36 @@ extern "C" __declspec(naked) void __stdcall _BinkControlBackgroundIO(int, int) {
 extern "C" __declspec(naked) void __stdcall _BinkControlPlatformFeatures(int, int) { _asm { jmp[binkw32.BinkControlPlatformFeatures] } }
 extern "C" __declspec(naked) void __stdcall _BinkCopyToBuffer(int, int, int, int, int, int, int) { _asm { jmp[binkw32.BinkCopyToBuffer] } }
 extern "C" __declspec(naked) void __stdcall _BinkCopyToBufferRect(int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[binkw32.BinkCopyToBufferRect] } }
+extern "C" __declspec(naked) void __stdcall _BinkCurrentSubtitle(int, int, int, int) { _asm { jmp[binkw32.BinkCurrentSubtitle] } }
 extern "C" __declspec(naked) void __stdcall _BinkDDSurfaceType(int) { _asm { jmp[binkw32.BinkDDSurfaceType] } }
 extern "C" __declspec(naked) void __stdcall _BinkDX8SurfaceType(int) { _asm { jmp[binkw32.BinkDX8SurfaceType] } }
 extern "C" __declspec(naked) void __stdcall _BinkDX9SurfaceType(int) { _asm { jmp[binkw32.BinkDX9SurfaceType] } }
 extern "C" __declspec(naked) void __stdcall _BinkDoFrame(int) { _asm { jmp[binkw32.BinkDoFrame] } }
 extern "C" __declspec(naked) void __stdcall _BinkDoFrameAsync(int, int, int) { _asm { jmp[binkw32.BinkDoFrameAsync] } }
+extern "C" __declspec(naked) void __stdcall _BinkDoFrameAsyncMulti(int, int, int) { _asm { jmp[binkw32.BinkDoFrameAsyncMulti] } }
 extern "C" __declspec(naked) void __stdcall _BinkDoFrameAsyncWait(int, int) { _asm { jmp[binkw32.BinkDoFrameAsyncWait] } }
 extern "C" __declspec(naked) void __stdcall _BinkDoFramePlane(int, int) { _asm { jmp[binkw32.BinkDoFramePlane] } }
+extern "C" __declspec(naked) void __stdcall _BinkFindXAudio2WinDevice(int, int) { _asm { jmp[binkw32.BinkFindXAudio2WinDevice] } }
 extern "C" __declspec(naked) void __stdcall _BinkFreeGlobals() { _asm { jmp[binkw32.BinkFreeGlobals] } }
 extern "C" __declspec(naked) void __stdcall _BinkGetError() { _asm { jmp[binkw32.BinkGetError] } }
 extern "C" __declspec(naked) void __stdcall _BinkGetFrameBuffersInfo(int, int) { _asm { jmp[binkw32.BinkGetFrameBuffersInfo] } }
+extern "C" __declspec(naked) void __stdcall _BinkGetGPUDataBuffersInfo(int, int) { _asm { jmp[binkw32.BinkGetGPUDataBuffersInfo] } }
 extern "C" __declspec(naked) void __stdcall _BinkGetKeyFrame(int, int, int) { _asm { jmp[binkw32.BinkGetKeyFrame] } }
 extern "C" __declspec(naked) void __stdcall _BinkGetPalette(int) { _asm { jmp[binkw32.BinkGetPalette] } }
 extern "C" __declspec(naked) void __stdcall _BinkGetPlatformInfo(int, int) { _asm { jmp[binkw32.BinkGetPlatformInfo] } }
 extern "C" __declspec(naked) void __stdcall _BinkGetRealtime(int, int, int) { _asm { jmp[binkw32.BinkGetRealtime] } }
 extern "C" __declspec(naked) void __stdcall _BinkGetRects(int, int) { _asm { jmp[binkw32.BinkGetRects] } }
+extern "C" __declspec(naked) void __stdcall _BinkGetRects4(int) { _asm { jmp[binkw32.BinkGetRects4] } }
+extern "C" __declspec(naked) void __stdcall _BinkGetSubtitleByIndex(int, int, int, int) { _asm { jmp[binkw32.BinkGetSubtitleByIndex] } }
 extern "C" __declspec(naked) void __stdcall _BinkGetSummary(int, int) { _asm { jmp[binkw32.BinkGetSummary] } }
 extern "C" __declspec(naked) void __stdcall _BinkGetTrackData(int, int) { _asm { jmp[binkw32.BinkGetTrackData] } }
+extern "C" __declspec(naked) void __stdcall _BinkGetTrackData12(int, int, int) { _asm { jmp[binkw32.BinkGetTrackData12] } }
 extern "C" __declspec(naked) void __stdcall _BinkGetTrackID(int, int) { _asm { jmp[binkw32.BinkGetTrackID] } }
 extern "C" __declspec(naked) void __stdcall _BinkGetTrackMaxSize(int, int) { _asm { jmp[binkw32.BinkGetTrackMaxSize] } }
 extern "C" __declspec(naked) void __stdcall _BinkGetTrackType(int, int) { _asm { jmp[binkw32.BinkGetTrackType] } }
 extern "C" __declspec(naked) void __stdcall _BinkGoto(int, int, int) { _asm { jmp[binkw32.BinkGoto] } }
 extern "C" __declspec(naked) void __stdcall _BinkIsSoftwareCursor(int, int) { _asm { jmp[binkw32.BinkIsSoftwareCursor] } }
+extern "C" __declspec(naked) void __stdcall _BinkLoadSubtitles(int, int) { _asm { jmp[binkw32.BinkLoadSubtitles] } }
 extern "C" __declspec(naked) void __stdcall _BinkLogoAddress() { _asm { jmp[binkw32.BinkLogoAddress] } }
 extern "C" __declspec(naked) void __stdcall _BinkNextFrame(int) { _asm { jmp[binkw32.BinkNextFrame] } }
 extern "C" __declspec(naked) void __stdcall _BinkOpen(int, int) { _asm { jmp[binkw32.BinkOpen] } }
@@ -3368,9 +3441,15 @@ extern "C" __declspec(naked) void __stdcall _BinkOpenTrack(int, int) { _asm { jm
 extern "C" __declspec(naked) void __stdcall _BinkOpenWaveOut(int) { _asm { jmp[binkw32.BinkOpenWaveOut] } }
 extern "C" __declspec(naked) void __stdcall _BinkOpenWithOptions(int, int, int) { _asm { jmp[binkw32.BinkOpenWithOptions] } }
 extern "C" __declspec(naked) void __stdcall _BinkOpenXAudio2(int) { _asm { jmp[binkw32.BinkOpenXAudio2] } }
+extern "C" __declspec(naked) void __stdcall _BinkOpenXAudio2_8(int, int) { _asm { jmp[binkw32.BinkOpenXAudio2_8] } }
+extern "C" __declspec(naked) void __stdcall _BinkOpenXAudio27(int, int) { _asm { jmp[binkw32.BinkOpenXAudio27] } }
+extern "C" __declspec(naked) void __stdcall _BinkOpenXAudio28(int, int) { _asm { jmp[binkw32.BinkOpenXAudio28] } }
+extern "C" __declspec(naked) void __stdcall _BinkOpenXAudio29(int, int) { _asm { jmp[binkw32.BinkOpenXAudio29] } }
 extern "C" __declspec(naked) void __stdcall _BinkPause(int, int) { _asm { jmp[binkw32.BinkPause] } }
 extern "C" __declspec(naked) void __stdcall _BinkRegisterFrameBuffers(int, int) { _asm { jmp[binkw32.BinkRegisterFrameBuffers] } }
+extern "C" __declspec(naked) void __stdcall _BinkRegisterGPUDataBuffers(int, int) { _asm { jmp[binkw32.BinkRegisterGPUDataBuffers] } }
 extern "C" __declspec(naked) void __stdcall _BinkRequestStopAsyncThread(int) { _asm { jmp[binkw32.BinkRequestStopAsyncThread] } }
+extern "C" __declspec(naked) void __stdcall _BinkRequestStopAsyncThreadsMulti(int, int) { _asm { jmp[binkw32.BinkRequestStopAsyncThreadsMulti] } }
 extern "C" __declspec(naked) void __stdcall _BinkRestoreCursor(int) { _asm { jmp[binkw32.BinkRestoreCursor] } }
 extern "C" __declspec(naked) void __stdcall _BinkService(int) { _asm { jmp[binkw32.BinkService] } }
 extern "C" __declspec(naked) void __stdcall _BinkServiceSound() { _asm { jmp[binkw32.BinkServiceSound] } }
@@ -3379,13 +3458,16 @@ extern "C" __declspec(naked) void __stdcall _BinkSetFileOffset(int, int) { _asm 
 extern "C" __declspec(naked) void __stdcall _BinkSetFrameRate(int, int) { _asm { jmp[binkw32.BinkSetFrameRate] } }
 extern "C" __declspec(naked) void __stdcall _BinkSetIO(int) { _asm { jmp[binkw32.BinkSetIO] } }
 extern "C" __declspec(naked) void __stdcall _BinkSetIOSize(int) { _asm { jmp[binkw32.BinkSetIOSize] } }
+extern "C" __declspec(naked) void __stdcall _BinkSetIOSize8(int, int) { _asm { jmp[binkw32.BinkSetIOSize8] } }
 extern "C" __declspec(naked) void __stdcall _BinkSetMemory(int, int) { _asm { jmp[binkw32.BinkSetMemory] } }
 extern "C" __declspec(naked) void __stdcall _BinkSetMixBinVolumes(int, int, int, int, int) { _asm { jmp[binkw32.BinkSetMixBinVolumes] } }
 extern "C" __declspec(naked) void __stdcall _BinkSetMixBins(int, int, int, int) { _asm { jmp[binkw32.BinkSetMixBins] } }
+extern "C" __declspec(naked) void __stdcall _BinkSetOSFileCallbacks(int, int, int, int) { _asm { jmp[binkw32.BinkSetOSFileCallbacks] } }
 extern "C" __declspec(naked) void __stdcall _BinkSetPan(int, int, int) { _asm { jmp[binkw32.BinkSetPan] } }
 extern "C" __declspec(naked) void __stdcall _BinkSetSimulate(int) { _asm { jmp[binkw32.BinkSetSimulate] } }
 extern "C" __declspec(naked) void __stdcall _BinkSetSoundOnOff(int, int) { _asm { jmp[binkw32.BinkSetSoundOnOff] } }
 extern "C" __declspec(naked) void __stdcall _BinkSetSoundSystem(int, int) { _asm { jmp[binkw32.BinkSetSoundSystem] } }
+extern "C" __declspec(naked) void __stdcall _BinkSetSoundSystem2(int, int, int) { _asm { jmp[binkw32.BinkSetSoundSystem2] } }
 extern "C" __declspec(naked) void __stdcall _BinkSetSoundTrack(int, int) { _asm { jmp[binkw32.BinkSetSoundTrack] } }
 extern "C" __declspec(naked) void __stdcall _BinkSetSpeakerVolumes(int, int, int, int, int) { _asm { jmp[binkw32.BinkSetSpeakerVolumes] } }
 extern "C" __declspec(naked) void __stdcall _BinkSetVideoOnOff(int, int) { _asm { jmp[binkw32.BinkSetVideoOnOff] } }
@@ -3395,8 +3477,19 @@ extern "C" __declspec(naked) void __stdcall _BinkShouldSkip(int) { _asm { jmp[bi
 extern "C" __declspec(naked) void __stdcall _BinkStartAsyncThread(int, int) { _asm { jmp[binkw32.BinkStartAsyncThread] } }
 extern "C" __declspec(naked) void __stdcall _BinkUseTelemetry(int) { _asm { jmp[binkw32.BinkUseTelemetry] } }
 extern "C" __declspec(naked) void __stdcall _BinkUseTmLite(int) { _asm { jmp[binkw32.BinkUseTmLite] } }
+extern "C" __declspec(naked) void __stdcall _BinkUtilCPUs() { _asm { jmp[binkw32.BinkUtilCPUs] } }
+extern "C" __declspec(naked) void __stdcall _BinkUtilFree(int) { _asm { jmp[binkw32.BinkUtilFree] } }
+extern "C" __declspec(naked) void __stdcall _BinkUtilMalloc(int, int) { _asm { jmp[binkw32.BinkUtilMalloc] } }
+extern "C" __declspec(naked) void __stdcall _BinkUtilMutexCreate(int, int) { _asm { jmp[binkw32.BinkUtilMutexCreate] } }
+extern "C" __declspec(naked) void __stdcall _BinkUtilMutexDestroy(int) { _asm { jmp[binkw32.BinkUtilMutexDestroy] } }
+extern "C" __declspec(naked) void __stdcall _BinkUtilMutexLock(int) { _asm { jmp[binkw32.BinkUtilMutexLock] } }
+extern "C" __declspec(naked) void __stdcall _BinkUtilMutexLockTimeOut(int, int) { _asm { jmp[binkw32.BinkUtilMutexLockTimeOut] } }
+extern "C" __declspec(naked) void __stdcall _BinkUtilMutexUnlock(int) { _asm { jmp[binkw32.BinkUtilMutexUnlock] } }
+extern "C" __declspec(naked) void __stdcall _BinkUtilSoundGlobalLock() { _asm { jmp[binkw32.BinkUtilSoundGlobalLock] } }
+extern "C" __declspec(naked) void __stdcall _BinkUtilSoundGlobalUnlock() { _asm { jmp[binkw32.BinkUtilSoundGlobalUnlock] } }
 extern "C" __declspec(naked) void __stdcall _BinkWait(int) { _asm { jmp[binkw32.BinkWait] } }
 extern "C" __declspec(naked) void __stdcall _BinkWaitStopAsyncThread(int) { _asm { jmp[binkw32.BinkWaitStopAsyncThread] } }
+extern "C" __declspec(naked) void __stdcall _BinkWaitStopAsyncThreadsMulti(int, int) { _asm { jmp[binkw32.BinkWaitStopAsyncThreadsMulti] } }
 extern "C" __declspec(naked) void __stdcall _RADSetMemory(int, int) { _asm { jmp[binkw32.RADSetMemory] } }
 extern "C" __declspec(naked) void __stdcall _RADTimerRead() { _asm { jmp[binkw32.RADTimerRead] } }
 extern "C" __declspec(naked) void __stdcall _YUV_blit_16a1bpp40(int, int, int, int, int, int, int, int, int, int) { _asm { jmp[binkw32.YUV_blit_16a1bpp40] } }
@@ -3949,6 +4042,7 @@ void _BinkCloseTrack() { bink2w64.BinkCloseTrack(); }
 void _BinkControlBackgroundIO() { bink2w64.BinkControlBackgroundIO(); }
 void _BinkCopyToBuffer() { bink2w64.BinkCopyToBuffer(); }
 void _BinkCopyToBufferRect() { bink2w64.BinkCopyToBufferRect(); }
+void _BinkCurrentSubtitle() { bink2w64.BinkCurrentSubtitle(); }
 void _BinkDoFrame() { bink2w64.BinkDoFrame(); }
 void _BinkDoFrameAsync() { bink2w64.BinkDoFrameAsync(); }
 void _BinkDoFrameAsyncMulti() { bink2w64.BinkDoFrameAsyncMulti(); }
@@ -3963,12 +4057,14 @@ void _BinkGetKeyFrame() { bink2w64.BinkGetKeyFrame(); }
 void _BinkGetPlatformInfo() { bink2w64.BinkGetPlatformInfo(); }
 void _BinkGetRealtime() { bink2w64.BinkGetRealtime(); }
 void _BinkGetRects() { bink2w64.BinkGetRects(); }
+void _BinkGetSubtitleByIndex() { bink2w64.BinkGetSubtitleByIndex(); }
 void _BinkGetSummary() { bink2w64.BinkGetSummary(); }
 void _BinkGetTrackData() { bink2w64.BinkGetTrackData(); }
 void _BinkGetTrackID() { bink2w64.BinkGetTrackID(); }
 void _BinkGetTrackMaxSize() { bink2w64.BinkGetTrackMaxSize(); }
 void _BinkGetTrackType() { bink2w64.BinkGetTrackType(); }
 void _BinkGoto() { bink2w64.BinkGoto(); }
+void _BinkLoadSubtitles() { bink2w64.BinkLoadSubtitles(); }
 void _BinkLogoAddress() { bink2w64.BinkLogoAddress(); }
 void _BinkNextFrame() { bink2w64.BinkNextFrame(); }
 void _BinkOpen() { bink2w64.BinkOpen(); }

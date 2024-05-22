@@ -562,6 +562,14 @@ void LoadOriginalLibrary()
             }
         }
     }
+    else if (iequals(szSelfName, L"bink2w32.dll"))
+    {
+        szLocalPath += L"bink2w32Hooked.dll";
+        if (std::filesystem::exists(szLocalPath))
+        {
+            binkw32.LoadOriginalLibrary(LoadLib(szLocalPath), false);
+        }
+    }
     else if (iequals(szSelfName, L"xlive.dll"))
     {
         // Unprotect image - make .text and .rdata section writeable
