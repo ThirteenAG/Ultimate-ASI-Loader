@@ -33,7 +33,7 @@ jobs:
       uses: microsoft/setup-msbuild@main
 
     - name: Auto Increment Version
-      uses: MCKanpolat/auto-semver-action@v1
+      uses: MCKanpolat/auto-semver-action@v2
       id: versioning
       with:
         releaseType: minor 
