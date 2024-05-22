@@ -346,10 +346,7 @@ namespace OverloadFromFolder
 #define IDR_VORBISF    101
 #define IDR_WNDMODE    103
 #define IDR_WNDWINI    104
-#define IDR_BINK00018X 105
-#define IDR_BINK00019U 106
-#define IDR_BINK00199W 107
-#define IDR_BINK01994I 108
+#define IDR_BINK       105
 #endif
 
 HMODULE LoadLib(const std::wstring& lpLibFileName);
@@ -532,26 +529,7 @@ void LoadOriginalLibrary()
         }
         else
         {
-            SYSTEMTIME t = {};
-            ModuleList dlls;
-            dlls.Enumerate(ModuleList::SearchLocation::LocalOnly);
-            for (auto& e : dlls.m_moduleList)
-            {
-                auto hInstance = (size_t)std::get<HMODULE>(e);
-                IMAGE_NT_HEADERS* ntHeader = (IMAGE_NT_HEADERS*)(hInstance + ((IMAGE_DOS_HEADER*)hInstance)->e_lfanew);
-                SYSTEMTIME stUTC, stLocal;
-                LONGLONG ll;
-                FILETIME ft;
-                ll = Int32x32To64(ntHeader->FileHeader.TimeDateStamp, 10000000) + 116444736000000000;
-                ft.dwLowDateTime = (DWORD)ll;
-                ft.dwHighDateTime = ll >> 32;
-                FileTimeToSystemTime(&ft, &stUTC);
-                SystemTimeToTzSpecificLocalTime(NULL, &stUTC, &stLocal);
-                if (t.wYear == 0 || t.wYear > stLocal.wYear)
-                    t = stLocal;
-            }
-
-            HRSRC hResource = FindResource(hm, MAKEINTRESOURCE((t.wYear <= 2007) ? IDR_BINK00018X : (t.wYear <= 2010) ? IDR_BINK00019U : (t.wYear <= 2012) ? IDR_BINK00199W : IDR_BINK01994I), RT_RCDATA);
+            HRSRC hResource = FindResource(hm, MAKEINTRESOURCE(IDR_BINK), RT_RCDATA);
             if (hResource)
             {
                 HGLOBAL hLoadedResource = LoadResource(hm, hResource);
