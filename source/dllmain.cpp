@@ -1,5 +1,9 @@
 #include "dllmain.h"
 #include "exception.hpp"
+#include <shellapi.h>
+#include <Commctrl.h>
+#pragma comment(lib,"Comctl32.lib")
+#pragma comment(linker,"\"/manifestdependency:type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
 #include <initguid.h>
 #include <filesystem>
 #include <safetyhook.hpp>
@@ -28,6 +32,18 @@ std::wstring sLoadFromAPI;
 std::vector<std::pair<std::filesystem::path, LARGE_INTEGER>> updateFilenames;
 thread_local std::string sCurrentFindFileDirA;
 thread_local std::wstring sCurrentFindFileDirW;
+
+HRESULT CALLBACK TaskDialogCallbackProc(HWND hwnd, UINT uNotification, WPARAM wParam, LPARAM lParam, LONG_PTR dwRefData)
+{
+    switch (uNotification)
+    {
+    case TDN_HYPERLINK_CLICKED:
+        ShellExecuteW(hwnd, L"open", (LPCWSTR)lParam, NULL, NULL, SW_SHOW);
+        break;
+    }
+
+    return S_OK;
+}
 
 bool iequals(std::wstring_view s1, std::wstring_view s2)
 {
@@ -324,8 +340,6 @@ namespace OverloadFromFolder
 {
     SafetyHookInline shLoadLibraryExA = {};
     SafetyHookInline shLoadLibraryExW = {};
-    SafetyHookInline shLoadLibraryA = {};
-    SafetyHookInline shLoadLibraryW = {};
     SafetyHookInline shCreateFileA = {};
     SafetyHookInline shCreateFileW = {};
     SafetyHookInline shGetFileAttributesA = {};
@@ -646,8 +660,34 @@ void FindFiles(WIN32_FIND_DATAW* fd)
                             auto e = GetLastError();
                             if (e != ERROR_DLL_INIT_FAILED && e != ERROR_BAD_EXE_FORMAT) // in case dllmain returns false or IMAGE_MACHINE is not compatible
                             {
+                                TASKDIALOGCONFIG tdc = { sizeof(TASKDIALOGCONFIG) };
+                                int nClickedBtn;
+                                BOOL bCheckboxChecked;
+                                LPCWSTR szTitle = L"ASI Loader", szHeader = L"", szContent = L"";
+                                TASKDIALOG_BUTTON aCustomButtons[] = { { 1000, L"Continue" } };
+
                                 std::wstring msg = L"Unable to load " + std::wstring(fd->cFileName) + L". Error: " + std::to_wstring(e);
-                                MessageBoxW(0, msg.c_str(), L"ASI Loader", MB_ICONERROR);
+                                szHeader = msg.c_str();
+
+                                if (e == ERROR_MOD_NOT_FOUND)
+                                {
+                                    szContent = L"This ASI file requires a dependency that is missing from your system. To identify the missing dependency, download and run the free, open-source app, " \
+                                        L"<a href=\"https://github.com/lucasg/Dependencies/releases/latest\">Dependencies</a>.\n\n" \
+                                        L"<a href=\"https://github.com/lucasg/Dependencies\">https://github.com/lucasg/Dependencies</a>";
+                                }
+
+                                tdc.hwndParent = NULL;
+                                tdc.dwFlags = TDF_USE_COMMAND_LINKS | TDF_ENABLE_HYPERLINKS | TDF_SIZE_TO_CONTENT | TDF_CAN_BE_MINIMIZED;
+                                tdc.pButtons = aCustomButtons;
+                                tdc.cButtons = _countof(aCustomButtons);
+                                tdc.pszWindowTitle = szTitle;
+                                tdc.pszMainIcon = TD_ERROR_ICON;
+                                tdc.pszMainInstruction = szHeader;
+                                tdc.pszContent = szContent;
+                                tdc.pfCallback = TaskDialogCallbackProc;
+                                tdc.lpCallbackData = 0;
+
+                                std::ignore = TaskDialogIndirect(&tdc, &nClickedBtn, NULL, &bCheckboxChecked);
                             }
                         }
                         else
@@ -1310,20 +1350,6 @@ namespace OverloadFromFolder
         return shLoadLibraryExW.unsafe_stdcall<ReturnType<decltype(LoadLibraryExW)>>(value_orW(r, lpLibFileName), hFile, dwFlags);
     }
 
-    HMODULE WINAPI shCustomLoadLibraryA(LPCSTR lpLibFileName)
-    {
-        auto raddr = _ReturnAddress();
-        auto r = GetFilePathForOverload(lpLibFileName, isRecursive(raddr));
-        return shLoadLibraryA.unsafe_stdcall<ReturnType<decltype(LoadLibraryA)>>(value_orA(r, lpLibFileName));
-    }
-
-    HMODULE WINAPI shCustomLoadLibraryW(LPCWSTR lpLibFileName)
-    {
-        auto raddr = _ReturnAddress();
-        auto r = GetFilePathForOverload(lpLibFileName, isRecursive(raddr));
-        return shLoadLibraryW.unsafe_stdcall<ReturnType<decltype(LoadLibraryW)>>(value_orW(r, lpLibFileName));
-    }
-
     HANDLE WINAPI shCustomCreateFileA(LPCSTR lpFileName, DWORD dwAccess, DWORD dwSharing, LPSECURITY_ATTRIBUTES saAttributes, DWORD dwCreation, DWORD dwAttributes, HANDLE hTemplate)
     {
         auto raddr = _ReturnAddress();
@@ -1508,8 +1534,6 @@ namespace OverloadFromFolder
     {
         shLoadLibraryExA = safetyhook::create_inline(LoadLibraryExA, shCustomLoadLibraryExA);
         shLoadLibraryExW = safetyhook::create_inline(LoadLibraryExW, shCustomLoadLibraryExW);
-        shLoadLibraryA = safetyhook::create_inline(LoadLibraryA, shCustomLoadLibraryA);
-        shLoadLibraryW = safetyhook::create_inline(LoadLibraryW, shCustomLoadLibraryW);
         shCreateFileA = safetyhook::create_inline(CreateFileA, shCustomCreateFileA);
         shCreateFileW = safetyhook::create_inline(CreateFileW, shCustomCreateFileW);
         shGetFileAttributesA = safetyhook::create_inline(GetFileAttributesA, shCustomGetFileAttributesA);
@@ -2559,8 +2583,6 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID /*lpReserved*/)
             shCreateFileW = {};
             shLoadLibraryExA = {};
             shLoadLibraryExW = {};
-            shLoadLibraryA = {};
-            shLoadLibraryW = {};
             shGetFileAttributesA = {};
             shGetFileAttributesW = {};
             shGetFileAttributesExA = {};
