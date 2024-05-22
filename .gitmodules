@@ -8,3 +8,6 @@
 [submodule "external/minidx9"]
 	path = external/minidx9
 	url = https://github.com/hrydgard/minidx9
+[submodule "external/injector"]
+	path = external/injector
+	url = https://github.com/ThirteenAG/injector
