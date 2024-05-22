@@ -3,7 +3,7 @@
 #include <map>
 #include <subauth.h>
 #include "../../external/ModuleList/ModuleList.hpp"
-#include "MinHook.h"
+#include "safetyhook.hpp"
 #include <filesystem>
 #include <functional>
 #include <vector>
@@ -161,10 +161,11 @@ static std::map<std::string, FARPROC> monoExports = {
     { "mono_method_desc_search_in_image", nullptr },
 };
 
-MonoAssembly* (*mono_assembly_load_from_full)(MonoImage*, const char*, MonoImageOpenStatus*, mono_bool);
+SafetyHookInline sh_mono_assembly_load_from_full_hook{};
+std::map<std::filesystem::path, std::set<std::filesystem::path>> pluginsToLoad;
 MonoAssembly* mono_assembly_load_from_full_hook(MonoImage* image, const char* fname, MonoImageOpenStatus* status, mono_bool refonly)
 {
-    auto ret = mono_assembly_load_from_full(image, fname, status, refonly);
+    auto ret = sh_mono_assembly_load_from_full_hook.unsafe_call<MonoAssembly*>(image, fname, status, refonly);
 
     static std::once_flag flag;
     std::call_once(flag, []()
@@ -177,7 +178,6 @@ MonoAssembly* mono_assembly_load_from_full_hook(MonoImage* image, const char* fn
         auto mono_method_desc_search_in_image = (MonoMethod*(*)(MonoMethodDesc* desc, MonoImage* image))monoExports["mono_method_desc_search_in_image"];
         auto mono_method_desc_free = (void(*)(MonoMethodDesc* desc))monoExports["mono_method_desc_free"];
 
-        std::map<std::filesystem::path, std::set<std::filesystem::path>> pluginsToLoad;
         std::set<MonoMethod*> invokedMethods;
 
         auto insertDefaults = [&](auto dll)
@@ -258,7 +258,7 @@ MonoAssembly* mono_assembly_load_from_full_hook(MonoImage* image, const char* fn
                                 {
                                     auto method = mono_method_desc_search_in_image(description, image);
                                     mono_method_desc_free(description);
-                                    if (method && invokedMethods.count(method) == 0)
+                                    if (method && !invokedMethods.contains(method))
                                     {
                                         void* exc = nullptr;
                                         mono_runtime_invoke(method, nullptr, nullptr, &exc);
@@ -276,7 +276,7 @@ MonoAssembly* mono_assembly_load_from_full_hook(MonoImage* image, const char* fn
             }
         }
     });
-    
+
     return ret;
 }
 
@@ -302,9 +302,7 @@ void GetMonoDllCB(HMODULE mod)
 
     if (std::all_of(monoExports.begin(), monoExports.end(), [](const auto& it) { return it.second != nullptr; }))
     {
-        MH_Initialize();
-        MH_CreateHook(monoExports["mono_assembly_load_from_full"], mono_assembly_load_from_full_hook, (LPVOID*)&mono_assembly_load_from_full);
-        MH_EnableHook(MH_ALL_HOOKS);
+        sh_mono_assembly_load_from_full_hook = safetyhook::create_inline(monoExports["mono_assembly_load_from_full"], mono_assembly_load_from_full_hook);
     }
 }
 
@@ -329,7 +327,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID /*lpReserved*/)
     }
     else if (reason == DLL_PROCESS_DETACH)
     {
-        MH_DisableHook(MH_ALL_HOOKS);
+        sh_mono_assembly_load_from_full_hook.reset();
     }
     return TRUE;
 }

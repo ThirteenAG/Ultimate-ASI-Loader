@@ -2,7 +2,7 @@ newoption {
     trigger     = "with-version",
     value       = "STRING",
     description = "Current UAL version",
-    default     = "6.0.0",
+    default     = "7.0.0",
 }
 
 -- x86
@@ -121,26 +121,6 @@ project "ExeUnprotect"
       defines { "NDEBUG" }
       optimize "On"
       staticruntime "On"
-      
-project "OverloadFromFolderDLL"
-   kind "SharedLib"
-   language "C++"
-   targetdir "bin/Win32/%{cfg.buildcfg}/scripts"
-   targetextension ".asi"
-   
-   files { "source/demo_plugins/OverloadFromFolderDLL.cpp" }
-   files { "source/resources/Versioninfo.rc" }
-
-   characterset ("UNICODE")
-   
-   filter "configurations:Debug"
-      defines { "DEBUG" }
-      symbols "On"
-
-   filter "configurations:Release"
-      defines { "NDEBUG" }
-      optimize "On"
-      staticruntime "On"
 
 project "MonoLoader"
    kind "SharedLib"
@@ -151,11 +131,9 @@ project "MonoLoader"
    files { "source/demo_plugins/MonoLoader.cpp" }
    files { "source/resources/Versioninfo.rc" }
 
-   includedirs { "source/demo_plugins/minhook/include" }
-   includedirs { "source/demo_plugins/minhook/src" }
-   
-   files { "source/demo_plugins/minhook/include/**" }
-   files { "source/demo_plugins/minhook/src/**" }
+   includedirs { "external/injector/safetyhook" }
+   files { "external/injector/safetyhook/safetyhook.hpp", "external/injector/safetyhook/safetyhook.cpp" }
+   files { "external/injector/safetyhook/Zydis.h", "external/injector/safetyhook/Zydis.c" }
 
    characterset ("UNICODE")
    
@@ -270,26 +248,6 @@ project "MessageBox_x64"
       defines { "NDEBUG" }
       optimize "On"
       staticruntime "On"
-      
-project "OverloadFromFolderDLL_x64"
-   kind "SharedLib"
-   language "C++"
-   targetdir "bin/x64/%{cfg.buildcfg}/scripts"
-   targetextension ".asi"
-   
-   files { "source/demo_plugins/OverloadFromFolderDLL.cpp" }
-   files { "source/resources/Versioninfo.rc" }
-
-   characterset ("UNICODE")
-   
-   filter "configurations:Debug"
-      defines { "DEBUG" }
-      symbols "On"
-
-   filter "configurations:Release"
-      defines { "NDEBUG" }
-      optimize "On"
-      staticruntime "On"
 
 project "MonoLoader_x64"
    kind "SharedLib"
@@ -300,11 +258,9 @@ project "MonoLoader_x64"
    files { "source/demo_plugins/MonoLoader.cpp" }
    files { "source/resources/Versioninfo.rc" }
 
-   includedirs { "source/demo_plugins/minhook/include" }
-   includedirs { "source/demo_plugins/minhook/src" }
-   
-   files { "source/demo_plugins/minhook/include/**" }
-   files { "source/demo_plugins/minhook/src/**" }
+   includedirs { "external/injector/safetyhook" }
+   files { "external/injector/safetyhook/safetyhook.hpp", "external/injector/safetyhook/safetyhook.cpp" }
+   files { "external/injector/safetyhook/Zydis.h", "external/injector/safetyhook/Zydis.c" }
 
    characterset ("UNICODE")
    
