@@ -50,7 +50,11 @@ project "Ultimate-ASI-Loader-Win32"
    
    includedirs { "source" }
    includedirs { "external" }
-   
+
+   includedirs { "external/injector/safetyhook" }
+   files { "external/injector/safetyhook/safetyhook.hpp", "external/injector/safetyhook/safetyhook.cpp" }
+   files { "external/injector/safetyhook/Zydis.h", "external/injector/safetyhook/Zydis.c" }
+
    files { "source/dllmain.h", "source/dllmain.cpp" }
    files { "source/x86.def" }
    files { "source/xlive/xliveless.h", "source/xlive/xliveless.cpp", "source/xlive/xliveless.rc"}
@@ -193,7 +197,11 @@ project "Ultimate-ASI-Loader-x64"
    
    includedirs { "source" }
    includedirs { "external" }
-   
+
+   includedirs { "external/injector/safetyhook" }
+   files { "external/injector/safetyhook/safetyhook.hpp", "external/injector/safetyhook/safetyhook.cpp" }
+   files { "external/injector/safetyhook/Zydis.h", "external/injector/safetyhook/Zydis.c" }
+
    files { "source/dllmain.h", "source/dllmain.cpp" }
    files { "source/x64.def" }
    files { "source/resources/Versioninfo.rc" }

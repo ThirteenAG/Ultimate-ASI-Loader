@@ -3,22 +3,6 @@ EXPORTS
 IsUltimateASILoader = IsUltimateASILoader
 GetOverloadedFilePath = GetOverloadedFilePath
 GetMemoryModule = GetMemoryModule
-CustomCreateFileA = CustomCreateFileA
-CustomCreateFileW = CustomCreateFileW
-CustomGetFileAttributesA = CustomGetFileAttributesA
-CustomGetFileAttributesW = CustomGetFileAttributesW
-CustomGetFileAttributesExA = CustomGetFileAttributesExA
-CustomGetFileAttributesExW = CustomGetFileAttributesExW
-CustomLoadLibraryExA = CustomLoadLibraryExA
-CustomLoadLibraryExW = CustomLoadLibraryExW
-CustomLoadLibraryA = CustomLoadLibraryA
-CustomLoadLibraryW = CustomLoadLibraryW
-CustomFindFirstFileA = CustomFindFirstFileA
-CustomFindNextFileA = CustomFindNextFileA
-CustomFindFirstFileW = CustomFindFirstFileW
-CustomFindNextFileW = CustomFindNextFileW
-CustomFindFirstFileExA = CustomFindFirstFileExA
-CustomFindFirstFileExW = CustomFindFirstFileExW
 
 LIBRARY "dinput8"
 EXPORTS

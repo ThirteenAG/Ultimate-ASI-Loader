@@ -2,6 +2,7 @@
 #include "exception.hpp"
 #include <initguid.h>
 #include <filesystem>
+#include <safetyhook.hpp>
 
 #if !X64
 #include <d3d8to9\source\d3d8to9.hpp>
@@ -24,10 +25,9 @@ std::vector<std::wstring> iniPaths;
 std::filesystem::path sFileLoaderPath;
 std::filesystem::path gamePath;
 std::wstring sLoadFromAPI;
-bool bPatchFindFile = false;
 std::vector<std::pair<std::filesystem::path, LARGE_INTEGER>> updateFilenames;
-std::string sCurrentFindFileDirA;
-std::wstring sCurrentFindFileDirW;
+thread_local std::string sCurrentFindFileDirA;
+thread_local std::wstring sCurrentFindFileDirW;
 
 bool iequals(std::wstring_view s1, std::wstring_view s2)
 {
@@ -320,6 +320,28 @@ enum OLE32ExportsNames
 size_t Kernel32Data[Kernel32ExportsNamesCount][Kernel32ExportsDataCount];
 size_t OLE32Data[OLE32ExportsNamesCount][Kernel32ExportsDataCount];
 
+namespace OverloadFromFolder
+{
+    SafetyHookInline shLoadLibraryExA = {};
+    SafetyHookInline shLoadLibraryExW = {};
+    SafetyHookInline shLoadLibraryA = {};
+    SafetyHookInline shLoadLibraryW = {};
+    SafetyHookInline shCreateFileA = {};
+    SafetyHookInline shCreateFileW = {};
+    SafetyHookInline shGetFileAttributesA = {};
+    SafetyHookInline shGetFileAttributesW = {};
+    SafetyHookInline shGetFileAttributesExA = {};
+    SafetyHookInline shGetFileAttributesExW = {};
+    SafetyHookInline shFindFirstFileA = {};
+    SafetyHookInline shFindNextFileA = {};
+    SafetyHookInline shFindFirstFileW = {};
+    SafetyHookInline shFindNextFileW = {};
+    SafetyHookInline shFindFirstFileExA = {};
+    SafetyHookInline shFindFirstFileExW = {};
+
+    void HookAPIForOverload();
+}
+
 #if !X64
 #define IDR_VORBISF    101
 #define IDR_WNDMODE    103
@@ -330,7 +352,7 @@ size_t OLE32Data[OLE32ExportsNamesCount][Kernel32ExportsDataCount];
 #define IDR_BINK01994I 108
 #endif
 
-HMODULE LoadLibraryW(const std::wstring& lpLibFileName);
+HMODULE LoadLib(const std::wstring& lpLibFileName);
 static LONG OriginalLibraryLoaded = 0;
 void LoadOriginalLibrary()
 {
@@ -344,81 +366,81 @@ void LoadOriginalLibrary()
     {
         szLocalPath += L"dsoundHooked.dll";
         if (std::filesystem::exists(szLocalPath))
-            dsound.LoadOriginalLibrary(LoadLibraryW(szLocalPath));
+            dsound.LoadOriginalLibrary(LoadLib(szLocalPath));
         else
-            dsound.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
+            dsound.LoadOriginalLibrary(LoadLib(szSystemPath));
     }
     else if (iequals(szSelfName, L"dinput8.dll"))
     {
         szLocalPath += L"dinput8Hooked.dll";
         if (std::filesystem::exists(szLocalPath))
-            dinput8.LoadOriginalLibrary(LoadLibraryW(szLocalPath));
+            dinput8.LoadOriginalLibrary(LoadLib(szLocalPath));
         else
-            dinput8.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
+            dinput8.LoadOriginalLibrary(LoadLib(szSystemPath));
     }
     else if (iequals(szSelfName, L"wininet.dll"))
     {
         szLocalPath += L"wininetHooked.dll";
         if (std::filesystem::exists(szLocalPath))
-            wininet.LoadOriginalLibrary(LoadLibraryW(szLocalPath));
+            wininet.LoadOriginalLibrary(LoadLib(szLocalPath));
         else
-            wininet.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
+            wininet.LoadOriginalLibrary(LoadLib(szSystemPath));
     }
     else if (iequals(szSelfName, L"version.dll"))
     {
         szLocalPath += L"versionHooked.dll";
         if (std::filesystem::exists(szLocalPath))
-            version.LoadOriginalLibrary(LoadLibraryW(szLocalPath));
+            version.LoadOriginalLibrary(LoadLib(szLocalPath));
         else
-            version.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
+            version.LoadOriginalLibrary(LoadLib(szSystemPath));
     }
     else if (iequals(szSelfName, L"d3d9.dll"))
     {
         szLocalPath += L"d3d9Hooked.dll";
         if (std::filesystem::exists(szLocalPath))
-            d3d9.LoadOriginalLibrary(LoadLibraryW(szLocalPath));
+            d3d9.LoadOriginalLibrary(LoadLib(szLocalPath));
         else
-            d3d9.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
+            d3d9.LoadOriginalLibrary(LoadLib(szSystemPath));
     }
     else if (iequals(szSelfName, L"d3d10.dll"))
     {
         szLocalPath += L"d3d10Hooked.dll";
         if (std::filesystem::exists(szLocalPath))
-            d3d10.LoadOriginalLibrary(LoadLibraryW(szLocalPath));
+            d3d10.LoadOriginalLibrary(LoadLib(szLocalPath));
         else
-            d3d10.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
+            d3d10.LoadOriginalLibrary(LoadLib(szSystemPath));
     }
     else if (iequals(szSelfName, L"d3d11.dll"))
     {
         szLocalPath += L"d3d11Hooked.dll";
         if (std::filesystem::exists(szLocalPath))
-            d3d11.LoadOriginalLibrary(LoadLibraryW(szLocalPath));
+            d3d11.LoadOriginalLibrary(LoadLib(szLocalPath));
         else
-            d3d11.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
+            d3d11.LoadOriginalLibrary(LoadLib(szSystemPath));
     }
     else if (iequals(szSelfName, L"d3d12.dll"))
     {
         szLocalPath += L"d3d12Hooked.dll";
         if (std::filesystem::exists(szLocalPath))
-            d3d12.LoadOriginalLibrary(LoadLibraryW(szLocalPath));
+            d3d12.LoadOriginalLibrary(LoadLib(szLocalPath));
         else
-            d3d12.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
+            d3d12.LoadOriginalLibrary(LoadLib(szSystemPath));
     } 
     else if (iequals(szSelfName, L"winmm.dll"))
     {
         szLocalPath += L"winmmHooked.dll";
         if (std::filesystem::exists(szLocalPath))
-            winmm.LoadOriginalLibrary(LoadLibraryW(szLocalPath));
+            winmm.LoadOriginalLibrary(LoadLib(szLocalPath));
         else
-            winmm.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
+            winmm.LoadOriginalLibrary(LoadLib(szSystemPath));
     }
     else if (iequals(szSelfName, L"winhttp.dll"))
     {
         szLocalPath += L"winhttpHooked.dll";
         if (std::filesystem::exists(szLocalPath))
-            winhttp.LoadOriginalLibrary(LoadLibraryW(szLocalPath));
+            winhttp.LoadOriginalLibrary(LoadLib(szLocalPath));
         else
-            winhttp.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
+            winhttp.LoadOriginalLibrary(LoadLib(szSystemPath));
     }
     else
 #if !X64
@@ -427,7 +449,7 @@ void LoadOriginalLibrary()
         szLocalPath += L"vorbisHooked.dll";
         if (std::filesystem::exists(szLocalPath))
         {
-            vorbisfile.LoadOriginalLibrary(LoadLibraryW(szLocalPath), false);
+            vorbisfile.LoadOriginalLibrary(LoadLib(szLocalPath), false);
         }
         else
         {
@@ -461,18 +483,18 @@ void LoadOriginalLibrary()
     {
         szLocalPath += L"ddrawHooked.dll";
         if (std::filesystem::exists(szLocalPath))
-            ddraw.LoadOriginalLibrary(LoadLibraryW(szLocalPath));
+            ddraw.LoadOriginalLibrary(LoadLib(szLocalPath));
         else
-            ddraw.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
+            ddraw.LoadOriginalLibrary(LoadLib(szSystemPath));
     }
     else if (iequals(szSelfName, L"d3d8.dll"))
     {
         szLocalPath += L"d3d8Hooked.dll";
         if (std::filesystem::exists(szLocalPath))
-            d3d8.LoadOriginalLibrary(LoadLibraryW(szLocalPath));
+            d3d8.LoadOriginalLibrary(LoadLib(szLocalPath));
         else
         {
-            d3d8.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
+            d3d8.LoadOriginalLibrary(LoadLib(szSystemPath));
             if (GetPrivateProfileIntW(L"globalsets", L"used3d8to9", FALSE, iniPaths))
                 d3d8.Direct3DCreate8 = (FARPROC)Direct3DCreate8;
         }
@@ -481,32 +503,32 @@ void LoadOriginalLibrary()
     {
         szLocalPath += L"msacm32Hooked.dll";
         if (std::filesystem::exists(szLocalPath))
-            msacm32.LoadOriginalLibrary(LoadLibraryW(szLocalPath));
+            msacm32.LoadOriginalLibrary(LoadLib(szLocalPath));
         else
-            msacm32.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
+            msacm32.LoadOriginalLibrary(LoadLib(szSystemPath));
     }
     else if (iequals(szSelfName, L"dinput.dll"))
     {
         szLocalPath += L"dinputHooked.dll";
         if (std::filesystem::exists(szLocalPath))
-            dinput.LoadOriginalLibrary(LoadLibraryW(szLocalPath));
+            dinput.LoadOriginalLibrary(LoadLib(szLocalPath));
         else
-            dinput.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
+            dinput.LoadOriginalLibrary(LoadLib(szSystemPath));
     }
     else if (iequals(szSelfName, L"msvfw32.dll"))
     {
         szLocalPath += L"msvfw32Hooked.dll";
         if (std::filesystem::exists(szLocalPath))
-            msvfw32.LoadOriginalLibrary(LoadLibraryW(szLocalPath));
+            msvfw32.LoadOriginalLibrary(LoadLib(szLocalPath));
         else
-            msvfw32.LoadOriginalLibrary(LoadLibraryW(szSystemPath));
+            msvfw32.LoadOriginalLibrary(LoadLib(szSystemPath));
     }
     else if (iequals(szSelfName, L"binkw32.dll"))
     {
         szLocalPath += L"binkw32Hooked.dll";
         if (std::filesystem::exists(szLocalPath))
         {
-            binkw32.LoadOriginalLibrary(LoadLibraryW(szLocalPath), false);
+            binkw32.LoadOriginalLibrary(LoadLib(szLocalPath), false);
         }
         else
         {
@@ -568,7 +590,7 @@ void LoadOriginalLibrary()
         szLocalPath += L"bink2w64Hooked.dll";
         if (std::filesystem::exists(szLocalPath))
         {
-            bink2w64.LoadOriginalLibrary(LoadLibraryW(szLocalPath));
+            bink2w64.LoadOriginalLibrary(LoadLib(szLocalPath));
         }
     } 
     else
@@ -596,7 +618,7 @@ void Direct3D8DisableMaximizedWindowedModeShim()
             pd3d8 = LoadLibraryW(L"d3d8.dll");
             if (!pd3d8)
             {
-                pd3d8 = LoadLibraryW(SHGetKnownFolderPath(FOLDERID_System, 0, nullptr) + L'\\' + L"d3d8.dll");
+                pd3d8 = LoadLib(SHGetKnownFolderPath(FOLDERID_System, 0, nullptr) + L'\\' + L"d3d8.dll");
             }
         }
 
@@ -638,7 +660,7 @@ void FindFiles(WIN32_FIND_DATAW* fd)
 
                     if (GetModuleHandle(path.c_str()) == NULL)
                     {
-                        auto h = LoadLibraryW(path);
+                        auto h = LoadLib(path);
                         SetCurrentDirectoryW(dir.c_str()); //in case asi switched it
 
                         if (h == NULL)
@@ -793,15 +815,6 @@ void LoadPluginsAndRestoreIAT(uintptr_t retaddr, std::wstring_view calledFrom = 
 
     for (size_t i = 0; i < Kernel32ExportsNamesCount; i++)
     {
-        if (!sFileLoaderPath.empty() && (i == eCreateFileA || i == eCreateFileW
-            || i == eLoadLibraryExA || i == eLoadLibraryExW || i == eLoadLibraryA || i == eLoadLibraryW
-            || i == eGetFileAttributesA || i == eGetFileAttributesW || i == eGetFileAttributesExA || i == eGetFileAttributesExW))
-            continue;
-
-        if (!sFileLoaderPath.empty() && bPatchFindFile && (i == eFindFirstFileA || i == eFindNextFileA || i == eFindFirstFileW
-            || i == eFindNextFileW || i == eFindFirstFileExA || i == eFindFirstFileExW))
-            continue;
-
         if (Kernel32Data[i][IATPtr] && Kernel32Data[i][ProcAddress])
         {
             auto ptr = (size_t*)Kernel32Data[i][IATPtr];
@@ -810,6 +823,11 @@ void LoadPluginsAndRestoreIAT(uintptr_t retaddr, std::wstring_view calledFrom = 
             *ptr = Kernel32Data[i][ProcAddress];
             VirtualProtect(ptr, sizeof(size_t), dwProtect[0], &dwProtect[1]);
         }
+    }
+
+    if (!sFileLoaderPath.empty())
+    {
+        OverloadFromFolder::HookAPIForOverload();
     }
 
     LoadEverything();
@@ -875,10 +893,13 @@ std::filesystem::path GetFilePathForOverload(auto path)
     return {};
 }
 
-HMODULE LoadLibraryW(const std::wstring& lpLibFileName)
+#define value_orA(path1, path2) (path1.empty() ? path2 : path1.string().c_str())
+#define value_orW(path1, path2) (path1.empty() ? path2 : path1.wstring().c_str())
+
+HMODULE LoadLib(const std::wstring& lpLibFileName)
 {
     auto r = GetFilePathForOverload(lpLibFileName);
-    return LoadLibraryW(r.empty() ? lpLibFileName.c_str() : r.wstring().c_str());
+    return LoadLibraryW(value_orW(r, lpLibFileName.c_str()));
 }
 
 void WINAPI CustomGetStartupInfoA(LPSTARTUPINFOA lpStartupInfo)
@@ -922,7 +943,7 @@ HMODULE WINAPI CustomLoadLibraryExA(LPCSTR lpLibFileName, HANDLE hFile, DWORD dw
     LoadOriginalLibrary();
 
     auto r = GetFilePathForOverload(lpLibFileName);
-    return LoadLibraryExA(r.empty() ? lpLibFileName : r.string().c_str(), hFile, dwFlags);
+    return LoadLibraryExA(value_orA(r, lpLibFileName), hFile, dwFlags);
 }
 
 HMODULE WINAPI CustomLoadLibraryExW(LPCWSTR lpLibFileName, HANDLE hFile, DWORD dwFlags)
@@ -930,7 +951,7 @@ HMODULE WINAPI CustomLoadLibraryExW(LPCWSTR lpLibFileName, HANDLE hFile, DWORD d
     LoadOriginalLibrary();
 
     auto r = GetFilePathForOverload(lpLibFileName);
-    return LoadLibraryExW(r.empty() ? lpLibFileName : r.wstring().c_str(), hFile, dwFlags);
+    return LoadLibraryExW(value_orW(r, lpLibFileName), hFile, dwFlags);
 }
 
 HMODULE WINAPI CustomLoadLibraryA(LPCSTR lpLibFileName)
@@ -938,7 +959,7 @@ HMODULE WINAPI CustomLoadLibraryA(LPCSTR lpLibFileName)
     LoadOriginalLibrary();
 
     auto r = GetFilePathForOverload(lpLibFileName);
-    return LoadLibraryA(r.empty() ? lpLibFileName : r.string().c_str());
+    return LoadLibraryA(value_orA(r, lpLibFileName));
 }
 
 HMODULE WINAPI CustomLoadLibraryW(LPCWSTR lpLibFileName)
@@ -946,7 +967,7 @@ HMODULE WINAPI CustomLoadLibraryW(LPCWSTR lpLibFileName)
     LoadOriginalLibrary();
 
     auto r = GetFilePathForOverload(lpLibFileName);
-    return LoadLibraryW(r.empty() ? lpLibFileName : r.wstring().c_str());
+    return LoadLibraryW(value_orW(r, lpLibFileName));
 }
 
 BOOL WINAPI CustomFreeLibrary(HMODULE hLibModule)
@@ -1017,8 +1038,7 @@ void WINAPI CustomAcquireSRWLockExclusive(PSRWLOCK SRWLock)
     return AcquireSRWLockExclusive(SRWLock);
 }
 
-typedef HANDLE(WINAPI* tCreateFileA)(LPCSTR lpFilename, DWORD dwAccess, DWORD dwSharing, LPSECURITY_ATTRIBUTES saAttributes, DWORD dwCreation, DWORD dwAttributes, HANDLE hTemplate);
-HANDLE WINAPI CustomCreateFileA(LPCSTR lpFilename, DWORD dwAccess, DWORD dwSharing, LPSECURITY_ATTRIBUTES saAttributes, DWORD dwCreation, DWORD dwAttributes, HANDLE hTemplate)
+HANDLE WINAPI CustomCreateFileA(LPCSTR lpFileName, DWORD dwAccess, DWORD dwSharing, LPSECURITY_ATTRIBUTES saAttributes, DWORD dwCreation, DWORD dwAttributes, HANDLE hTemplate)
 {
     static bool once = false;
     if (!once)
@@ -1027,12 +1047,11 @@ HANDLE WINAPI CustomCreateFileA(LPCSTR lpFilename, DWORD dwAccess, DWORD dwShari
         once = true;
     }
 
-    auto r = GetFilePathForOverload(lpFilename);
-    return CreateFileA(r.empty() ? lpFilename : r.string().c_str(), dwAccess, dwSharing, saAttributes, dwCreation, dwAttributes, hTemplate);
+    auto r = GetFilePathForOverload(lpFileName);
+    return CreateFileA(value_orA(r, lpFileName), dwAccess, dwSharing, saAttributes, dwCreation, dwAttributes, hTemplate);
 }
 
-typedef HANDLE(WINAPI* tCreateFileW)(LPCWSTR lpFilename, DWORD dwAccess, DWORD dwSharing, LPSECURITY_ATTRIBUTES saAttributes, DWORD dwCreation, DWORD dwAttributes, HANDLE hTemplate);
-HANDLE WINAPI CustomCreateFileW(LPCWSTR lpFilename, DWORD dwAccess, DWORD dwSharing, LPSECURITY_ATTRIBUTES saAttributes, DWORD dwCreation, DWORD dwAttributes, HANDLE hTemplate)
+HANDLE WINAPI CustomCreateFileW(LPCWSTR lpFileName, DWORD dwAccess, DWORD dwSharing, LPSECURITY_ATTRIBUTES saAttributes, DWORD dwCreation, DWORD dwAttributes, HANDLE hTemplate)
 {
     static bool once = false;
     if (!once)
@@ -1041,11 +1060,10 @@ HANDLE WINAPI CustomCreateFileW(LPCWSTR lpFilename, DWORD dwAccess, DWORD dwShar
         once = true;
     }
 
-    auto r = GetFilePathForOverload(lpFilename);
-    return CreateFileW(r.empty() ? lpFilename : r.wstring().c_str(), dwAccess, dwSharing, saAttributes, dwCreation, dwAttributes, hTemplate);
+    auto r = GetFilePathForOverload(lpFileName);
+    return CreateFileW(value_orW(r, lpFileName), dwAccess, dwSharing, saAttributes, dwCreation, dwAttributes, hTemplate);
 }
 
-typedef DWORD(WINAPI* tGetFileAttributesA)(LPCSTR lpFileName);
 DWORD WINAPI CustomGetFileAttributesA(LPCSTR lpFileName)
 {
     static bool once = false;
@@ -1056,10 +1074,9 @@ DWORD WINAPI CustomGetFileAttributesA(LPCSTR lpFileName)
     }
 
     auto r = GetFilePathForOverload(lpFileName);
-    return GetFileAttributesA(r.empty() ? lpFileName : r.string().c_str());
+    return GetFileAttributesA(value_orA(r, lpFileName));
 }
 
-typedef DWORD(WINAPI* tGetFileAttributesW)(LPCWSTR lpFileName);
 DWORD WINAPI CustomGetFileAttributesW(LPCWSTR lpFileName)
 {
     static bool once = false;
@@ -1070,10 +1087,9 @@ DWORD WINAPI CustomGetFileAttributesW(LPCWSTR lpFileName)
     }
 
     auto r = GetFilePathForOverload(lpFileName);
-    return GetFileAttributesW(r.empty() ? lpFileName : r.wstring().c_str());
+    return GetFileAttributesW(value_orW(r, lpFileName));
 }
 
-typedef BOOL(WINAPI* tGetFileAttributesExA)(LPCSTR lpFileName, GET_FILEEX_INFO_LEVELS fInfoLevelId, LPVOID lpFileInformation);
 BOOL WINAPI CustomGetFileAttributesExA(LPCSTR lpFileName, GET_FILEEX_INFO_LEVELS fInfoLevelId, LPVOID lpFileInformation)
 {
     static bool once = false;
@@ -1084,10 +1100,9 @@ BOOL WINAPI CustomGetFileAttributesExA(LPCSTR lpFileName, GET_FILEEX_INFO_LEVELS
     }
 
     auto r = GetFilePathForOverload(lpFileName);
-    return GetFileAttributesExA(r.empty() ? lpFileName : r.string().c_str(), fInfoLevelId, lpFileInformation);
+    return GetFileAttributesExA(value_orA(r, lpFileName), fInfoLevelId, lpFileInformation);
 }
 
-typedef BOOL(WINAPI* tGetFileAttributesExW)(LPCWSTR lpFileName, GET_FILEEX_INFO_LEVELS fInfoLevelId, LPVOID lpFileInformation);
 BOOL WINAPI CustomGetFileAttributesExW(LPCWSTR lpFileName, GET_FILEEX_INFO_LEVELS fInfoLevelId, LPVOID lpFileInformation)
 {
     static bool once = false;
@@ -1098,10 +1113,9 @@ BOOL WINAPI CustomGetFileAttributesExW(LPCWSTR lpFileName, GET_FILEEX_INFO_LEVEL
     }
 
     auto r = GetFilePathForOverload(lpFileName);
-    return GetFileAttributesExW(r.empty() ? lpFileName : r.wstring().c_str(), fInfoLevelId, lpFileInformation);
+    return GetFileAttributesExW(value_orW(r, lpFileName), fInfoLevelId, lpFileInformation);
 }
 
-typedef HANDLE(WINAPI* tFindFirstFileA)(LPCSTR lpFileName, LPWIN32_FIND_DATAA lpFindFileData);
 HANDLE WINAPI CustomFindFirstFileA(LPCSTR lpFileName, LPWIN32_FIND_DATAA lpFindFileData)
 {
     static bool once = false;
@@ -1113,22 +1127,18 @@ HANDLE WINAPI CustomFindFirstFileA(LPCSTR lpFileName, LPWIN32_FIND_DATAA lpFindF
 
     auto ret = FindFirstFileA(lpFileName, lpFindFileData);
 
-    if (bPatchFindFile)
-    {
-        sCurrentFindFileDirA = lpFileName;
+    sCurrentFindFileDirA = lpFileName;
 
-        auto i = FindFileCheckOverloadedPath(lpFindFileData->cFileName);
-        if (i.QuadPart)
-        {
-            lpFindFileData->nFileSizeHigh = i.HighPart;
-            lpFindFileData->nFileSizeLow = i.LowPart;
-        }
+    auto i = FindFileCheckOverloadedPath(lpFindFileData->cFileName);
+    if (i.QuadPart)
+    {
+        lpFindFileData->nFileSizeHigh = i.HighPart;
+        lpFindFileData->nFileSizeLow = i.LowPart;
     }
 
     return ret;
 }
 
-typedef BOOL(WINAPI* tFindNextFileA)(HANDLE hFindFile, LPWIN32_FIND_DATAA lpFindFileData);
 BOOL WINAPI CustomFindNextFileA(HANDLE hFindFile, LPWIN32_FIND_DATAA lpFindFileData)
 {
     static bool once = false;
@@ -1140,20 +1150,16 @@ BOOL WINAPI CustomFindNextFileA(HANDLE hFindFile, LPWIN32_FIND_DATAA lpFindFileD
 
     auto ret = FindNextFileA(hFindFile, lpFindFileData);
 
-    if (bPatchFindFile)
+    auto i = FindFileCheckOverloadedPath(lpFindFileData->cFileName);
+    if (i.QuadPart)
     {
-        auto i = FindFileCheckOverloadedPath(lpFindFileData->cFileName);
-        if (i.QuadPart)
-        {
-            lpFindFileData->nFileSizeHigh = i.HighPart;
-            lpFindFileData->nFileSizeLow = i.LowPart;
-        }
+        lpFindFileData->nFileSizeHigh = i.HighPart;
+        lpFindFileData->nFileSizeLow = i.LowPart;
     }
 
     return ret;
 }
 
-typedef HANDLE(WINAPI* tFindFirstFileW)(LPCWSTR lpFileName, LPWIN32_FIND_DATAW lpFindFileData);
 HANDLE WINAPI CustomFindFirstFileW(LPCWSTR lpFileName, LPWIN32_FIND_DATAW lpFindFileData)
 {
     static bool once = false;
@@ -1165,22 +1171,18 @@ HANDLE WINAPI CustomFindFirstFileW(LPCWSTR lpFileName, LPWIN32_FIND_DATAW lpFind
 
     auto ret = FindFirstFileW(lpFileName, lpFindFileData);
 
-    if (bPatchFindFile)
-    {
-        sCurrentFindFileDirW = lpFileName;
+    sCurrentFindFileDirW = lpFileName;
 
-        auto i = FindFileCheckOverloadedPath(lpFindFileData->cFileName);
-        if (i.QuadPart)
-        {
-            lpFindFileData->nFileSizeHigh = i.HighPart;
-            lpFindFileData->nFileSizeLow = i.LowPart;
-        }
+    auto i = FindFileCheckOverloadedPath(lpFindFileData->cFileName);
+    if (i.QuadPart)
+    {
+        lpFindFileData->nFileSizeHigh = i.HighPart;
+        lpFindFileData->nFileSizeLow = i.LowPart;
     }
 
     return ret;
 }
 
-typedef BOOL(WINAPI* tFindNextFileW)(HANDLE hFindFile, LPWIN32_FIND_DATAW lpFindFileData);
 BOOL WINAPI CustomFindNextFileW(HANDLE hFindFile, LPWIN32_FIND_DATAW lpFindFileData)
 {
     static bool once = false;
@@ -1192,20 +1194,16 @@ BOOL WINAPI CustomFindNextFileW(HANDLE hFindFile, LPWIN32_FIND_DATAW lpFindFileD
 
     auto ret = FindNextFileW(hFindFile, lpFindFileData);
 
-    if (bPatchFindFile)
+    auto i = FindFileCheckOverloadedPath(lpFindFileData->cFileName);
+    if (i.QuadPart)
     {
-        auto i = FindFileCheckOverloadedPath(lpFindFileData->cFileName);
-        if (i.QuadPart)
-        {
-            lpFindFileData->nFileSizeHigh = i.HighPart;
-            lpFindFileData->nFileSizeLow = i.LowPart;
-        }
+        lpFindFileData->nFileSizeHigh = i.HighPart;
+        lpFindFileData->nFileSizeLow = i.LowPart;
     }
 
     return ret;
 }
 
-typedef HANDLE(WINAPI* tFindFirstFileExA)(LPCSTR lpFileName, FINDEX_INFO_LEVELS fInfoLevelId, WIN32_FIND_DATAA* lpFindFileData, FINDEX_SEARCH_OPS fSearchOp, LPVOID lpSearchFilter, DWORD dwAdditionalFlags);
 HANDLE WINAPI CustomFindFirstFileExA(LPCSTR lpFileName, FINDEX_INFO_LEVELS fInfoLevelId, WIN32_FIND_DATAA* lpFindFileData, FINDEX_SEARCH_OPS fSearchOp, LPVOID lpSearchFilter, DWORD dwAdditionalFlags)
 {
     static bool once = false;
@@ -1217,7 +1215,7 @@ HANDLE WINAPI CustomFindFirstFileExA(LPCSTR lpFileName, FINDEX_INFO_LEVELS fInfo
 
     auto ret = FindFirstFileExA(lpFileName, fInfoLevelId, lpFindFileData, fSearchOp, lpSearchFilter, dwAdditionalFlags);
 
-    if (fInfoLevelId != FindExInfoMaxInfoLevel && bPatchFindFile)
+    if (fInfoLevelId != FindExInfoMaxInfoLevel)
     {
         sCurrentFindFileDirA = lpFileName;
 
@@ -1232,7 +1230,6 @@ HANDLE WINAPI CustomFindFirstFileExA(LPCSTR lpFileName, FINDEX_INFO_LEVELS fInfo
     return ret;
 }
 
-typedef HANDLE(WINAPI* tFindFirstFileExW)(LPCWSTR lpFileName, FINDEX_INFO_LEVELS fInfoLevelId, WIN32_FIND_DATAW* lpFindFileData, FINDEX_SEARCH_OPS fSearchOp, LPVOID lpSearchFilter, DWORD dwAdditionalFlags);
 HANDLE WINAPI CustomFindFirstFileExW(LPCWSTR lpFileName, FINDEX_INFO_LEVELS fInfoLevelId, WIN32_FIND_DATAW* lpFindFileData, FINDEX_SEARCH_OPS fSearchOp, LPVOID lpSearchFilter, DWORD dwAdditionalFlags)
 {
     static bool once = false;
@@ -1244,7 +1241,7 @@ HANDLE WINAPI CustomFindFirstFileExW(LPCWSTR lpFileName, FINDEX_INFO_LEVELS fInf
 
     auto ret = FindFirstFileExW(lpFileName, fInfoLevelId, lpFindFileData, fSearchOp, lpSearchFilter, dwAdditionalFlags);
 
-    if (fInfoLevelId != FindExInfoMaxInfoLevel && bPatchFindFile)
+    if (fInfoLevelId != FindExInfoMaxInfoLevel)
     {
         sCurrentFindFileDirW = lpFileName;
 
@@ -1297,6 +1294,257 @@ HRESULT WINAPI CustomCoCreateInstance(REFCLSID rclsid, LPUNKNOWN pUnkOuter, DWOR
     pIFactory->Release();
 
     return hr;
+}
+
+namespace OverloadFromFolder
+{
+    template<typename Callable>
+    using ReturnType = typename decltype(std::function{ std::declval<Callable>() })::result_type;
+
+    bool isRecursive(auto addr)
+    {
+        HMODULE hModule = NULL;
+        GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, (LPCTSTR)addr, &hModule);
+        if (hModule == hm)
+            return true;
+        return false;
+    }
+
+    std::filesystem::path GetFilePathForOverload(auto& lpLibFileName, bool bRecursive)
+    {
+        if (bRecursive)
+            return {};
+
+        return ::GetFilePathForOverload(lpLibFileName);
+    }
+
+    HMODULE WINAPI shCustomLoadLibraryExA(LPCSTR lpLibFileName, HANDLE hFile, DWORD dwFlags)
+    {
+        auto raddr = _ReturnAddress();
+        auto r = GetFilePathForOverload(lpLibFileName, isRecursive(raddr));
+        return shLoadLibraryExA.unsafe_stdcall<ReturnType<decltype(LoadLibraryExA)>>(value_orA(r, lpLibFileName), hFile, dwFlags);
+    }
+
+    HMODULE WINAPI shCustomLoadLibraryExW(LPCWSTR lpLibFileName, HANDLE hFile, DWORD dwFlags)
+    {
+        auto raddr = _ReturnAddress();
+        auto r = GetFilePathForOverload(lpLibFileName, isRecursive(raddr));
+        return shLoadLibraryExW.unsafe_stdcall<ReturnType<decltype(LoadLibraryExW)>>(value_orW(r, lpLibFileName), hFile, dwFlags);
+    }
+
+    HMODULE WINAPI shCustomLoadLibraryA(LPCSTR lpLibFileName)
+    {
+        auto raddr = _ReturnAddress();
+        auto r = GetFilePathForOverload(lpLibFileName, isRecursive(raddr));
+        return shLoadLibraryA.unsafe_stdcall<ReturnType<decltype(LoadLibraryA)>>(value_orA(r, lpLibFileName));
+    }
+
+    HMODULE WINAPI shCustomLoadLibraryW(LPCWSTR lpLibFileName)
+    {
+        auto raddr = _ReturnAddress();
+        auto r = GetFilePathForOverload(lpLibFileName, isRecursive(raddr));
+        return shLoadLibraryW.unsafe_stdcall<ReturnType<decltype(LoadLibraryW)>>(value_orW(r, lpLibFileName));
+    }
+
+    HANDLE WINAPI shCustomCreateFileA(LPCSTR lpFileName, DWORD dwAccess, DWORD dwSharing, LPSECURITY_ATTRIBUTES saAttributes, DWORD dwCreation, DWORD dwAttributes, HANDLE hTemplate)
+    {
+        auto raddr = _ReturnAddress();
+        auto r = GetFilePathForOverload(lpFileName, isRecursive(raddr));
+        return shCreateFileA.unsafe_stdcall<ReturnType<decltype(CreateFileA)>>(value_orA(r, lpFileName), dwAccess, dwSharing, saAttributes, dwCreation, dwAttributes, hTemplate);
+    }
+
+    HANDLE WINAPI shCustomCreateFileW(LPCWSTR lpFileName, DWORD dwAccess, DWORD dwSharing, LPSECURITY_ATTRIBUTES saAttributes, DWORD dwCreation, DWORD dwAttributes, HANDLE hTemplate)
+    {
+        auto raddr = _ReturnAddress();
+        auto r = GetFilePathForOverload(lpFileName, isRecursive(raddr));
+        return shCreateFileW.unsafe_stdcall<ReturnType<decltype(CreateFileW)>>(value_orW(r, lpFileName), dwAccess, dwSharing, saAttributes, dwCreation, dwAttributes, hTemplate);
+    }
+
+    DWORD WINAPI shCustomGetFileAttributesA(LPCSTR lpFileName)
+    {
+        auto raddr = _ReturnAddress();
+        auto r = GetFilePathForOverload(lpFileName, isRecursive(raddr));
+        return shGetFileAttributesA.unsafe_stdcall<ReturnType<decltype(GetFileAttributesA)>>(value_orA(r, lpFileName));
+    }
+
+    DWORD WINAPI shCustomGetFileAttributesW(LPCWSTR lpFileName)
+    {
+        auto raddr = _ReturnAddress();
+        auto r = GetFilePathForOverload(lpFileName, isRecursive(raddr));
+        return shGetFileAttributesW.unsafe_stdcall<ReturnType<decltype(GetFileAttributesW)>>(value_orW(r, lpFileName));
+    }
+
+    BOOL WINAPI shCustomGetFileAttributesExA(LPCSTR lpFileName, GET_FILEEX_INFO_LEVELS fInfoLevelId, LPVOID lpFileInformation)
+    {
+        auto raddr = _ReturnAddress();
+        auto r = GetFilePathForOverload(lpFileName, isRecursive(raddr));
+        return shGetFileAttributesExA.unsafe_stdcall<ReturnType<decltype(GetFileAttributesExA)>>(value_orA(r, lpFileName), fInfoLevelId, lpFileInformation);
+    }
+
+    BOOL WINAPI shCustomGetFileAttributesExW(LPCWSTR lpFileName, GET_FILEEX_INFO_LEVELS fInfoLevelId, LPVOID lpFileInformation)
+    {
+        auto raddr = _ReturnAddress();
+        auto r = GetFilePathForOverload(lpFileName, isRecursive(raddr));
+        return shGetFileAttributesExW.unsafe_stdcall<ReturnType<decltype(GetFileAttributesExW)>>(value_orW(r, lpFileName), fInfoLevelId, lpFileInformation);
+    }
+
+    typedef HANDLE(WINAPI* tFindFirstFileA)(LPCSTR lpFileName, LPWIN32_FIND_DATAA lpFindFileData);
+    HANDLE WINAPI shCustomFindFirstFileA(LPCSTR lpFileName, LPWIN32_FIND_DATAA lpFindFileData)
+    {
+        auto raddr = _ReturnAddress();
+        auto ret = shFindFirstFileA.unsafe_stdcall<ReturnType<decltype(FindFirstFileA)>>(lpFileName, lpFindFileData);
+
+        if (isRecursive(raddr))
+            return ret;
+
+        if (!sFileLoaderPath.empty())
+        {
+            sCurrentFindFileDirA = lpFileName;
+
+            auto i = FindFileCheckOverloadedPath(lpFindFileData->cFileName);
+            if (i.QuadPart)
+            {
+                lpFindFileData->nFileSizeHigh = i.HighPart;
+                lpFindFileData->nFileSizeLow = i.LowPart;
+            }
+        }
+
+        return ret;
+    }
+
+    typedef BOOL(WINAPI* tFindNextFileA)(HANDLE hFindFile, LPWIN32_FIND_DATAA lpFindFileData);
+    BOOL WINAPI shCustomFindNextFileA(HANDLE hFindFile, LPWIN32_FIND_DATAA lpFindFileData)
+    {
+        auto raddr = _ReturnAddress();
+        auto ret = shFindNextFileA.unsafe_stdcall<ReturnType<decltype(FindNextFileA)>>(hFindFile, lpFindFileData);
+
+        if (isRecursive(raddr))
+            return ret;
+
+        if (!sFileLoaderPath.empty())
+        {
+            auto i = FindFileCheckOverloadedPath(lpFindFileData->cFileName);
+            if (i.QuadPart)
+            {
+                lpFindFileData->nFileSizeHigh = i.HighPart;
+                lpFindFileData->nFileSizeLow = i.LowPart;
+            }
+        }
+
+        return ret;
+    }
+
+    typedef HANDLE(WINAPI* tFindFirstFileW)(LPCWSTR lpFileName, LPWIN32_FIND_DATAW lpFindFileData);
+    HANDLE WINAPI shCustomFindFirstFileW(LPCWSTR lpFileName, LPWIN32_FIND_DATAW lpFindFileData)
+    {
+        auto raddr = _ReturnAddress();
+        auto ret = shFindFirstFileW.unsafe_stdcall<ReturnType<decltype(FindFirstFileW)>>(lpFileName, lpFindFileData);
+
+        if (isRecursive(raddr))
+            return ret;
+
+        if (!sFileLoaderPath.empty())
+        {
+            sCurrentFindFileDirW = lpFileName;
+
+            auto i = FindFileCheckOverloadedPath(lpFindFileData->cFileName);
+            if (i.QuadPart)
+            {
+                lpFindFileData->nFileSizeHigh = i.HighPart;
+                lpFindFileData->nFileSizeLow = i.LowPart;
+            }
+        }
+
+        return ret;
+    }
+
+    typedef BOOL(WINAPI* tFindNextFileW)(HANDLE hFindFile, LPWIN32_FIND_DATAW lpFindFileData);
+    BOOL WINAPI shCustomFindNextFileW(HANDLE hFindFile, LPWIN32_FIND_DATAW lpFindFileData)
+    {
+        auto raddr = _ReturnAddress();
+        auto ret = shFindNextFileW.unsafe_stdcall<ReturnType<decltype(FindNextFileW)>>(hFindFile, lpFindFileData);
+
+        if (isRecursive(raddr))
+            return ret;
+
+        if (!sFileLoaderPath.empty())
+        {
+            auto i = FindFileCheckOverloadedPath(lpFindFileData->cFileName);
+            if (i.QuadPart)
+            {
+                lpFindFileData->nFileSizeHigh = i.HighPart;
+                lpFindFileData->nFileSizeLow = i.LowPart;
+            }
+        }
+
+        return ret;
+    }
+
+    HANDLE WINAPI shCustomFindFirstFileExA(LPCSTR lpFileName, FINDEX_INFO_LEVELS fInfoLevelId, WIN32_FIND_DATAA* lpFindFileData, FINDEX_SEARCH_OPS fSearchOp, LPVOID lpSearchFilter, DWORD dwAdditionalFlags)
+    {
+        auto raddr = _ReturnAddress();
+        auto ret = shFindFirstFileExA.unsafe_stdcall<ReturnType<decltype(FindFirstFileExA)>>(lpFileName, fInfoLevelId, lpFindFileData, fSearchOp, lpSearchFilter, dwAdditionalFlags);
+
+        if (isRecursive(raddr))
+            return ret;
+
+        if (fInfoLevelId != FindExInfoMaxInfoLevel && !sFileLoaderPath.empty())
+        {
+            sCurrentFindFileDirA = lpFileName;
+
+            auto i = FindFileCheckOverloadedPath(lpFindFileData->cFileName);
+            if (i.QuadPart)
+            {
+                lpFindFileData->nFileSizeHigh = i.HighPart;
+                lpFindFileData->nFileSizeLow = i.LowPart;
+            }
+        }
+
+        return ret;
+    }
+
+    HANDLE WINAPI shCustomFindFirstFileExW(LPCWSTR lpFileName, FINDEX_INFO_LEVELS fInfoLevelId, WIN32_FIND_DATAW* lpFindFileData, FINDEX_SEARCH_OPS fSearchOp, LPVOID lpSearchFilter, DWORD dwAdditionalFlags)
+    {
+        auto raddr = _ReturnAddress();
+        auto ret = shFindFirstFileExW.unsafe_stdcall<ReturnType<decltype(FindFirstFileExW)>>(lpFileName, fInfoLevelId, lpFindFileData, fSearchOp, lpSearchFilter, dwAdditionalFlags);
+
+        if (isRecursive(raddr))
+            return ret;
+
+        if (fInfoLevelId != FindExInfoMaxInfoLevel && !sFileLoaderPath.empty())
+        {
+            sCurrentFindFileDirW = lpFileName;
+
+            auto i = FindFileCheckOverloadedPath(lpFindFileData->cFileName);
+            if (i.QuadPart)
+            {
+                lpFindFileData->nFileSizeHigh = i.HighPart;
+                lpFindFileData->nFileSizeLow = i.LowPart;
+            }
+        }
+
+        return ret;
+    }
+
+    void HookAPIForOverload()
+    {
+        shLoadLibraryExA = safetyhook::create_inline(LoadLibraryExA, shCustomLoadLibraryExA);
+        shLoadLibraryExW = safetyhook::create_inline(LoadLibraryExW, shCustomLoadLibraryExW);
+        shLoadLibraryA = safetyhook::create_inline(LoadLibraryA, shCustomLoadLibraryA);
+        shLoadLibraryW = safetyhook::create_inline(LoadLibraryW, shCustomLoadLibraryW);
+        shCreateFileA = safetyhook::create_inline(CreateFileA, shCustomCreateFileA);
+        shCreateFileW = safetyhook::create_inline(CreateFileW, shCustomCreateFileW);
+        shGetFileAttributesA = safetyhook::create_inline(GetFileAttributesA, shCustomGetFileAttributesA);
+        shGetFileAttributesW = safetyhook::create_inline(GetFileAttributesW, shCustomGetFileAttributesW);
+        shGetFileAttributesExA = safetyhook::create_inline(GetFileAttributesExA, shCustomGetFileAttributesExA);
+        shGetFileAttributesExW = safetyhook::create_inline(GetFileAttributesExW, shCustomGetFileAttributesExW);
+        shFindFirstFileA = safetyhook::create_inline(FindFirstFileA, shCustomFindFirstFileA);
+        shFindNextFileA = safetyhook::create_inline(FindNextFileA, shCustomFindNextFileA);
+        shFindFirstFileW = safetyhook::create_inline(FindFirstFileW, shCustomFindFirstFileW);
+        shFindNextFileW = safetyhook::create_inline(FindNextFileW, shCustomFindNextFileW);
+        shFindFirstFileExA = safetyhook::create_inline(FindFirstFileExA, shCustomFindFirstFileExA);
+        shFindFirstFileExW = safetyhook::create_inline(FindFirstFileExW, shCustomFindFirstFileExW);
+    }
 }
 
 std::vector<std::string> importedModulesList;
@@ -2199,7 +2447,6 @@ void Init()
     auto nFindModule = GetPrivateProfileIntW(TEXT("globalsets"), TEXT("findmodule"), FALSE, iniPaths);
     auto nDisableCrashDumps = GetPrivateProfileIntW(TEXT("globalsets"), TEXT("disablecrashdumps"), FALSE, iniPaths);
     sFileLoaderPath = GetPrivateProfileStringW(TEXT("fileloader"), TEXT("overloadfromfolder"), TEXT("update"), iniPaths);
-    bPatchFindFile = GetPrivateProfileIntW(TEXT("fileloader"), TEXT("patchfindfile"), FALSE, iniPaths);
 
     auto FolderExists = [](auto szPath) -> bool
     {
@@ -2249,14 +2496,6 @@ void Init()
             {
                 if (iequals(exeName, L"GTA5") || iequals(exeName, L"RDR2") || iequals(exeName, L"game_win64_master"))
                     sLoadFromAPI = L"GetSystemTimeAsFileTime";
-            }
-
-            if (!sFileLoaderPath.empty())
-            {
-                if (iequals(exeName, L"deadrising2") || iequals(exeName, L"deadrising2otr") || iequals(exeName, L"deadrising3") || iequals(exeName, L"deadrising4"))
-                {
-                    bPatchFindFile = true;
-                }
             }
         }
         catch (...) {}
@@ -2334,6 +2573,26 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID /*lpReserved*/)
                 *ptr = OLE32Data[i][ProcAddress];
                 VirtualProtect(ptr, sizeof(size_t), dwProtect[0], &dwProtect[1]);
             }
+        }
+
+        {
+            using namespace OverloadFromFolder;
+            shCreateFileA = {};
+            shCreateFileW = {};
+            shLoadLibraryExA = {};
+            shLoadLibraryExW = {};
+            shLoadLibraryA = {};
+            shLoadLibraryW = {};
+            shGetFileAttributesA = {};
+            shGetFileAttributesW = {};
+            shGetFileAttributesExA = {};
+            shGetFileAttributesExW = {};
+            shFindFirstFileA = {};
+            shFindNextFileA = {};
+            shFindFirstFileW = {};
+            shFindNextFileW = {};
+            shFindFirstFileExA = {};
+            shFindFirstFileExW = {};
         }
     }
     return TRUE;
