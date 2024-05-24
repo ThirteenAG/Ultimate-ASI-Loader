@@ -845,7 +845,7 @@ VerLanguageNameW = _VerLanguageNameW
 VerQueryValueA = _VerQueryValueA
 VerQueryValueW = _VerQueryValueW
 
-LIBRARY "binkw32"
+LIBRARY "bink2w32"
 EXPORTS
 _BinkAllocateFrameBuffers@12 = __BinkAllocateFrameBuffers@12
 _BinkBufferBlit@12 = __BinkBufferBlit@12

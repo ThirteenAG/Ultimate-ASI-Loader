@@ -539,7 +539,7 @@ void LoadOriginalLibrary()
         szLocalPath += L"binkw32Hooked.dll";
         if (std::filesystem::exists(szLocalPath))
         {
-            binkw32.LoadOriginalLibrary(LoadLib(szLocalPath), false);
+            bink2w32.LoadOriginalLibrary(LoadLib(szLocalPath), false);
         }
         else
         {
@@ -555,7 +555,7 @@ void LoadOriginalLibrary()
                         size_t dwResourceSize = SizeofResource(hm, hResource);
                         if (0 != dwResourceSize)
                         {
-                            binkw32.LoadOriginalLibrary(ogMemModule = MemoryLoadLibrary((const void*)pLockedResource, dwResourceSize), true);
+                            bink2w32.LoadOriginalLibrary(ogMemModule = MemoryLoadLibrary((const void*)pLockedResource, dwResourceSize), true);
                         }
                     }
                 }
@@ -567,7 +567,7 @@ void LoadOriginalLibrary()
         szLocalPath += L"bink2w32Hooked.dll";
         if (std::filesystem::exists(szLocalPath))
         {
-            binkw32.LoadOriginalLibrary(LoadLib(szLocalPath), false);
+            bink2w32.LoadOriginalLibrary(LoadLib(szLocalPath), false);
         }
     }
     else if (iequals(szSelfName, L"xlive.dll"))
@@ -593,6 +593,14 @@ void LoadOriginalLibrary()
             bink2w64.LoadOriginalLibrary(LoadLib(szLocalPath));
         }
     } 
+    else if (iequals(szSelfName, L"binkw64.dll"))
+    {
+        szLocalPath += L"binkw64Hooked.dll";
+        if (std::filesystem::exists(szLocalPath))
+        {
+            bink2w64.LoadOriginalLibrary(LoadLib(szLocalPath));
+        }
+    }
     else
 #endif
     {
@@ -799,8 +807,11 @@ void LoadPlugins()
 
         SetCurrentDirectoryW(szSelfPath.c_str());
 
-        if (SetCurrentDirectoryW(L"update\\"))
-            FindFiles(&fd);
+        if (!sFileLoaderPath.empty())
+        {
+            if (SetCurrentDirectoryW(sFileLoaderPath.wstring().c_str()))
+                FindFiles(&fd);
+        }
     }
 
     SetCurrentDirectoryW(oldDir.c_str()); // Reset the current directory

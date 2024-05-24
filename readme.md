@@ -23,12 +23,15 @@ This is a DLL file which adds ASI plugin loading functionality to any game, whic
 - winmm.dll ([x86](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/Win32-latest/winmm-Win32.zip) and [x64](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/x64-latest/winmm-x64.zip))
 - winhttp.dll ([x86](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/Win32-latest/winhttp-Win32.zip) and [x64](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/x64-latest/winhttp-x64.zip))
 - [xlive.dll](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/Win32-latest/xlive-Win32.zip) (x86)
-- [binkw32.dll](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/Win32-latest/binkw32-Win32.zip) (rename original to binkw32Hooked.dll, optional)
-- [bink2w64.dll](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/x64-latest/bink2w64-x64.zip) (rename original to bink2w64Hooked.dll)
-- [vorbisFile.dll](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/Win32-latest/vorbisFile-Win32.zip) (rename original to vorbisHooked.dll, optional)
+- [binkw32.dll](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/Win32-latest/binkw32-Win32.zip) (x86)
+- [bink2w32.dll](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/Win32-latest/bink2w32-Win32.zip) (x86)
+- [binkw64.dll](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/x64-latest/binkw64-x64.zip) (x64)
+- [bink2w64.dll](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/x64-latest/bink2w64-x64.zip) (x64)
+- [vorbisFile.dll](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/Win32-latest/vorbisFile-Win32.zip) (x86)
 
-With the last two, it is possible to load the original dll by renaming it to 'vorbisHooked.dll' or 'binkw32Hooked.dll'.
-Usually it is not required and you can simply replace the dll. Always make a backup before replacing any files.
+It is possible(and sometimes necessary) to load the original dll by renaming it to `<dllname>Hooked.dll`, e.g. `d3d12Hooked.dll`.
+With **binkw32.dll** and **vorbisFile.dll** it is optional and you can simply replace the dll. Always make a backup before replacing any files.
+
 
 ## INSTALLATION
 
@@ -36,7 +39,7 @@ In order to install it, you just need to place DLL into game directory. Usually 
 
 ## USAGE
 
-Put ASI files in game root directory, 'scripts' or 'plugins' folder.
+Put ASI files in game root directory, 'scripts', 'plugins' or 'update' folder.
 If configuration is necessary, global.ini file can be placed to 'scripts' or 'plugins' folder. It can be used alongside the chosen dll and if so, it is also possible to use dll name for ini file, e.g. version.dll/version.ini.
 [See example of global.ini here](https://github.com/ThirteenAG/Ultimate-ASI-Loader/blob/master/data/scripts/global.ini).
 

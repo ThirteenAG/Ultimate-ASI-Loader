@@ -1659,12 +1659,31 @@ struct bink2w64_dll
 {
     HMODULE dll;
     FARPROC BinkAllocateFrameBuffers;
+    FARPROC BinkBufferBlit;
+    FARPROC BinkBufferCheckWinPos;
+    FARPROC BinkBufferClear;
+    FARPROC BinkBufferClose;
+    FARPROC BinkBufferGetDescription;
+    FARPROC BinkBufferGetError;
+    FARPROC BinkBufferLock;
+    FARPROC BinkBufferOpen;
+    FARPROC BinkBufferSetDirectDraw;
+    FARPROC BinkBufferSetHWND;
+    FARPROC BinkBufferSetOffset;
+    FARPROC BinkBufferSetResolution;
+    FARPROC BinkBufferSetScale;
+    FARPROC BinkBufferUnlock;
+    FARPROC BinkCheckCursor;
     FARPROC BinkClose;
     FARPROC BinkCloseTrack;
     FARPROC BinkControlBackgroundIO;
+    FARPROC BinkControlPlatformFeatures;
     FARPROC BinkCopyToBuffer;
     FARPROC BinkCopyToBufferRect;
     FARPROC BinkCurrentSubtitle;
+    FARPROC BinkDDSurfaceType;
+    FARPROC BinkDX8SurfaceType;
+    FARPROC BinkDX9SurfaceType;
     FARPROC BinkDoFrame;
     FARPROC BinkDoFrameAsync;
     FARPROC BinkDoFrameAsyncMulti;
@@ -1676,6 +1695,7 @@ struct bink2w64_dll
     FARPROC BinkGetFrameBuffersInfo;
     FARPROC BinkGetGPUDataBuffersInfo;
     FARPROC BinkGetKeyFrame;
+    FARPROC BinkGetPalette;
     FARPROC BinkGetPlatformInfo;
     FARPROC BinkGetRealtime;
     FARPROC BinkGetRects;
@@ -1686,6 +1706,7 @@ struct bink2w64_dll
     FARPROC BinkGetTrackMaxSize;
     FARPROC BinkGetTrackType;
     FARPROC BinkGoto;
+    FARPROC BinkIsSoftwareCursor;
     FARPROC BinkLoadSubtitles;
     FARPROC BinkLogoAddress;
     FARPROC BinkNextFrame;
@@ -1704,7 +1725,9 @@ struct bink2w64_dll
     FARPROC BinkRegisterGPUDataBuffers;
     FARPROC BinkRequestStopAsyncThread;
     FARPROC BinkRequestStopAsyncThreadsMulti;
+    FARPROC BinkRestoreCursor;
     FARPROC BinkService;
+    FARPROC BinkServiceSound;
     FARPROC BinkSetError;
     FARPROC BinkSetFileOffset;
     FARPROC BinkSetFrameRate;
@@ -1744,12 +1767,31 @@ struct bink2w64_dll
         dll = module;
         shared.LoadOriginalLibrary(dll);
         BinkAllocateFrameBuffers = GetProcAddress(dll, "BinkAllocateFrameBuffers");
+        BinkBufferBlit = GetProcAddress(dll, "BinkBufferBlit");
+        BinkBufferCheckWinPos = GetProcAddress(dll, "BinkBufferCheckWinPos");
+        BinkBufferClear = GetProcAddress(dll, "BinkBufferClear");
+        BinkBufferClose = GetProcAddress(dll, "BinkBufferClose");
+        BinkBufferGetDescription = GetProcAddress(dll, "BinkBufferGetDescription");
+        BinkBufferGetError = GetProcAddress(dll, "BinkBufferGetError");
+        BinkBufferLock = GetProcAddress(dll, "BinkBufferLock");
+        BinkBufferOpen = GetProcAddress(dll, "BinkBufferOpen");
+        BinkBufferSetDirectDraw = GetProcAddress(dll, "BinkBufferSetDirectDraw");
+        BinkBufferSetHWND = GetProcAddress(dll, "BinkBufferSetHWND");
+        BinkBufferSetOffset = GetProcAddress(dll, "BinkBufferSetOffset");
+        BinkBufferSetResolution = GetProcAddress(dll, "BinkBufferSetResolution");
+        BinkBufferSetScale = GetProcAddress(dll, "BinkBufferSetScale");
+        BinkBufferUnlock = GetProcAddress(dll, "BinkBufferUnlock");
+        BinkCheckCursor = GetProcAddress(dll, "BinkCheckCursor");
         BinkClose = GetProcAddress(dll, "BinkClose");
         BinkCloseTrack = GetProcAddress(dll, "BinkCloseTrack");
         BinkControlBackgroundIO = GetProcAddress(dll, "BinkControlBackgroundIO");
+        BinkControlPlatformFeatures = GetProcAddress(dll, "BinkControlPlatformFeatures");
         BinkCopyToBuffer = GetProcAddress(dll, "BinkCopyToBuffer");
         BinkCopyToBufferRect = GetProcAddress(dll, "BinkCopyToBufferRect");
         BinkCurrentSubtitle = GetProcAddress(dll, "BinkCurrentSubtitle");
+        BinkDDSurfaceType = GetProcAddress(dll, "BinkDDSurfaceType");
+        BinkDX8SurfaceType = GetProcAddress(dll, "BinkDX8SurfaceType");
+        BinkDX9SurfaceType = GetProcAddress(dll, "BinkDX9SurfaceType");
         BinkDoFrame = GetProcAddress(dll, "BinkDoFrame");
         BinkDoFrameAsync = GetProcAddress(dll, "BinkDoFrameAsync");
         BinkDoFrameAsyncMulti = GetProcAddress(dll, "BinkDoFrameAsyncMulti");
@@ -1761,6 +1803,7 @@ struct bink2w64_dll
         BinkGetFrameBuffersInfo = GetProcAddress(dll, "BinkGetFrameBuffersInfo");
         BinkGetGPUDataBuffersInfo = GetProcAddress(dll, "BinkGetGPUDataBuffersInfo");
         BinkGetKeyFrame = GetProcAddress(dll, "BinkGetKeyFrame");
+        BinkGetPalette = GetProcAddress(dll, "BinkGetPalette");
         BinkGetPlatformInfo = GetProcAddress(dll, "BinkGetPlatformInfo");
         BinkGetRealtime = GetProcAddress(dll, "BinkGetRealtime");
         BinkGetRects = GetProcAddress(dll, "BinkGetRects");
@@ -1771,6 +1814,7 @@ struct bink2w64_dll
         BinkGetTrackMaxSize = GetProcAddress(dll, "BinkGetTrackMaxSize");
         BinkGetTrackType = GetProcAddress(dll, "BinkGetTrackType");
         BinkGoto = GetProcAddress(dll, "BinkGoto");
+        BinkIsSoftwareCursor = GetProcAddress(dll, "BinkIsSoftwareCursor");
         BinkLoadSubtitles = GetProcAddress(dll, "BinkLoadSubtitles");
         BinkLogoAddress = GetProcAddress(dll, "BinkLogoAddress");
         BinkNextFrame = GetProcAddress(dll, "BinkNextFrame");
@@ -1789,7 +1833,9 @@ struct bink2w64_dll
         BinkRegisterGPUDataBuffers = GetProcAddress(dll, "BinkRegisterGPUDataBuffers");
         BinkRequestStopAsyncThread = GetProcAddress(dll, "BinkRequestStopAsyncThread");
         BinkRequestStopAsyncThreadsMulti = GetProcAddress(dll, "BinkRequestStopAsyncThreadsMulti");
+        BinkRestoreCursor = GetProcAddress(dll, "BinkRestoreCursor");
         BinkService = GetProcAddress(dll, "BinkService");
+        BinkServiceSound = GetProcAddress(dll, "BinkServiceSound");
         BinkSetError = GetProcAddress(dll, "BinkSetError");
         BinkSetFileOffset = GetProcAddress(dll, "BinkSetFileOffset");
         BinkSetFrameRate = GetProcAddress(dll, "BinkSetFrameRate");
@@ -2117,7 +2163,7 @@ struct msvfw32_dll
     }
 } msvfw32;
 
-struct binkw32_dll
+struct bink2w32_dll
 {
     HMEMORYMODULE dll;
     FARPROC BinkAllocateFrameBuffers;
@@ -2486,7 +2532,7 @@ struct binkw32_dll
         radfree = AutoGetProcAddress(dll, "_radfree@4");
         radmalloc = AutoGetProcAddress(dll, "_radmalloc@4");
     }
-} binkw32;
+} bink2w32;
 
 __declspec(naked) void _ov_bitrate() { _asm { jmp[vorbisfile.ov_bitrate] } }
 __declspec(naked) void _ov_bitrate_instant() { _asm { jmp[vorbisfile.ov_bitrate_instant] } }
@@ -3380,182 +3426,182 @@ __declspec(naked) void _VerLanguageNameW() { _asm { jmp[version.VerLanguageNameW
 __declspec(naked) void _VerQueryValueA() { _asm { jmp[version.VerQueryValueA] } }
 __declspec(naked) void _VerQueryValueW() { _asm { jmp[version.VerQueryValueW] } }
 
-extern "C" __declspec(naked) void __stdcall _BinkAllocateFrameBuffers(int, int, int) { _asm { jmp[binkw32.BinkAllocateFrameBuffers] } }
-extern "C" __declspec(naked) void __stdcall _BinkBufferBlit(int, int, int) { _asm { jmp[binkw32.BinkBufferBlit] } }
-extern "C" __declspec(naked) void __stdcall _BinkBufferCheckWinPos(int, int, int) { _asm { jmp[binkw32.BinkBufferCheckWinPos] } }
-extern "C" __declspec(naked) void __stdcall _BinkBufferClear(int, int) { _asm { jmp[binkw32.BinkBufferClear] } }
-extern "C" __declspec(naked) void __stdcall _BinkBufferClose(int) { _asm { jmp[binkw32.BinkBufferClose] } }
-extern "C" __declspec(naked) void __stdcall _BinkBufferGetDescription(int) { _asm { jmp[binkw32.BinkBufferGetDescription] } }
-extern "C" __declspec(naked) void __stdcall _BinkBufferGetError() { _asm { jmp[binkw32.BinkBufferGetError] } }
-extern "C" __declspec(naked) void __stdcall _BinkBufferLock(int) { _asm { jmp[binkw32.BinkBufferLock] } }
-extern "C" __declspec(naked) void __stdcall _BinkBufferOpen(int, int, int, int) { _asm { jmp[binkw32.BinkBufferOpen] } }
-extern "C" __declspec(naked) void __stdcall _BinkBufferSetDirectDraw(int, int) { _asm { jmp[binkw32.BinkBufferSetDirectDraw] } }
-extern "C" __declspec(naked) void __stdcall _BinkBufferSetHWND(int, int) { _asm { jmp[binkw32.BinkBufferSetHWND] } }
-extern "C" __declspec(naked) void __stdcall _BinkBufferSetOffset(int, int, int) { _asm { jmp[binkw32.BinkBufferSetOffset] } }
-extern "C" __declspec(naked) void __stdcall _BinkBufferSetResolution(int, int, int) { _asm { jmp[binkw32.BinkBufferSetResolution] } }
-extern "C" __declspec(naked) void __stdcall _BinkBufferSetScale(int, int, int) { _asm { jmp[binkw32.BinkBufferSetScale] } }
-extern "C" __declspec(naked) void __stdcall _BinkBufferUnlock(int) { _asm { jmp[binkw32.BinkBufferUnlock] } }
-extern "C" __declspec(naked) void __stdcall _BinkCheckCursor(int, int, int, int, int) { _asm { jmp[binkw32.BinkCheckCursor] } }
-extern "C" __declspec(naked) void __stdcall _BinkClose(int) { _asm { jmp[binkw32.BinkClose] } }
-extern "C" __declspec(naked) void __stdcall _BinkCloseTrack(int) { _asm { jmp[binkw32.BinkCloseTrack] } }
-extern "C" __declspec(naked) void __stdcall _BinkControlBackgroundIO(int, int) { _asm { jmp[binkw32.BinkControlBackgroundIO] } }
-extern "C" __declspec(naked) void __stdcall _BinkControlPlatformFeatures(int, int) { _asm { jmp[binkw32.BinkControlPlatformFeatures] } }
-extern "C" __declspec(naked) void __stdcall _BinkCopyToBuffer(int, int, int, int, int, int, int) { _asm { jmp[binkw32.BinkCopyToBuffer] } }
-extern "C" __declspec(naked) void __stdcall _BinkCopyToBufferRect(int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[binkw32.BinkCopyToBufferRect] } }
-extern "C" __declspec(naked) void __stdcall _BinkCurrentSubtitle(int, int, int, int) { _asm { jmp[binkw32.BinkCurrentSubtitle] } }
-extern "C" __declspec(naked) void __stdcall _BinkDDSurfaceType(int) { _asm { jmp[binkw32.BinkDDSurfaceType] } }
-extern "C" __declspec(naked) void __stdcall _BinkDX8SurfaceType(int) { _asm { jmp[binkw32.BinkDX8SurfaceType] } }
-extern "C" __declspec(naked) void __stdcall _BinkDX9SurfaceType(int) { _asm { jmp[binkw32.BinkDX9SurfaceType] } }
-extern "C" __declspec(naked) void __stdcall _BinkDoFrame(int) { _asm { jmp[binkw32.BinkDoFrame] } }
-extern "C" __declspec(naked) void __stdcall _BinkDoFrameAsync(int, int, int) { _asm { jmp[binkw32.BinkDoFrameAsync] } }
-extern "C" __declspec(naked) void __stdcall _BinkDoFrameAsyncMulti(int, int, int) { _asm { jmp[binkw32.BinkDoFrameAsyncMulti] } }
-extern "C" __declspec(naked) void __stdcall _BinkDoFrameAsyncWait(int, int) { _asm { jmp[binkw32.BinkDoFrameAsyncWait] } }
-extern "C" __declspec(naked) void __stdcall _BinkDoFramePlane(int, int) { _asm { jmp[binkw32.BinkDoFramePlane] } }
-extern "C" __declspec(naked) void __stdcall _BinkFindXAudio2WinDevice(int, int) { _asm { jmp[binkw32.BinkFindXAudio2WinDevice] } }
-extern "C" __declspec(naked) void __stdcall _BinkFreeGlobals() { _asm { jmp[binkw32.BinkFreeGlobals] } }
-extern "C" __declspec(naked) void __stdcall _BinkGetError() { _asm { jmp[binkw32.BinkGetError] } }
-extern "C" __declspec(naked) void __stdcall _BinkGetFrameBuffersInfo(int, int) { _asm { jmp[binkw32.BinkGetFrameBuffersInfo] } }
-extern "C" __declspec(naked) void __stdcall _BinkGetGPUDataBuffersInfo(int, int) { _asm { jmp[binkw32.BinkGetGPUDataBuffersInfo] } }
-extern "C" __declspec(naked) void __stdcall _BinkGetKeyFrame(int, int, int) { _asm { jmp[binkw32.BinkGetKeyFrame] } }
-extern "C" __declspec(naked) void __stdcall _BinkGetPalette(int) { _asm { jmp[binkw32.BinkGetPalette] } }
-extern "C" __declspec(naked) void __stdcall _BinkGetPlatformInfo(int, int) { _asm { jmp[binkw32.BinkGetPlatformInfo] } }
-extern "C" __declspec(naked) void __stdcall _BinkGetRealtime(int, int, int) { _asm { jmp[binkw32.BinkGetRealtime] } }
-extern "C" __declspec(naked) void __stdcall _BinkGetRects(int, int) { _asm { jmp[binkw32.BinkGetRects] } }
-extern "C" __declspec(naked) void __stdcall _BinkGetRects4(int) { _asm { jmp[binkw32.BinkGetRects4] } }
-extern "C" __declspec(naked) void __stdcall _BinkGetSubtitleByIndex(int, int, int, int) { _asm { jmp[binkw32.BinkGetSubtitleByIndex] } }
-extern "C" __declspec(naked) void __stdcall _BinkGetSummary(int, int) { _asm { jmp[binkw32.BinkGetSummary] } }
-extern "C" __declspec(naked) void __stdcall _BinkGetTrackData(int, int) { _asm { jmp[binkw32.BinkGetTrackData] } }
-extern "C" __declspec(naked) void __stdcall _BinkGetTrackData12(int, int, int) { _asm { jmp[binkw32.BinkGetTrackData12] } }
-extern "C" __declspec(naked) void __stdcall _BinkGetTrackID(int, int) { _asm { jmp[binkw32.BinkGetTrackID] } }
-extern "C" __declspec(naked) void __stdcall _BinkGetTrackMaxSize(int, int) { _asm { jmp[binkw32.BinkGetTrackMaxSize] } }
-extern "C" __declspec(naked) void __stdcall _BinkGetTrackType(int, int) { _asm { jmp[binkw32.BinkGetTrackType] } }
-extern "C" __declspec(naked) void __stdcall _BinkGoto(int, int, int) { _asm { jmp[binkw32.BinkGoto] } }
-extern "C" __declspec(naked) void __stdcall _BinkIsSoftwareCursor(int, int) { _asm { jmp[binkw32.BinkIsSoftwareCursor] } }
-extern "C" __declspec(naked) void __stdcall _BinkLoadSubtitles(int, int) { _asm { jmp[binkw32.BinkLoadSubtitles] } }
-extern "C" __declspec(naked) void __stdcall _BinkLogoAddress() { _asm { jmp[binkw32.BinkLogoAddress] } }
-extern "C" __declspec(naked) void __stdcall _BinkNextFrame(int) { _asm { jmp[binkw32.BinkNextFrame] } }
-extern "C" __declspec(naked) void __stdcall _BinkOpen(int, int) { _asm { jmp[binkw32.BinkOpen] } }
-extern "C" __declspec(naked) void __stdcall _BinkOpenDirectSound(int) { _asm { jmp[binkw32.BinkOpenDirectSound] } }
-extern "C" __declspec(naked) void __stdcall _BinkOpenMiles(int) { _asm { jmp[binkw32.BinkOpenMiles] } }
-extern "C" __declspec(naked) void __stdcall _BinkOpenTrack(int, int) { _asm { jmp[binkw32.BinkOpenTrack] } }
-extern "C" __declspec(naked) void __stdcall _BinkOpenWaveOut(int) { _asm { jmp[binkw32.BinkOpenWaveOut] } }
-extern "C" __declspec(naked) void __stdcall _BinkOpenWithOptions(int, int, int) { _asm { jmp[binkw32.BinkOpenWithOptions] } }
-extern "C" __declspec(naked) void __stdcall _BinkOpenXAudio2(int) { _asm { jmp[binkw32.BinkOpenXAudio2] } }
-extern "C" __declspec(naked) void __stdcall _BinkOpenXAudio2_8(int, int) { _asm { jmp[binkw32.BinkOpenXAudio2_8] } }
-extern "C" __declspec(naked) void __stdcall _BinkOpenXAudio27(int, int) { _asm { jmp[binkw32.BinkOpenXAudio27] } }
-extern "C" __declspec(naked) void __stdcall _BinkOpenXAudio28(int, int) { _asm { jmp[binkw32.BinkOpenXAudio28] } }
-extern "C" __declspec(naked) void __stdcall _BinkOpenXAudio29(int, int) { _asm { jmp[binkw32.BinkOpenXAudio29] } }
-extern "C" __declspec(naked) void __stdcall _BinkPause(int, int) { _asm { jmp[binkw32.BinkPause] } }
-extern "C" __declspec(naked) void __stdcall _BinkRegisterFrameBuffers(int, int) { _asm { jmp[binkw32.BinkRegisterFrameBuffers] } }
-extern "C" __declspec(naked) void __stdcall _BinkRegisterGPUDataBuffers(int, int) { _asm { jmp[binkw32.BinkRegisterGPUDataBuffers] } }
-extern "C" __declspec(naked) void __stdcall _BinkRequestStopAsyncThread(int) { _asm { jmp[binkw32.BinkRequestStopAsyncThread] } }
-extern "C" __declspec(naked) void __stdcall _BinkRequestStopAsyncThreadsMulti(int, int) { _asm { jmp[binkw32.BinkRequestStopAsyncThreadsMulti] } }
-extern "C" __declspec(naked) void __stdcall _BinkRestoreCursor(int) { _asm { jmp[binkw32.BinkRestoreCursor] } }
-extern "C" __declspec(naked) void __stdcall _BinkService(int) { _asm { jmp[binkw32.BinkService] } }
-extern "C" __declspec(naked) void __stdcall _BinkServiceSound() { _asm { jmp[binkw32.BinkServiceSound] } }
-extern "C" __declspec(naked) void __stdcall _BinkSetError(int) { _asm { jmp[binkw32.BinkSetError] } }
-extern "C" __declspec(naked) void __stdcall _BinkSetFileOffset(int, int) { _asm { jmp[binkw32.BinkSetFileOffset] } }
-extern "C" __declspec(naked) void __stdcall _BinkSetFrameRate(int, int) { _asm { jmp[binkw32.BinkSetFrameRate] } }
-extern "C" __declspec(naked) void __stdcall _BinkSetIO(int) { _asm { jmp[binkw32.BinkSetIO] } }
-extern "C" __declspec(naked) void __stdcall _BinkSetIOSize(int) { _asm { jmp[binkw32.BinkSetIOSize] } }
-extern "C" __declspec(naked) void __stdcall _BinkSetIOSize8(int, int) { _asm { jmp[binkw32.BinkSetIOSize8] } }
-extern "C" __declspec(naked) void __stdcall _BinkSetMemory(int, int) { _asm { jmp[binkw32.BinkSetMemory] } }
-extern "C" __declspec(naked) void __stdcall _BinkSetMixBinVolumes(int, int, int, int, int) { _asm { jmp[binkw32.BinkSetMixBinVolumes] } }
-extern "C" __declspec(naked) void __stdcall _BinkSetMixBins(int, int, int, int) { _asm { jmp[binkw32.BinkSetMixBins] } }
-extern "C" __declspec(naked) void __stdcall _BinkSetOSFileCallbacks(int, int, int, int) { _asm { jmp[binkw32.BinkSetOSFileCallbacks] } }
-extern "C" __declspec(naked) void __stdcall _BinkSetPan(int, int, int) { _asm { jmp[binkw32.BinkSetPan] } }
-extern "C" __declspec(naked) void __stdcall _BinkSetSimulate(int) { _asm { jmp[binkw32.BinkSetSimulate] } }
-extern "C" __declspec(naked) void __stdcall _BinkSetSoundOnOff(int, int) { _asm { jmp[binkw32.BinkSetSoundOnOff] } }
-extern "C" __declspec(naked) void __stdcall _BinkSetSoundSystem(int, int) { _asm { jmp[binkw32.BinkSetSoundSystem] } }
-extern "C" __declspec(naked) void __stdcall _BinkSetSoundSystem2(int, int, int) { _asm { jmp[binkw32.BinkSetSoundSystem2] } }
-extern "C" __declspec(naked) void __stdcall _BinkSetSoundTrack(int, int) { _asm { jmp[binkw32.BinkSetSoundTrack] } }
-extern "C" __declspec(naked) void __stdcall _BinkSetSpeakerVolumes(int, int, int, int, int) { _asm { jmp[binkw32.BinkSetSpeakerVolumes] } }
-extern "C" __declspec(naked) void __stdcall _BinkSetVideoOnOff(int, int) { _asm { jmp[binkw32.BinkSetVideoOnOff] } }
-extern "C" __declspec(naked) void __stdcall _BinkSetVolume(int, int, int) { _asm { jmp[binkw32.BinkSetVolume] } }
-extern "C" __declspec(naked) void __stdcall _BinkSetWillLoop(int, int) { _asm { jmp[binkw32.BinkSetWillLoop] } }
-extern "C" __declspec(naked) void __stdcall _BinkShouldSkip(int) { _asm { jmp[binkw32.BinkShouldSkip] } }
-extern "C" __declspec(naked) void __stdcall _BinkStartAsyncThread(int, int) { _asm { jmp[binkw32.BinkStartAsyncThread] } }
-extern "C" __declspec(naked) void __stdcall _BinkUseTelemetry(int) { _asm { jmp[binkw32.BinkUseTelemetry] } }
-extern "C" __declspec(naked) void __stdcall _BinkUseTmLite(int) { _asm { jmp[binkw32.BinkUseTmLite] } }
-extern "C" __declspec(naked) void __stdcall _BinkUtilCPUs() { _asm { jmp[binkw32.BinkUtilCPUs] } }
-extern "C" __declspec(naked) void __stdcall _BinkUtilFree(int) { _asm { jmp[binkw32.BinkUtilFree] } }
-extern "C" __declspec(naked) void __stdcall _BinkUtilMalloc(int, int) { _asm { jmp[binkw32.BinkUtilMalloc] } }
-extern "C" __declspec(naked) void __stdcall _BinkUtilMutexCreate(int, int) { _asm { jmp[binkw32.BinkUtilMutexCreate] } }
-extern "C" __declspec(naked) void __stdcall _BinkUtilMutexDestroy(int) { _asm { jmp[binkw32.BinkUtilMutexDestroy] } }
-extern "C" __declspec(naked) void __stdcall _BinkUtilMutexLock(int) { _asm { jmp[binkw32.BinkUtilMutexLock] } }
-extern "C" __declspec(naked) void __stdcall _BinkUtilMutexLockTimeOut(int, int) { _asm { jmp[binkw32.BinkUtilMutexLockTimeOut] } }
-extern "C" __declspec(naked) void __stdcall _BinkUtilMutexUnlock(int) { _asm { jmp[binkw32.BinkUtilMutexUnlock] } }
-extern "C" __declspec(naked) void __stdcall _BinkUtilSoundGlobalLock() { _asm { jmp[binkw32.BinkUtilSoundGlobalLock] } }
-extern "C" __declspec(naked) void __stdcall _BinkUtilSoundGlobalUnlock() { _asm { jmp[binkw32.BinkUtilSoundGlobalUnlock] } }
-extern "C" __declspec(naked) void __stdcall _BinkWait(int) { _asm { jmp[binkw32.BinkWait] } }
-extern "C" __declspec(naked) void __stdcall _BinkWaitStopAsyncThread(int) { _asm { jmp[binkw32.BinkWaitStopAsyncThread] } }
-extern "C" __declspec(naked) void __stdcall _BinkWaitStopAsyncThreadsMulti(int, int) { _asm { jmp[binkw32.BinkWaitStopAsyncThreadsMulti] } }
-extern "C" __declspec(naked) void __stdcall _RADSetMemory(int, int) { _asm { jmp[binkw32.RADSetMemory] } }
-extern "C" __declspec(naked) void __stdcall _RADTimerRead() { _asm { jmp[binkw32.RADTimerRead] } }
-extern "C" __declspec(naked) void __stdcall _YUV_blit_16a1bpp40(int, int, int, int, int, int, int, int, int, int) { _asm { jmp[binkw32.YUV_blit_16a1bpp40] } }
-extern "C" __declspec(naked) void __stdcall _YUV_blit_16a1bpp52(int, int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[binkw32.YUV_blit_16a1bpp52] } }
-extern "C" __declspec(naked) void __stdcall _YUV_blit_16a1bpp_mask48(int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[binkw32.YUV_blit_16a1bpp_mask48] } }
-extern "C" __declspec(naked) void __stdcall _YUV_blit_16a1bpp_mask60(int, int, int, int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[binkw32.YUV_blit_16a1bpp_mask60] } }
-extern "C" __declspec(naked) void __stdcall _YUV_blit_16a4bpp40(int, int, int, int, int, int, int, int, int, int) { _asm { jmp[binkw32.YUV_blit_16a4bpp40] } }
-extern "C" __declspec(naked) void __stdcall _YUV_blit_16a4bpp52(int, int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[binkw32.YUV_blit_16a4bpp52] } }
-extern "C" __declspec(naked) void __stdcall _YUV_blit_16a4bpp_mask48(int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[binkw32.YUV_blit_16a4bpp_mask48] } }
-extern "C" __declspec(naked) void __stdcall _YUV_blit_16a4bpp_mask60(int, int, int, int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[binkw32.YUV_blit_16a4bpp_mask60] } }
-extern "C" __declspec(naked) void __stdcall _YUV_blit_16bpp40(int, int, int, int, int, int, int, int, int, int) { _asm { jmp[binkw32.YUV_blit_16bpp40] } }
-extern "C" __declspec(naked) void __stdcall _YUV_blit_16bpp48(int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[binkw32.YUV_blit_16bpp48] } }
-extern "C" __declspec(naked) void __stdcall _YUV_blit_16bpp52(int, int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[binkw32.YUV_blit_16bpp52] } }
-extern "C" __declspec(naked) void __stdcall _YUV_blit_16bpp_mask48(int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[binkw32.YUV_blit_16bpp_mask48] } }
-extern "C" __declspec(naked) void __stdcall _YUV_blit_16bpp_mask56(int, int, int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[binkw32.YUV_blit_16bpp_mask56] } }
-extern "C" __declspec(naked) void __stdcall _YUV_blit_16bpp_mask60(int, int, int, int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[binkw32.YUV_blit_16bpp_mask60] } }
-extern "C" __declspec(naked) void __stdcall _YUV_blit_24bpp40(int, int, int, int, int, int, int, int, int, int) { _asm { jmp[binkw32.YUV_blit_24bpp40] } }
-extern "C" __declspec(naked) void __stdcall _YUV_blit_24bpp48(int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[binkw32.YUV_blit_24bpp48] } }
-extern "C" __declspec(naked) void __stdcall _YUV_blit_24bpp52(int, int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[binkw32.YUV_blit_24bpp52] } }
-extern "C" __declspec(naked) void __stdcall _YUV_blit_24bpp_mask48(int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[binkw32.YUV_blit_24bpp_mask48] } }
-extern "C" __declspec(naked) void __stdcall _YUV_blit_24bpp_mask56(int, int, int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[binkw32.YUV_blit_24bpp_mask56] } }
-extern "C" __declspec(naked) void __stdcall _YUV_blit_24bpp_mask60(int, int, int, int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[binkw32.YUV_blit_24bpp_mask60] } }
-extern "C" __declspec(naked) void __stdcall _YUV_blit_24rbpp40(int, int, int, int, int, int, int, int, int, int) { _asm { jmp[binkw32.YUV_blit_24rbpp40] } }
-extern "C" __declspec(naked) void __stdcall _YUV_blit_24rbpp48(int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[binkw32.YUV_blit_24rbpp48] } }
-extern "C" __declspec(naked) void __stdcall _YUV_blit_24rbpp52(int, int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[binkw32.YUV_blit_24rbpp52] } }
-extern "C" __declspec(naked) void __stdcall _YUV_blit_24rbpp_mask48(int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[binkw32.YUV_blit_24rbpp_mask48] } }
-extern "C" __declspec(naked) void __stdcall _YUV_blit_24rbpp_mask56(int, int, int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[binkw32.YUV_blit_24rbpp_mask56] } }
-extern "C" __declspec(naked) void __stdcall _YUV_blit_24rbpp_mask60(int, int, int, int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[binkw32.YUV_blit_24rbpp_mask60] } }
-extern "C" __declspec(naked) void __stdcall _YUV_blit_32abpp40(int, int, int, int, int, int, int, int, int, int) { _asm { jmp[binkw32.YUV_blit_32abpp40] } }
-extern "C" __declspec(naked) void __stdcall _YUV_blit_32abpp52(int, int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[binkw32.YUV_blit_32abpp52] } }
-extern "C" __declspec(naked) void __stdcall _YUV_blit_32abpp_mask48(int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[binkw32.YUV_blit_32abpp_mask48] } }
-extern "C" __declspec(naked) void __stdcall _YUV_blit_32abpp_mask60(int, int, int, int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[binkw32.YUV_blit_32abpp_mask60] } }
-extern "C" __declspec(naked) void __stdcall _YUV_blit_32bpp40(int, int, int, int, int, int, int, int, int, int) { _asm { jmp[binkw32.YUV_blit_32bpp40] } }
-extern "C" __declspec(naked) void __stdcall _YUV_blit_32bpp48(int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[binkw32.YUV_blit_32bpp48] } }
-extern "C" __declspec(naked) void __stdcall _YUV_blit_32bpp52(int, int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[binkw32.YUV_blit_32bpp52] } }
-extern "C" __declspec(naked) void __stdcall _YUV_blit_32bpp_mask48(int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[binkw32.YUV_blit_32bpp_mask48] } }
-extern "C" __declspec(naked) void __stdcall _YUV_blit_32bpp_mask56(int, int, int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[binkw32.YUV_blit_32bpp_mask56] } }
-extern "C" __declspec(naked) void __stdcall _YUV_blit_32bpp_mask60(int, int, int, int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[binkw32.YUV_blit_32bpp_mask60] } }
-extern "C" __declspec(naked) void __stdcall _YUV_blit_32rabpp40(int, int, int, int, int, int, int, int, int, int) { _asm { jmp[binkw32.YUV_blit_32rabpp40] } }
-extern "C" __declspec(naked) void __stdcall _YUV_blit_32rabpp52(int, int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[binkw32.YUV_blit_32rabpp52] } }
-extern "C" __declspec(naked) void __stdcall _YUV_blit_32rabpp_mask48(int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[binkw32.YUV_blit_32rabpp_mask48] } }
-extern "C" __declspec(naked) void __stdcall _YUV_blit_32rabpp_mask60(int, int, int, int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[binkw32.YUV_blit_32rabpp_mask60] } }
-extern "C" __declspec(naked) void __stdcall _YUV_blit_32rbpp40(int, int, int, int, int, int, int, int, int, int) { _asm { jmp[binkw32.YUV_blit_32rbpp40] } }
-extern "C" __declspec(naked) void __stdcall _YUV_blit_32rbpp48(int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[binkw32.YUV_blit_32rbpp48] } }
-extern "C" __declspec(naked) void __stdcall _YUV_blit_32rbpp52(int, int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[binkw32.YUV_blit_32rbpp52] } }
-extern "C" __declspec(naked) void __stdcall _YUV_blit_32rbpp_mask48(int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[binkw32.YUV_blit_32rbpp_mask48] } }
-extern "C" __declspec(naked) void __stdcall _YUV_blit_32rbpp_mask56(int, int, int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[binkw32.YUV_blit_32rbpp_mask56] } }
-extern "C" __declspec(naked) void __stdcall _YUV_blit_32rbpp_mask60(int, int, int, int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[binkw32.YUV_blit_32rbpp_mask60] } }
-extern "C" __declspec(naked) void __stdcall _YUV_blit_UYVY40(int, int, int, int, int, int, int, int, int, int) { _asm { jmp[binkw32.YUV_blit_UYVY40] } }
-extern "C" __declspec(naked) void __stdcall _YUV_blit_UYVY48(int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[binkw32.YUV_blit_UYVY48] } }
-extern "C" __declspec(naked) void __stdcall _YUV_blit_UYVY52(int, int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[binkw32.YUV_blit_UYVY52] } }
-extern "C" __declspec(naked) void __stdcall _YUV_blit_UYVY_mask48(int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[binkw32.YUV_blit_UYVY_mask48] } }
-extern "C" __declspec(naked) void __stdcall _YUV_blit_UYVY_mask56(int, int, int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[binkw32.YUV_blit_UYVY_mask56] } }
-extern "C" __declspec(naked) void __stdcall _YUV_blit_UYVY_mask60(int, int, int, int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[binkw32.YUV_blit_UYVY_mask60] } }
-extern "C" __declspec(naked) void __stdcall _YUV_blit_YUY240(int, int, int, int, int, int, int, int, int, int) { _asm { jmp[binkw32.YUV_blit_YUY240] } }
-extern "C" __declspec(naked) void __stdcall _YUV_blit_YUY248(int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[binkw32.YUV_blit_YUY248] } }
-extern "C" __declspec(naked) void __stdcall _YUV_blit_YUY252(int, int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[binkw32.YUV_blit_YUY252] } }
-extern "C" __declspec(naked) void __stdcall _YUV_blit_YUY2_mask48(int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[binkw32.YUV_blit_YUY2_mask48] } }
-extern "C" __declspec(naked) void __stdcall _YUV_blit_YUY2_mask56(int, int, int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[binkw32.YUV_blit_YUY2_mask56] } }
-extern "C" __declspec(naked) void __stdcall _YUV_blit_YUY2_mask60(int, int, int, int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[binkw32.YUV_blit_YUY2_mask60] } }
-extern "C" __declspec(naked) void __stdcall _YUV_blit_YV1244(int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[binkw32.YUV_blit_YV1244] } }
-extern "C" __declspec(naked) void __stdcall _YUV_blit_YV1252(int, int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[binkw32.YUV_blit_YV1252] } }
-extern "C" __declspec(naked) void __stdcall _YUV_blit_YV1256(int, int, int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[binkw32.YUV_blit_YV1256] } }
-extern "C" __declspec(naked) void __stdcall _YUV_init4(int) { _asm { jmp[binkw32.YUV_init4] } }
-extern "C" __declspec(naked) void __stdcall _radfree(int) { _asm { jmp[binkw32.radfree] } }
-extern "C" __declspec(naked) void __stdcall _radmalloc(int) { _asm { jmp[binkw32.radmalloc] } }
+extern "C" __declspec(naked) void __stdcall _BinkAllocateFrameBuffers(int, int, int) { _asm { jmp[bink2w32.BinkAllocateFrameBuffers] } }
+extern "C" __declspec(naked) void __stdcall _BinkBufferBlit(int, int, int) { _asm { jmp[bink2w32.BinkBufferBlit] } }
+extern "C" __declspec(naked) void __stdcall _BinkBufferCheckWinPos(int, int, int) { _asm { jmp[bink2w32.BinkBufferCheckWinPos] } }
+extern "C" __declspec(naked) void __stdcall _BinkBufferClear(int, int) { _asm { jmp[bink2w32.BinkBufferClear] } }
+extern "C" __declspec(naked) void __stdcall _BinkBufferClose(int) { _asm { jmp[bink2w32.BinkBufferClose] } }
+extern "C" __declspec(naked) void __stdcall _BinkBufferGetDescription(int) { _asm { jmp[bink2w32.BinkBufferGetDescription] } }
+extern "C" __declspec(naked) void __stdcall _BinkBufferGetError() { _asm { jmp[bink2w32.BinkBufferGetError] } }
+extern "C" __declspec(naked) void __stdcall _BinkBufferLock(int) { _asm { jmp[bink2w32.BinkBufferLock] } }
+extern "C" __declspec(naked) void __stdcall _BinkBufferOpen(int, int, int, int) { _asm { jmp[bink2w32.BinkBufferOpen] } }
+extern "C" __declspec(naked) void __stdcall _BinkBufferSetDirectDraw(int, int) { _asm { jmp[bink2w32.BinkBufferSetDirectDraw] } }
+extern "C" __declspec(naked) void __stdcall _BinkBufferSetHWND(int, int) { _asm { jmp[bink2w32.BinkBufferSetHWND] } }
+extern "C" __declspec(naked) void __stdcall _BinkBufferSetOffset(int, int, int) { _asm { jmp[bink2w32.BinkBufferSetOffset] } }
+extern "C" __declspec(naked) void __stdcall _BinkBufferSetResolution(int, int, int) { _asm { jmp[bink2w32.BinkBufferSetResolution] } }
+extern "C" __declspec(naked) void __stdcall _BinkBufferSetScale(int, int, int) { _asm { jmp[bink2w32.BinkBufferSetScale] } }
+extern "C" __declspec(naked) void __stdcall _BinkBufferUnlock(int) { _asm { jmp[bink2w32.BinkBufferUnlock] } }
+extern "C" __declspec(naked) void __stdcall _BinkCheckCursor(int, int, int, int, int) { _asm { jmp[bink2w32.BinkCheckCursor] } }
+extern "C" __declspec(naked) void __stdcall _BinkClose(int) { _asm { jmp[bink2w32.BinkClose] } }
+extern "C" __declspec(naked) void __stdcall _BinkCloseTrack(int) { _asm { jmp[bink2w32.BinkCloseTrack] } }
+extern "C" __declspec(naked) void __stdcall _BinkControlBackgroundIO(int, int) { _asm { jmp[bink2w32.BinkControlBackgroundIO] } }
+extern "C" __declspec(naked) void __stdcall _BinkControlPlatformFeatures(int, int) { _asm { jmp[bink2w32.BinkControlPlatformFeatures] } }
+extern "C" __declspec(naked) void __stdcall _BinkCopyToBuffer(int, int, int, int, int, int, int) { _asm { jmp[bink2w32.BinkCopyToBuffer] } }
+extern "C" __declspec(naked) void __stdcall _BinkCopyToBufferRect(int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[bink2w32.BinkCopyToBufferRect] } }
+extern "C" __declspec(naked) void __stdcall _BinkCurrentSubtitle(int, int, int, int) { _asm { jmp[bink2w32.BinkCurrentSubtitle] } }
+extern "C" __declspec(naked) void __stdcall _BinkDDSurfaceType(int) { _asm { jmp[bink2w32.BinkDDSurfaceType] } }
+extern "C" __declspec(naked) void __stdcall _BinkDX8SurfaceType(int) { _asm { jmp[bink2w32.BinkDX8SurfaceType] } }
+extern "C" __declspec(naked) void __stdcall _BinkDX9SurfaceType(int) { _asm { jmp[bink2w32.BinkDX9SurfaceType] } }
+extern "C" __declspec(naked) void __stdcall _BinkDoFrame(int) { _asm { jmp[bink2w32.BinkDoFrame] } }
+extern "C" __declspec(naked) void __stdcall _BinkDoFrameAsync(int, int, int) { _asm { jmp[bink2w32.BinkDoFrameAsync] } }
+extern "C" __declspec(naked) void __stdcall _BinkDoFrameAsyncMulti(int, int, int) { _asm { jmp[bink2w32.BinkDoFrameAsyncMulti] } }
+extern "C" __declspec(naked) void __stdcall _BinkDoFrameAsyncWait(int, int) { _asm { jmp[bink2w32.BinkDoFrameAsyncWait] } }
+extern "C" __declspec(naked) void __stdcall _BinkDoFramePlane(int, int) { _asm { jmp[bink2w32.BinkDoFramePlane] } }
+extern "C" __declspec(naked) void __stdcall _BinkFindXAudio2WinDevice(int, int) { _asm { jmp[bink2w32.BinkFindXAudio2WinDevice] } }
+extern "C" __declspec(naked) void __stdcall _BinkFreeGlobals() { _asm { jmp[bink2w32.BinkFreeGlobals] } }
+extern "C" __declspec(naked) void __stdcall _BinkGetError() { _asm { jmp[bink2w32.BinkGetError] } }
+extern "C" __declspec(naked) void __stdcall _BinkGetFrameBuffersInfo(int, int) { _asm { jmp[bink2w32.BinkGetFrameBuffersInfo] } }
+extern "C" __declspec(naked) void __stdcall _BinkGetGPUDataBuffersInfo(int, int) { _asm { jmp[bink2w32.BinkGetGPUDataBuffersInfo] } }
+extern "C" __declspec(naked) void __stdcall _BinkGetKeyFrame(int, int, int) { _asm { jmp[bink2w32.BinkGetKeyFrame] } }
+extern "C" __declspec(naked) void __stdcall _BinkGetPalette(int) { _asm { jmp[bink2w32.BinkGetPalette] } }
+extern "C" __declspec(naked) void __stdcall _BinkGetPlatformInfo(int, int) { _asm { jmp[bink2w32.BinkGetPlatformInfo] } }
+extern "C" __declspec(naked) void __stdcall _BinkGetRealtime(int, int, int) { _asm { jmp[bink2w32.BinkGetRealtime] } }
+extern "C" __declspec(naked) void __stdcall _BinkGetRects(int, int) { _asm { jmp[bink2w32.BinkGetRects] } }
+extern "C" __declspec(naked) void __stdcall _BinkGetRects4(int) { _asm { jmp[bink2w32.BinkGetRects4] } }
+extern "C" __declspec(naked) void __stdcall _BinkGetSubtitleByIndex(int, int, int, int) { _asm { jmp[bink2w32.BinkGetSubtitleByIndex] } }
+extern "C" __declspec(naked) void __stdcall _BinkGetSummary(int, int) { _asm { jmp[bink2w32.BinkGetSummary] } }
+extern "C" __declspec(naked) void __stdcall _BinkGetTrackData(int, int) { _asm { jmp[bink2w32.BinkGetTrackData] } }
+extern "C" __declspec(naked) void __stdcall _BinkGetTrackData12(int, int, int) { _asm { jmp[bink2w32.BinkGetTrackData12] } }
+extern "C" __declspec(naked) void __stdcall _BinkGetTrackID(int, int) { _asm { jmp[bink2w32.BinkGetTrackID] } }
+extern "C" __declspec(naked) void __stdcall _BinkGetTrackMaxSize(int, int) { _asm { jmp[bink2w32.BinkGetTrackMaxSize] } }
+extern "C" __declspec(naked) void __stdcall _BinkGetTrackType(int, int) { _asm { jmp[bink2w32.BinkGetTrackType] } }
+extern "C" __declspec(naked) void __stdcall _BinkGoto(int, int, int) { _asm { jmp[bink2w32.BinkGoto] } }
+extern "C" __declspec(naked) void __stdcall _BinkIsSoftwareCursor(int, int) { _asm { jmp[bink2w32.BinkIsSoftwareCursor] } }
+extern "C" __declspec(naked) void __stdcall _BinkLoadSubtitles(int, int) { _asm { jmp[bink2w32.BinkLoadSubtitles] } }
+extern "C" __declspec(naked) void __stdcall _BinkLogoAddress() { _asm { jmp[bink2w32.BinkLogoAddress] } }
+extern "C" __declspec(naked) void __stdcall _BinkNextFrame(int) { _asm { jmp[bink2w32.BinkNextFrame] } }
+extern "C" __declspec(naked) void __stdcall _BinkOpen(int, int) { _asm { jmp[bink2w32.BinkOpen] } }
+extern "C" __declspec(naked) void __stdcall _BinkOpenDirectSound(int) { _asm { jmp[bink2w32.BinkOpenDirectSound] } }
+extern "C" __declspec(naked) void __stdcall _BinkOpenMiles(int) { _asm { jmp[bink2w32.BinkOpenMiles] } }
+extern "C" __declspec(naked) void __stdcall _BinkOpenTrack(int, int) { _asm { jmp[bink2w32.BinkOpenTrack] } }
+extern "C" __declspec(naked) void __stdcall _BinkOpenWaveOut(int) { _asm { jmp[bink2w32.BinkOpenWaveOut] } }
+extern "C" __declspec(naked) void __stdcall _BinkOpenWithOptions(int, int, int) { _asm { jmp[bink2w32.BinkOpenWithOptions] } }
+extern "C" __declspec(naked) void __stdcall _BinkOpenXAudio2(int) { _asm { jmp[bink2w32.BinkOpenXAudio2] } }
+extern "C" __declspec(naked) void __stdcall _BinkOpenXAudio2_8(int, int) { _asm { jmp[bink2w32.BinkOpenXAudio2_8] } }
+extern "C" __declspec(naked) void __stdcall _BinkOpenXAudio27(int, int) { _asm { jmp[bink2w32.BinkOpenXAudio27] } }
+extern "C" __declspec(naked) void __stdcall _BinkOpenXAudio28(int, int) { _asm { jmp[bink2w32.BinkOpenXAudio28] } }
+extern "C" __declspec(naked) void __stdcall _BinkOpenXAudio29(int, int) { _asm { jmp[bink2w32.BinkOpenXAudio29] } }
+extern "C" __declspec(naked) void __stdcall _BinkPause(int, int) { _asm { jmp[bink2w32.BinkPause] } }
+extern "C" __declspec(naked) void __stdcall _BinkRegisterFrameBuffers(int, int) { _asm { jmp[bink2w32.BinkRegisterFrameBuffers] } }
+extern "C" __declspec(naked) void __stdcall _BinkRegisterGPUDataBuffers(int, int) { _asm { jmp[bink2w32.BinkRegisterGPUDataBuffers] } }
+extern "C" __declspec(naked) void __stdcall _BinkRequestStopAsyncThread(int) { _asm { jmp[bink2w32.BinkRequestStopAsyncThread] } }
+extern "C" __declspec(naked) void __stdcall _BinkRequestStopAsyncThreadsMulti(int, int) { _asm { jmp[bink2w32.BinkRequestStopAsyncThreadsMulti] } }
+extern "C" __declspec(naked) void __stdcall _BinkRestoreCursor(int) { _asm { jmp[bink2w32.BinkRestoreCursor] } }
+extern "C" __declspec(naked) void __stdcall _BinkService(int) { _asm { jmp[bink2w32.BinkService] } }
+extern "C" __declspec(naked) void __stdcall _BinkServiceSound() { _asm { jmp[bink2w32.BinkServiceSound] } }
+extern "C" __declspec(naked) void __stdcall _BinkSetError(int) { _asm { jmp[bink2w32.BinkSetError] } }
+extern "C" __declspec(naked) void __stdcall _BinkSetFileOffset(int, int) { _asm { jmp[bink2w32.BinkSetFileOffset] } }
+extern "C" __declspec(naked) void __stdcall _BinkSetFrameRate(int, int) { _asm { jmp[bink2w32.BinkSetFrameRate] } }
+extern "C" __declspec(naked) void __stdcall _BinkSetIO(int) { _asm { jmp[bink2w32.BinkSetIO] } }
+extern "C" __declspec(naked) void __stdcall _BinkSetIOSize(int) { _asm { jmp[bink2w32.BinkSetIOSize] } }
+extern "C" __declspec(naked) void __stdcall _BinkSetIOSize8(int, int) { _asm { jmp[bink2w32.BinkSetIOSize8] } }
+extern "C" __declspec(naked) void __stdcall _BinkSetMemory(int, int) { _asm { jmp[bink2w32.BinkSetMemory] } }
+extern "C" __declspec(naked) void __stdcall _BinkSetMixBinVolumes(int, int, int, int, int) { _asm { jmp[bink2w32.BinkSetMixBinVolumes] } }
+extern "C" __declspec(naked) void __stdcall _BinkSetMixBins(int, int, int, int) { _asm { jmp[bink2w32.BinkSetMixBins] } }
+extern "C" __declspec(naked) void __stdcall _BinkSetOSFileCallbacks(int, int, int, int) { _asm { jmp[bink2w32.BinkSetOSFileCallbacks] } }
+extern "C" __declspec(naked) void __stdcall _BinkSetPan(int, int, int) { _asm { jmp[bink2w32.BinkSetPan] } }
+extern "C" __declspec(naked) void __stdcall _BinkSetSimulate(int) { _asm { jmp[bink2w32.BinkSetSimulate] } }
+extern "C" __declspec(naked) void __stdcall _BinkSetSoundOnOff(int, int) { _asm { jmp[bink2w32.BinkSetSoundOnOff] } }
+extern "C" __declspec(naked) void __stdcall _BinkSetSoundSystem(int, int) { _asm { jmp[bink2w32.BinkSetSoundSystem] } }
+extern "C" __declspec(naked) void __stdcall _BinkSetSoundSystem2(int, int, int) { _asm { jmp[bink2w32.BinkSetSoundSystem2] } }
+extern "C" __declspec(naked) void __stdcall _BinkSetSoundTrack(int, int) { _asm { jmp[bink2w32.BinkSetSoundTrack] } }
+extern "C" __declspec(naked) void __stdcall _BinkSetSpeakerVolumes(int, int, int, int, int) { _asm { jmp[bink2w32.BinkSetSpeakerVolumes] } }
+extern "C" __declspec(naked) void __stdcall _BinkSetVideoOnOff(int, int) { _asm { jmp[bink2w32.BinkSetVideoOnOff] } }
+extern "C" __declspec(naked) void __stdcall _BinkSetVolume(int, int, int) { _asm { jmp[bink2w32.BinkSetVolume] } }
+extern "C" __declspec(naked) void __stdcall _BinkSetWillLoop(int, int) { _asm { jmp[bink2w32.BinkSetWillLoop] } }
+extern "C" __declspec(naked) void __stdcall _BinkShouldSkip(int) { _asm { jmp[bink2w32.BinkShouldSkip] } }
+extern "C" __declspec(naked) void __stdcall _BinkStartAsyncThread(int, int) { _asm { jmp[bink2w32.BinkStartAsyncThread] } }
+extern "C" __declspec(naked) void __stdcall _BinkUseTelemetry(int) { _asm { jmp[bink2w32.BinkUseTelemetry] } }
+extern "C" __declspec(naked) void __stdcall _BinkUseTmLite(int) { _asm { jmp[bink2w32.BinkUseTmLite] } }
+extern "C" __declspec(naked) void __stdcall _BinkUtilCPUs() { _asm { jmp[bink2w32.BinkUtilCPUs] } }
+extern "C" __declspec(naked) void __stdcall _BinkUtilFree(int) { _asm { jmp[bink2w32.BinkUtilFree] } }
+extern "C" __declspec(naked) void __stdcall _BinkUtilMalloc(int, int) { _asm { jmp[bink2w32.BinkUtilMalloc] } }
+extern "C" __declspec(naked) void __stdcall _BinkUtilMutexCreate(int, int) { _asm { jmp[bink2w32.BinkUtilMutexCreate] } }
+extern "C" __declspec(naked) void __stdcall _BinkUtilMutexDestroy(int) { _asm { jmp[bink2w32.BinkUtilMutexDestroy] } }
+extern "C" __declspec(naked) void __stdcall _BinkUtilMutexLock(int) { _asm { jmp[bink2w32.BinkUtilMutexLock] } }
+extern "C" __declspec(naked) void __stdcall _BinkUtilMutexLockTimeOut(int, int) { _asm { jmp[bink2w32.BinkUtilMutexLockTimeOut] } }
+extern "C" __declspec(naked) void __stdcall _BinkUtilMutexUnlock(int) { _asm { jmp[bink2w32.BinkUtilMutexUnlock] } }
+extern "C" __declspec(naked) void __stdcall _BinkUtilSoundGlobalLock() { _asm { jmp[bink2w32.BinkUtilSoundGlobalLock] } }
+extern "C" __declspec(naked) void __stdcall _BinkUtilSoundGlobalUnlock() { _asm { jmp[bink2w32.BinkUtilSoundGlobalUnlock] } }
+extern "C" __declspec(naked) void __stdcall _BinkWait(int) { _asm { jmp[bink2w32.BinkWait] } }
+extern "C" __declspec(naked) void __stdcall _BinkWaitStopAsyncThread(int) { _asm { jmp[bink2w32.BinkWaitStopAsyncThread] } }
+extern "C" __declspec(naked) void __stdcall _BinkWaitStopAsyncThreadsMulti(int, int) { _asm { jmp[bink2w32.BinkWaitStopAsyncThreadsMulti] } }
+extern "C" __declspec(naked) void __stdcall _RADSetMemory(int, int) { _asm { jmp[bink2w32.RADSetMemory] } }
+extern "C" __declspec(naked) void __stdcall _RADTimerRead() { _asm { jmp[bink2w32.RADTimerRead] } }
+extern "C" __declspec(naked) void __stdcall _YUV_blit_16a1bpp40(int, int, int, int, int, int, int, int, int, int) { _asm { jmp[bink2w32.YUV_blit_16a1bpp40] } }
+extern "C" __declspec(naked) void __stdcall _YUV_blit_16a1bpp52(int, int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[bink2w32.YUV_blit_16a1bpp52] } }
+extern "C" __declspec(naked) void __stdcall _YUV_blit_16a1bpp_mask48(int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[bink2w32.YUV_blit_16a1bpp_mask48] } }
+extern "C" __declspec(naked) void __stdcall _YUV_blit_16a1bpp_mask60(int, int, int, int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[bink2w32.YUV_blit_16a1bpp_mask60] } }
+extern "C" __declspec(naked) void __stdcall _YUV_blit_16a4bpp40(int, int, int, int, int, int, int, int, int, int) { _asm { jmp[bink2w32.YUV_blit_16a4bpp40] } }
+extern "C" __declspec(naked) void __stdcall _YUV_blit_16a4bpp52(int, int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[bink2w32.YUV_blit_16a4bpp52] } }
+extern "C" __declspec(naked) void __stdcall _YUV_blit_16a4bpp_mask48(int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[bink2w32.YUV_blit_16a4bpp_mask48] } }
+extern "C" __declspec(naked) void __stdcall _YUV_blit_16a4bpp_mask60(int, int, int, int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[bink2w32.YUV_blit_16a4bpp_mask60] } }
+extern "C" __declspec(naked) void __stdcall _YUV_blit_16bpp40(int, int, int, int, int, int, int, int, int, int) { _asm { jmp[bink2w32.YUV_blit_16bpp40] } }
+extern "C" __declspec(naked) void __stdcall _YUV_blit_16bpp48(int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[bink2w32.YUV_blit_16bpp48] } }
+extern "C" __declspec(naked) void __stdcall _YUV_blit_16bpp52(int, int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[bink2w32.YUV_blit_16bpp52] } }
+extern "C" __declspec(naked) void __stdcall _YUV_blit_16bpp_mask48(int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[bink2w32.YUV_blit_16bpp_mask48] } }
+extern "C" __declspec(naked) void __stdcall _YUV_blit_16bpp_mask56(int, int, int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[bink2w32.YUV_blit_16bpp_mask56] } }
+extern "C" __declspec(naked) void __stdcall _YUV_blit_16bpp_mask60(int, int, int, int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[bink2w32.YUV_blit_16bpp_mask60] } }
+extern "C" __declspec(naked) void __stdcall _YUV_blit_24bpp40(int, int, int, int, int, int, int, int, int, int) { _asm { jmp[bink2w32.YUV_blit_24bpp40] } }
+extern "C" __declspec(naked) void __stdcall _YUV_blit_24bpp48(int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[bink2w32.YUV_blit_24bpp48] } }
+extern "C" __declspec(naked) void __stdcall _YUV_blit_24bpp52(int, int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[bink2w32.YUV_blit_24bpp52] } }
+extern "C" __declspec(naked) void __stdcall _YUV_blit_24bpp_mask48(int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[bink2w32.YUV_blit_24bpp_mask48] } }
+extern "C" __declspec(naked) void __stdcall _YUV_blit_24bpp_mask56(int, int, int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[bink2w32.YUV_blit_24bpp_mask56] } }
+extern "C" __declspec(naked) void __stdcall _YUV_blit_24bpp_mask60(int, int, int, int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[bink2w32.YUV_blit_24bpp_mask60] } }
+extern "C" __declspec(naked) void __stdcall _YUV_blit_24rbpp40(int, int, int, int, int, int, int, int, int, int) { _asm { jmp[bink2w32.YUV_blit_24rbpp40] } }
+extern "C" __declspec(naked) void __stdcall _YUV_blit_24rbpp48(int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[bink2w32.YUV_blit_24rbpp48] } }
+extern "C" __declspec(naked) void __stdcall _YUV_blit_24rbpp52(int, int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[bink2w32.YUV_blit_24rbpp52] } }
+extern "C" __declspec(naked) void __stdcall _YUV_blit_24rbpp_mask48(int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[bink2w32.YUV_blit_24rbpp_mask48] } }
+extern "C" __declspec(naked) void __stdcall _YUV_blit_24rbpp_mask56(int, int, int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[bink2w32.YUV_blit_24rbpp_mask56] } }
+extern "C" __declspec(naked) void __stdcall _YUV_blit_24rbpp_mask60(int, int, int, int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[bink2w32.YUV_blit_24rbpp_mask60] } }
+extern "C" __declspec(naked) void __stdcall _YUV_blit_32abpp40(int, int, int, int, int, int, int, int, int, int) { _asm { jmp[bink2w32.YUV_blit_32abpp40] } }
+extern "C" __declspec(naked) void __stdcall _YUV_blit_32abpp52(int, int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[bink2w32.YUV_blit_32abpp52] } }
+extern "C" __declspec(naked) void __stdcall _YUV_blit_32abpp_mask48(int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[bink2w32.YUV_blit_32abpp_mask48] } }
+extern "C" __declspec(naked) void __stdcall _YUV_blit_32abpp_mask60(int, int, int, int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[bink2w32.YUV_blit_32abpp_mask60] } }
+extern "C" __declspec(naked) void __stdcall _YUV_blit_32bpp40(int, int, int, int, int, int, int, int, int, int) { _asm { jmp[bink2w32.YUV_blit_32bpp40] } }
+extern "C" __declspec(naked) void __stdcall _YUV_blit_32bpp48(int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[bink2w32.YUV_blit_32bpp48] } }
+extern "C" __declspec(naked) void __stdcall _YUV_blit_32bpp52(int, int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[bink2w32.YUV_blit_32bpp52] } }
+extern "C" __declspec(naked) void __stdcall _YUV_blit_32bpp_mask48(int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[bink2w32.YUV_blit_32bpp_mask48] } }
+extern "C" __declspec(naked) void __stdcall _YUV_blit_32bpp_mask56(int, int, int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[bink2w32.YUV_blit_32bpp_mask56] } }
+extern "C" __declspec(naked) void __stdcall _YUV_blit_32bpp_mask60(int, int, int, int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[bink2w32.YUV_blit_32bpp_mask60] } }
+extern "C" __declspec(naked) void __stdcall _YUV_blit_32rabpp40(int, int, int, int, int, int, int, int, int, int) { _asm { jmp[bink2w32.YUV_blit_32rabpp40] } }
+extern "C" __declspec(naked) void __stdcall _YUV_blit_32rabpp52(int, int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[bink2w32.YUV_blit_32rabpp52] } }
+extern "C" __declspec(naked) void __stdcall _YUV_blit_32rabpp_mask48(int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[bink2w32.YUV_blit_32rabpp_mask48] } }
+extern "C" __declspec(naked) void __stdcall _YUV_blit_32rabpp_mask60(int, int, int, int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[bink2w32.YUV_blit_32rabpp_mask60] } }
+extern "C" __declspec(naked) void __stdcall _YUV_blit_32rbpp40(int, int, int, int, int, int, int, int, int, int) { _asm { jmp[bink2w32.YUV_blit_32rbpp40] } }
+extern "C" __declspec(naked) void __stdcall _YUV_blit_32rbpp48(int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[bink2w32.YUV_blit_32rbpp48] } }
+extern "C" __declspec(naked) void __stdcall _YUV_blit_32rbpp52(int, int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[bink2w32.YUV_blit_32rbpp52] } }
+extern "C" __declspec(naked) void __stdcall _YUV_blit_32rbpp_mask48(int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[bink2w32.YUV_blit_32rbpp_mask48] } }
+extern "C" __declspec(naked) void __stdcall _YUV_blit_32rbpp_mask56(int, int, int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[bink2w32.YUV_blit_32rbpp_mask56] } }
+extern "C" __declspec(naked) void __stdcall _YUV_blit_32rbpp_mask60(int, int, int, int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[bink2w32.YUV_blit_32rbpp_mask60] } }
+extern "C" __declspec(naked) void __stdcall _YUV_blit_UYVY40(int, int, int, int, int, int, int, int, int, int) { _asm { jmp[bink2w32.YUV_blit_UYVY40] } }
+extern "C" __declspec(naked) void __stdcall _YUV_blit_UYVY48(int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[bink2w32.YUV_blit_UYVY48] } }
+extern "C" __declspec(naked) void __stdcall _YUV_blit_UYVY52(int, int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[bink2w32.YUV_blit_UYVY52] } }
+extern "C" __declspec(naked) void __stdcall _YUV_blit_UYVY_mask48(int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[bink2w32.YUV_blit_UYVY_mask48] } }
+extern "C" __declspec(naked) void __stdcall _YUV_blit_UYVY_mask56(int, int, int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[bink2w32.YUV_blit_UYVY_mask56] } }
+extern "C" __declspec(naked) void __stdcall _YUV_blit_UYVY_mask60(int, int, int, int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[bink2w32.YUV_blit_UYVY_mask60] } }
+extern "C" __declspec(naked) void __stdcall _YUV_blit_YUY240(int, int, int, int, int, int, int, int, int, int) { _asm { jmp[bink2w32.YUV_blit_YUY240] } }
+extern "C" __declspec(naked) void __stdcall _YUV_blit_YUY248(int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[bink2w32.YUV_blit_YUY248] } }
+extern "C" __declspec(naked) void __stdcall _YUV_blit_YUY252(int, int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[bink2w32.YUV_blit_YUY252] } }
+extern "C" __declspec(naked) void __stdcall _YUV_blit_YUY2_mask48(int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[bink2w32.YUV_blit_YUY2_mask48] } }
+extern "C" __declspec(naked) void __stdcall _YUV_blit_YUY2_mask56(int, int, int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[bink2w32.YUV_blit_YUY2_mask56] } }
+extern "C" __declspec(naked) void __stdcall _YUV_blit_YUY2_mask60(int, int, int, int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[bink2w32.YUV_blit_YUY2_mask60] } }
+extern "C" __declspec(naked) void __stdcall _YUV_blit_YV1244(int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[bink2w32.YUV_blit_YV1244] } }
+extern "C" __declspec(naked) void __stdcall _YUV_blit_YV1252(int, int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[bink2w32.YUV_blit_YV1252] } }
+extern "C" __declspec(naked) void __stdcall _YUV_blit_YV1256(int, int, int, int, int, int, int, int, int, int, int, int, int, int) { _asm { jmp[bink2w32.YUV_blit_YV1256] } }
+extern "C" __declspec(naked) void __stdcall _YUV_init4(int) { _asm { jmp[bink2w32.YUV_init4] } }
+extern "C" __declspec(naked) void __stdcall _radfree(int) { _asm { jmp[bink2w32.radfree] } }
+extern "C" __declspec(naked) void __stdcall _radmalloc(int) { _asm { jmp[bink2w32.radmalloc] } }
 #endif
 
 #if X64
@@ -4037,12 +4083,31 @@ void _GetBehaviorValue() { d3d12.GetBehaviorValue(); }
 void _SetAppCompatStringPointer() { d3d12.SetAppCompatStringPointer(); }
 
 void _BinkAllocateFrameBuffers() { bink2w64.BinkAllocateFrameBuffers(); }
+void _BinkBufferBlit() { bink2w64.BinkBufferBlit(); }
+void _BinkBufferCheckWinPos() { bink2w64.BinkBufferCheckWinPos(); }
+void _BinkBufferClear() { bink2w64.BinkBufferClear(); }
+void _BinkBufferClose() { bink2w64.BinkBufferClose(); }
+void _BinkBufferGetDescription() { bink2w64.BinkBufferGetDescription(); }
+void _BinkBufferGetError() { bink2w64.BinkBufferGetError(); }
+void _BinkBufferLock() { bink2w64.BinkBufferLock(); }
+void _BinkBufferOpen() { bink2w64.BinkBufferOpen(); }
+void _BinkBufferSetDirectDraw() { bink2w64.BinkBufferSetDirectDraw(); }
+void _BinkBufferSetHWND() { bink2w64.BinkBufferSetHWND(); }
+void _BinkBufferSetOffset() { bink2w64.BinkBufferSetOffset(); }
+void _BinkBufferSetResolution() { bink2w64.BinkBufferSetResolution(); }
+void _BinkBufferSetScale() { bink2w64.BinkBufferSetScale(); }
+void _BinkBufferUnlock() { bink2w64.BinkBufferUnlock(); }
+void _BinkCheckCursor() { bink2w64.BinkCheckCursor(); }
 void _BinkClose() { bink2w64.BinkClose(); }
 void _BinkCloseTrack() { bink2w64.BinkCloseTrack(); }
 void _BinkControlBackgroundIO() { bink2w64.BinkControlBackgroundIO(); }
+void _BinkControlPlatformFeatures() { bink2w64.BinkControlPlatformFeatures(); }
 void _BinkCopyToBuffer() { bink2w64.BinkCopyToBuffer(); }
 void _BinkCopyToBufferRect() { bink2w64.BinkCopyToBufferRect(); }
 void _BinkCurrentSubtitle() { bink2w64.BinkCurrentSubtitle(); }
+void _BinkDDSurfaceType() { bink2w64.BinkDDSurfaceType(); }
+void _BinkDX8SurfaceType() { bink2w64.BinkDX8SurfaceType(); }
+void _BinkDX9SurfaceType() { bink2w64.BinkDX9SurfaceType(); }
 void _BinkDoFrame() { bink2w64.BinkDoFrame(); }
 void _BinkDoFrameAsync() { bink2w64.BinkDoFrameAsync(); }
 void _BinkDoFrameAsyncMulti() { bink2w64.BinkDoFrameAsyncMulti(); }
@@ -4054,6 +4119,7 @@ void _BinkGetError() { bink2w64.BinkGetError(); }
 void _BinkGetFrameBuffersInfo() { bink2w64.BinkGetFrameBuffersInfo(); }
 void _BinkGetGPUDataBuffersInfo() { bink2w64.BinkGetGPUDataBuffersInfo(); }
 void _BinkGetKeyFrame() { bink2w64.BinkGetKeyFrame(); }
+void _BinkGetPalette() { bink2w64.BinkGetPalette(); }
 void _BinkGetPlatformInfo() { bink2w64.BinkGetPlatformInfo(); }
 void _BinkGetRealtime() { bink2w64.BinkGetRealtime(); }
 void _BinkGetRects() { bink2w64.BinkGetRects(); }
@@ -4064,6 +4130,7 @@ void _BinkGetTrackID() { bink2w64.BinkGetTrackID(); }
 void _BinkGetTrackMaxSize() { bink2w64.BinkGetTrackMaxSize(); }
 void _BinkGetTrackType() { bink2w64.BinkGetTrackType(); }
 void _BinkGoto() { bink2w64.BinkGoto(); }
+void _BinkIsSoftwareCursor() { bink2w64.BinkIsSoftwareCursor(); }
 void _BinkLoadSubtitles() { bink2w64.BinkLoadSubtitles(); }
 void _BinkLogoAddress() { bink2w64.BinkLogoAddress(); }
 void _BinkNextFrame() { bink2w64.BinkNextFrame(); }
@@ -4082,7 +4149,9 @@ void _BinkRegisterFrameBuffers() { bink2w64.BinkRegisterFrameBuffers(); }
 void _BinkRegisterGPUDataBuffers() { bink2w64.BinkRegisterGPUDataBuffers(); }
 void _BinkRequestStopAsyncThread() { bink2w64.BinkRequestStopAsyncThread(); }
 void _BinkRequestStopAsyncThreadsMulti() { bink2w64.BinkRequestStopAsyncThreadsMulti(); }
+void _BinkRestoreCursor() { bink2w64.BinkRestoreCursor(); }
 void _BinkService() { bink2w64.BinkService(); }
+void _BinkServiceSound() { bink2w64.BinkServiceSound(); }
 void _BinkSetError() { bink2w64.BinkSetError(); }
 void _BinkSetFileOffset() { bink2w64.BinkSetFileOffset(); }
 void _BinkSetFrameRate() { bink2w64.BinkSetFrameRate(); }
