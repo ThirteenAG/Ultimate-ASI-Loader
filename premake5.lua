@@ -51,9 +51,10 @@ project "Ultimate-ASI-Loader-Win32"
    includedirs { "source" }
    includedirs { "external" }
 
-   includedirs { "external/injector/safetyhook" }
-   files { "external/injector/safetyhook/safetyhook.hpp", "external/injector/safetyhook/safetyhook.cpp" }
-   files { "external/injector/safetyhook/Zydis.h", "external/injector/safetyhook/Zydis.c" }
+   includedirs { "external/injector/safetyhook/include" }
+   files { "external/injector/safetyhook/include/**.hpp", "external/injector/safetyhook/src/**.cpp" }
+   includedirs { "external/injector/zydis" }
+   files { "external/injector/zydis/**.h", "external/injector/zydis/**.c" }
 
    files { "source/dllmain.h", "source/dllmain.cpp" }
    files { "source/x86.def" }
@@ -135,9 +136,10 @@ project "MonoLoader"
    files { "source/demo_plugins/MonoLoader.cpp" }
    files { "source/resources/Versioninfo.rc" }
 
-   includedirs { "external/injector/safetyhook" }
-   files { "external/injector/safetyhook/safetyhook.hpp", "external/injector/safetyhook/safetyhook.cpp" }
-   files { "external/injector/safetyhook/Zydis.h", "external/injector/safetyhook/Zydis.c" }
+   includedirs { "external/injector/safetyhook/include" }
+   files { "external/injector/safetyhook/include/**.hpp", "external/injector/safetyhook/src/**.cpp" }
+   includedirs { "external/injector/zydis" }
+   files { "external/injector/zydis/**.h", "external/injector/zydis/**.c" }
 
    characterset ("UNICODE")
    
@@ -198,9 +200,10 @@ project "Ultimate-ASI-Loader-x64"
    includedirs { "source" }
    includedirs { "external" }
 
-   includedirs { "external/injector/safetyhook" }
-   files { "external/injector/safetyhook/safetyhook.hpp", "external/injector/safetyhook/safetyhook.cpp" }
-   files { "external/injector/safetyhook/Zydis.h", "external/injector/safetyhook/Zydis.c" }
+   includedirs { "external/injector/safetyhook/include" }
+   files { "external/injector/safetyhook/include/**.hpp", "external/injector/safetyhook/src/**.cpp" }
+   includedirs { "external/injector/zydis" }
+   files { "external/injector/zydis/**.h", "external/injector/zydis/**.c" }
 
    files { "source/dllmain.h", "source/dllmain.cpp" }
    files { "source/x64.def" }
@@ -266,9 +269,10 @@ project "MonoLoader_x64"
    files { "source/demo_plugins/MonoLoader.cpp" }
    files { "source/resources/Versioninfo.rc" }
 
-   includedirs { "external/injector/safetyhook" }
-   files { "external/injector/safetyhook/safetyhook.hpp", "external/injector/safetyhook/safetyhook.cpp" }
-   files { "external/injector/safetyhook/Zydis.h", "external/injector/safetyhook/Zydis.c" }
+   includedirs { "external/injector/safetyhook/include" }
+   files { "external/injector/safetyhook/include/**.hpp", "external/injector/safetyhook/src/**.cpp" }
+   includedirs { "external/injector/zydis" }
+   files { "external/injector/zydis/**.h", "external/injector/zydis/**.c" }
 
    characterset ("UNICODE")
    
