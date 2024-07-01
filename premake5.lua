@@ -51,10 +51,10 @@ project "Ultimate-ASI-Loader-Win32"
    includedirs { "source" }
    includedirs { "external" }
 
-   includedirs { "external/injector/safetyhook/include" }
-   files { "external/injector/safetyhook/include/**.hpp", "external/injector/safetyhook/src/**.cpp" }
-   includedirs { "external/injector/zydis" }
-   files { "external/injector/zydis/**.h", "external/injector/zydis/**.c" }
+   includedirs { "external/injector/minhook/include" }
+   files { "external/injector/minhook/include/*.h", "external/injector/minhook/src/**.h", "external/injector/minhook/src/**.c" }
+   includedirs { "external/injector/utility" }
+   files { "external/injector/utility/FunctionHookMinHook.hpp", "external/injector/utility/FunctionHookMinHook.cpp" }
 
    files { "source/dllmain.h", "source/dllmain.cpp" }
    files { "source/x86.def" }
@@ -200,10 +200,10 @@ project "Ultimate-ASI-Loader-x64"
    includedirs { "source" }
    includedirs { "external" }
 
-   includedirs { "external/injector/safetyhook/include" }
-   files { "external/injector/safetyhook/include/**.hpp", "external/injector/safetyhook/src/**.cpp" }
-   includedirs { "external/injector/zydis" }
-   files { "external/injector/zydis/**.h", "external/injector/zydis/**.c" }
+   includedirs { "external/injector/minhook/include" }
+   files { "external/injector/minhook/include/*.h", "external/injector/minhook/src/**.h", "external/injector/minhook/src/**.c" }
+   includedirs { "external/injector/utility" }
+   files { "external/injector/utility/FunctionHookMinHook.hpp", "external/injector/utility/FunctionHookMinHook.cpp" }
 
    files { "source/dllmain.h", "source/dllmain.cpp" }
    files { "source/x64.def" }
