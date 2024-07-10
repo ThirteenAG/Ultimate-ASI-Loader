@@ -1,7 +1,8 @@
 LIBRARY "UAL"
 EXPORTS
 IsUltimateASILoader = IsUltimateASILoader
-GetOverloadedFilePath = GetOverloadedFilePath
+GetOverloadedFilePathA = GetOverloadedFilePathA
+GetOverloadedFilePathW = GetOverloadedFilePathW
 GetMemoryModule = GetMemoryModule
 
 LIBRARY "dinput8"

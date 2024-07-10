@@ -882,6 +882,52 @@ std::filesystem::path WINAPI GetOverloadedFilePath(std::filesystem::path lpFilen
     return {};
 }
 
+bool WINAPI GetOverloadedFilePathA(const char* lpFilename, char* out, size_t out_size)
+{
+    try
+    {
+        if (!sFileLoaderPath.empty())
+        {
+            auto path = GetOverloadedFilePath(lpFilename);
+            if (!path.empty())
+            {
+                if (out && out_size)
+                {
+                    if (!std::filesystem::path(lpFilename).is_absolute())
+                        path = lexicallyRelativeCaseIns(path, gamePath);
+                    out[path.string().copy(out, out_size, 0)] = '\0';
+                }
+                return true;
+            }
+        }
+    }
+    catch (...) {}
+    return false;
+}
+
+bool WINAPI GetOverloadedFilePathW(const wchar_t* lpFilename, wchar_t* out, size_t out_size)
+{
+    try
+    {
+        if (!sFileLoaderPath.empty())
+        {
+            auto path = GetOverloadedFilePath(lpFilename);
+            if (!path.empty())
+            {
+                if (out && out_size)
+                {
+                    if (!std::filesystem::path(lpFilename).is_absolute())
+                        path = lexicallyRelativeCaseIns(path, gamePath);
+                    out[path.wstring().copy(out, out_size, 0)] = '\0';
+                }
+                return true;
+            }
+        }
+    }
+    catch (...) {}
+    return false;
+}
+
 std::filesystem::path GetFilePathForOverload(auto path)
 {
     try
