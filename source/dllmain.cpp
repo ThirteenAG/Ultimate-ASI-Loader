@@ -10,6 +10,9 @@
 extern "C" Direct3D8* WINAPI Direct3DCreate8(UINT SDKVersion);
 #endif
 
+extern "C" IMAGE_DOS_HEADER __ImageBase;
+typedef NTSTATUS(NTAPI* LdrAddRefDll_t)(ULONG, HMODULE);
+
 bool WINAPI IsUltimateASILoader()
 {
     return true;
@@ -1561,6 +1564,23 @@ namespace OverloadFromFolder
 
     void HookAPIForOverload()
     {
+        constexpr auto mutexName = L"Ultimate-ASI-Loader-OverloadFromFolder";
+
+        auto hMutex = OpenMutexW(MUTEX_ALL_ACCESS, FALSE, mutexName);
+        if (hMutex)
+        {
+            CloseHandle(hMutex);
+            return;
+        }
+
+        hMutex = CreateMutexW(nullptr, TRUE, mutexName);
+        if (!hMutex || GetLastError() == ERROR_ALREADY_EXISTS)
+        {
+            if (hMutex)
+                CloseHandle(hMutex);
+            return;
+        }
+
         mhLoadLibraryExA = std::make_unique<FunctionHookMinHook>((uintptr_t)LoadLibraryExA, (uintptr_t)shCustomLoadLibraryExA);
         mhLoadLibraryExW = std::make_unique<FunctionHookMinHook>((uintptr_t)LoadLibraryExW, (uintptr_t)shCustomLoadLibraryExW);
         mhCreateFileA = std::make_unique<FunctionHookMinHook>((uintptr_t)CreateFileA, (uintptr_t)shCustomCreateFileA);
@@ -1590,6 +1610,17 @@ namespace OverloadFromFolder
         mhFindNextFileW->create();
         mhFindFirstFileExA->create();
         mhFindFirstFileExW->create();
+
+        // increase the ref count in case this dll is unloaded before the game exit
+        auto hNtdll = GetModuleHandleW(L"ntdll.dll");
+        if (hNtdll)
+        {
+            auto pLdrAddRefDll = (LdrAddRefDll_t)GetProcAddress(hNtdll, "LdrAddRefDll");
+            if (pLdrAddRefDll)
+            {
+                pLdrAddRefDll(0, (HMODULE)&__ImageBase);
+            }
+        }
     }
 }
 
