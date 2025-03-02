@@ -11,6 +11,16 @@ on:
     paths-ignore:
       - "**/*.md"
       - '**/*.txt'
+  workflow_dispatch:
+    inputs:
+      release:
+        description: "Create a release"
+        type: choice
+        required: false
+        default: 'false'
+        options:
+          - 'true'
+          - 'false'
 
 concurrency:
   group: ${{ github.ref }}
@@ -67,8 +77,8 @@ jobs:
 
     - name: Upload Release (Main)
       if: |
+        github.event.inputs.release == 'true' &&
         github.ref_name == 'master' &&
-        github.event_name == 'push' &&
         github.repository == 'ThirteenAG/Ultimate-ASI-Loader'
       uses: ncipollo/release-action@main
       with:
@@ -81,8 +91,8 @@ jobs:
 
     - name: Get release info (Win32)
       if: |
+        github.event.inputs.release == 'true' &&
         github.ref_name == 'master' &&
-        github.event_name == 'push' &&
         github.repository == 'ThirteenAG/Ultimate-ASI-Loader'
       id: release_info_x86
       uses: cardinalby/git-get-release-action@master
@@ -93,8 +103,8 @@ jobs:
 
     - name: Upload Release (Win32)
       if: |
+        github.event.inputs.release == 'true' &&
         github.ref_name == 'master' &&
-        github.event_name == 'push' &&
         github.repository == 'ThirteenAG/Ultimate-ASI-Loader'
       uses: ncipollo/release-action@main
       with:
@@ -107,8 +117,8 @@ jobs:
 
     - name: Get release info (Win64)
       if: |
+        github.event.inputs.release == 'true' &&
         github.ref_name == 'master' &&
-        github.event_name == 'push' &&
         github.repository == 'ThirteenAG/Ultimate-ASI-Loader'
       id: release_info_x64
       uses: cardinalby/git-get-release-action@master
@@ -119,8 +129,8 @@ jobs:
 
     - name: Upload Release (Win64)
       if: |
+        github.event.inputs.release == 'true' &&
         github.ref_name == 'master' &&
-        github.event_name == 'push' &&
         github.repository == 'ThirteenAG/Ultimate-ASI-Loader'
       uses: ncipollo/release-action@main
       with:
