@@ -691,6 +691,44 @@ void FindFiles(WIN32_FIND_DATAW* fd)
     }
 }
 
+void FindPlugins(WIN32_FIND_DATAW fd,
+                 const wchar_t* szPath,
+                 const wchar_t* szSelfPath,
+                 const UINT nWantsToLoadRecursively)
+{
+    if (!std::filesystem::exists(szPath))
+        return;
+
+    // Try to find ASI in directories inside szPath
+    if (nWantsToLoadRecursively)
+    {
+        std::error_code ec;
+        constexpr auto perms =
+          std::filesystem::directory_options::skip_permission_denied |
+          std::filesystem::directory_options::follow_directory_symlink;
+
+        for (auto& i : std::filesystem::directory_iterator(szPath, perms, ec))
+        {
+            if (!i.is_directory(ec))
+                continue;
+
+            SetCurrentDirectoryW(szSelfPath);
+
+            if (SetCurrentDirectoryW(i.path().wstring().c_str()))
+                FindFiles(&fd);
+        }
+    }
+
+    // Try to find ASI only inside szPath, not in directories
+    SetCurrentDirectoryW(szSelfPath);
+
+    if (SetCurrentDirectoryW(szPath))
+        FindFiles(&fd);
+
+    // After all, need to restore current directory to self path
+    SetCurrentDirectoryW(szSelfPath);
+}
+
 void LoadPlugins()
 {
     auto oldDir = GetCurrentDirectoryW(); // store the current directory
@@ -755,29 +793,29 @@ void LoadPlugins()
 
     auto nWantsToLoadPlugins = GetPrivateProfileIntW(L"globalsets", L"loadplugins", TRUE, iniPaths);
     auto nWantsToLoadFromScriptsOnly = GetPrivateProfileIntW(L"globalsets", L"loadfromscriptsonly", FALSE, iniPaths);
+    auto nWantsToLoadRecursively = GetPrivateProfileIntW(L"globalsets", L"loadrecursively", TRUE, iniPaths);
 
     if (nWantsToLoadPlugins)
     {
         WIN32_FIND_DATAW fd;
         if (!nWantsToLoadFromScriptsOnly)
+        {
+            SetCurrentDirectoryW(szSelfPath.c_str());
             FindFiles(&fd);
+        }
 
-        SetCurrentDirectoryW(szSelfPath.c_str());
+        FindPlugins(
+          fd, L"scripts", szSelfPath.c_str(), nWantsToLoadRecursively);
 
-        if (SetCurrentDirectoryW(L"scripts\\"))
-            FindFiles(&fd);
-
-        SetCurrentDirectoryW(szSelfPath.c_str());
-
-        if (SetCurrentDirectoryW(L"plugins\\"))
-            FindFiles(&fd);
-
-        SetCurrentDirectoryW(szSelfPath.c_str());
+        FindPlugins(
+          fd, L"plugins", szSelfPath.c_str(), nWantsToLoadRecursively);
 
         if (!sFileLoaderPath.empty())
         {
-            if (SetCurrentDirectoryW(sFileLoaderPath.wstring().c_str()))
-                FindFiles(&fd);
+            FindPlugins(fd,
+                        sFileLoaderPath.c_str(),
+                        szSelfPath.c_str(),
+                        nWantsToLoadRecursively);
         }
     }
 
