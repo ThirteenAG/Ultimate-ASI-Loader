@@ -2,6 +2,7 @@
 #include "exception.hpp"
 #include <initguid.h>
 #include <filesystem>
+#include <fstream>
 #include <memory>
 #include <FunctionHookMinHook.hpp>
 #include <shellapi.h>
