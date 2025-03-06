@@ -3,6 +3,8 @@ EXPORTS
 IsUltimateASILoader = IsUltimateASILoader
 GetOverloadedFilePathA = GetOverloadedFilePathA
 GetOverloadedFilePathW = GetOverloadedFilePathW
+GetOverloadPathA = GetOverloadPathA
+GetOverloadPathW = GetOverloadPathW
 GetMemoryModule = GetMemoryModule
 
 LIBRARY "dinput8"

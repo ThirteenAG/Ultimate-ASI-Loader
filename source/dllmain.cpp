@@ -4,6 +4,10 @@
 #include <filesystem>
 #include <memory>
 #include <FunctionHookMinHook.hpp>
+#include <shellapi.h>
+#include <Commctrl.h>
+#pragma comment(lib,"Comctl32.lib")
+#pragma comment(linker,"\"/manifestdependency:type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
 
 #if !X64
 #include <d3d8to9\source\d3d8to9.hpp>
@@ -24,9 +28,22 @@ void* WINAPI GetMemoryModule()
     return ogMemModule;
 }
 
+HRESULT CALLBACK TaskDialogCallbackProc(HWND hwnd, UINT uNotification, WPARAM wParam, LPARAM lParam, LONG_PTR dwRefData)
+{
+    switch (uNotification)
+    {
+    case TDN_HYPERLINK_CLICKED:
+        ShellExecuteW(hwnd, L"open", (LPCWSTR)lParam, NULL, NULL, SW_SHOW);
+        break;
+    }
+
+    return S_OK;
+}
+
 HMODULE hm;
 std::vector<std::wstring> iniPaths;
 std::filesystem::path sFileLoaderPath;
+std::vector<std::filesystem::path> sFileLoaderPaths;
 std::filesystem::path gamePath;
 std::wstring sLoadFromAPI;
 std::vector<std::pair<std::filesystem::path, LARGE_INTEGER>> updateFilenames;
@@ -664,14 +681,34 @@ void FindFiles(WIN32_FIND_DATAW* fd)
                             auto e = GetLastError();
                             if (e != ERROR_DLL_INIT_FAILED && e != ERROR_BAD_EXE_FORMAT) // in case dllmain returns false or IMAGE_MACHINE is not compatible
                             {
-                                std::wstring msg = L"Unable to load " + std::wstring(fd->cFileName) + L". Error: " + std::to_wstring(e) + L".";
+                                TASKDIALOGCONFIG tdc = { sizeof(TASKDIALOGCONFIG) };
+                                int nClickedBtn;
+                                BOOL bCheckboxChecked;
+                                LPCWSTR szTitle = L"ASI Loader", szHeader = L"", szContent = L"";
+                                TASKDIALOG_BUTTON aCustomButtons[] = { { 1000, L"Continue" } };
+
+                                std::wstring msg = L"Unable to load " + std::wstring(fd->cFileName) + L". Error: " + std::to_wstring(e);
+                                szHeader = msg.c_str();
+
                                 if (e == ERROR_MOD_NOT_FOUND)
                                 {
-                                    msg += L" This ASI file requires a dependency that is missing from your system. " \
-                                        "To identify the missing dependency, download and run the free, open-source app, " \
-                                        "Dependencies at https://github.com/lucasg/Dependencies";
+                                    szContent = L"This ASI file requires a dependency that is missing from your system. To identify the missing dependency, download and run the free, open-source app, " \
+                                        L"<a href=\"https://github.com/lucasg/Dependencies/releases/latest\">Dependencies</a>.\n\n" \
+                                        L"<a href=\"https://github.com/lucasg/Dependencies\">https://github.com/lucasg/Dependencies</a>";
                                 }
-                                MessageBoxW(0, msg.c_str(), L"ASI Loader", MB_ICONERROR);
+
+                                tdc.hwndParent = NULL;
+                                tdc.dwFlags = TDF_USE_COMMAND_LINKS | TDF_ENABLE_HYPERLINKS | TDF_SIZE_TO_CONTENT | TDF_CAN_BE_MINIMIZED;
+                                tdc.pButtons = aCustomButtons;
+                                tdc.cButtons = _countof(aCustomButtons);
+                                tdc.pszWindowTitle = szTitle;
+                                tdc.pszMainIcon = TD_ERROR_ICON;
+                                tdc.pszMainInstruction = szHeader;
+                                tdc.pszContent = szContent;
+                                tdc.pfCallback = TaskDialogCallbackProc;
+                                tdc.lpCallbackData = 0;
+
+                                std::ignore = TaskDialogIndirect(&tdc, &nClickedBtn, NULL, &bCheckboxChecked);
                             }
                         }
                         else
@@ -696,13 +733,14 @@ void FindPlugins(WIN32_FIND_DATAW fd,
                  const wchar_t* szSelfPath,
                  const UINT nWantsToLoadRecursively)
 {
-    if (!std::filesystem::exists(szPath))
+    std::error_code ec;
+
+    if (!std::filesystem::exists(szPath, ec))
         return;
 
     // Try to find ASI in directories inside szPath
     if (nWantsToLoadRecursively)
     {
-        std::error_code ec;
         constexpr auto perms =
           std::filesystem::directory_options::skip_permission_denied |
           std::filesystem::directory_options::follow_directory_symlink;
@@ -867,9 +905,83 @@ void LoadPluginsAndRestoreIAT(uintptr_t retaddr, std::wstring_view calledFrom = 
         }
     }
 
-    if (!sFileLoaderPath.empty())
+    if (sFileLoaderPaths.size() >= 1)
     {
+        sFileLoaderPath = sFileLoaderPaths.front().make_preferred();
+
+        if (sFileLoaderPaths.size() > 1)
+        {
+            int buttonId = 1000;
+            std::vector<TASKDIALOG_BUTTON> aButtons;
+            aButtons.reserve(sFileLoaderPaths.size() + 1);
+            std::vector<std::wstring> buttonTexts;
+            buttonTexts.reserve(sFileLoaderPaths.size() + 1);
+            
+            std::error_code ec;
+            for (const auto& path : sFileLoaderPaths)
+            {
+                auto header = path.wstring();
+                auto updateTxtPath = path / "update.txt";
+
+                if (std::filesystem::exists(updateTxtPath, ec))
+                {
+                    std::wifstream file(updateTxtPath);
+                    if (file.is_open())
+                    {
+                        std::wstring content;
+                        wchar_t buffer[101] = { 0 };
+                        file.getline(buffer, 100);
+                        content = buffer;
+                        if (!content.empty())
+                            header = content;
+                    }
+                }
+
+                std::wstring buttonText = std::wstring(L"&") + header + L"\n" + std::filesystem::absolute(path, ec).wstring();
+                buttonTexts.push_back(buttonText);
+                aButtons.push_back({ buttonId++, buttonTexts.back().c_str() });
+            }
+            
+            // Add a "Cancel" option
+            //buttonTexts.push_back(L"Cancel");
+            //aButtons.push_back({ IDCANCEL, buttonTexts.back().c_str() });
+            
+            // Configure the TaskDialog
+            TASKDIALOGCONFIG tdc = { sizeof(TASKDIALOGCONFIG) };
+            int nClickedBtn = 0;
+            BOOL bCheckboxChecked = FALSE;
+            LPCWSTR szTitle = L"ASI Loader";
+            LPCWSTR szHeader = L"Select Override (Update) Folder";
+            LPCWSTR szContent = L"Multiple folders have been specified for file overloading.\nPlease select which folder you want to use:";
+            LPCWSTR szFooter = L"<a href=\"https://github.com/ThirteenAG/Ultimate-ASI-Loader\">https://github.com/ThirteenAG/Ultimate-ASI-Loader</a>";
+            
+            tdc.hwndParent = NULL;
+            tdc.dwFlags = TDF_USE_COMMAND_LINKS | TDF_ENABLE_HYPERLINKS | TDF_SIZE_TO_CONTENT | TDF_CAN_BE_MINIMIZED;
+            tdc.pButtons = aButtons.data();
+            tdc.cButtons = static_cast<UINT>(aButtons.size());
+            tdc.pszWindowTitle = szTitle;
+            tdc.pszMainIcon = TD_WARNING_ICON;
+            tdc.pszMainInstruction = szHeader;
+            tdc.pszContent = szContent;
+            tdc.pfCallback = TaskDialogCallbackProc;
+            tdc.lpCallbackData = 0;
+            tdc.nDefaultButton = 1000;
+            tdc.pszFooter = szFooter;
+            tdc.pszFooterIcon = TD_INFORMATION_ICON;
+            
+            if (SUCCEEDED(TaskDialogIndirect(&tdc, &nClickedBtn, NULL, &bCheckboxChecked)))
+            {
+                if (nClickedBtn != IDCANCEL) {
+                    int selectedIndex = nClickedBtn - 1000;
+                    auto& path = sFileLoaderPaths[selectedIndex];
+                    sFileLoaderPath = path.make_preferred();
+                }
+            }
+        }
+
         OverloadFromFolder::HookAPIForOverload();
+
+        sFileLoaderPaths.clear();
     }
 
     LoadEverything();
@@ -959,8 +1071,44 @@ bool WINAPI GetOverloadedFilePathW(const wchar_t* lpFilename, wchar_t* out, size
                 {
                     if (!std::filesystem::path(lpFilename).is_absolute())
                         path = lexicallyRelativeCaseIns(path, gamePath);
-                    out[path.wstring().copy(out, out_size, 0)] = '\0';
+                    out[path.wstring().copy(out, out_size, 0)] = L'\0';
                 }
+                return true;
+            }
+        }
+    }
+    catch (...) {}
+    return false;
+}
+
+bool WINAPI GetOverloadPathA(char* out, size_t out_size)
+{
+    try
+    {
+        if (!sFileLoaderPath.empty())
+        {
+            if (out && out_size)
+            {
+                auto path = gamePath / sFileLoaderPath;
+                out[path.string().copy(out, out_size, 0)] = '\0';
+                return true;
+            }
+        }
+    }
+    catch (...) {}
+    return false;
+}
+
+bool WINAPI GetOverloadPathW(wchar_t* out, size_t out_size)
+{
+    try
+    {
+        if (!sFileLoaderPath.empty())
+        {
+            if (out && out_size)
+            {
+                auto path = gamePath / sFileLoaderPath;
+                out[path.wstring().copy(out, out_size, 0)] = L'\0';
                 return true;
             }
         }
@@ -2561,7 +2709,7 @@ void Init()
     sLoadFromAPI = GetPrivateProfileStringW(TEXT("globalsets"), TEXT("loadfromapi"), L"", iniPaths);
     auto nFindModule = GetPrivateProfileIntW(TEXT("globalsets"), TEXT("findmodule"), FALSE, iniPaths);
     auto nDisableCrashDumps = GetPrivateProfileIntW(TEXT("globalsets"), TEXT("disablecrashdumps"), FALSE, iniPaths);
-    sFileLoaderPath = GetPrivateProfileStringW(TEXT("fileloader"), TEXT("overloadfromfolder"), TEXT("update"), iniPaths);
+    auto sFileLoaderPathIniString = GetPrivateProfileStringW(TEXT("fileloader"), TEXT("overloadfromfolder"), TEXT("update"), iniPaths);
 
     auto FolderExists = [](auto szPath) -> bool
     {
@@ -2596,10 +2744,91 @@ void Init()
         }
     }
 
-    if (!FolderExists(sFileLoaderPath))
+    auto ParseMultiplePaths = [](const std::wstring& pathsString, wchar_t delimiter = L'|') -> std::vector<std::filesystem::path>
+    {
+        std::vector<std::filesystem::path> paths;
+        std::wstring::size_type start = 0;
+        std::wstring::size_type end = 0;
+
+        auto trim = [](const std::wstring& str) -> std::wstring
+        {
+            const auto first = str.find_first_not_of(L" \t\r\n");
+            if (first == std::wstring::npos)
+                return L"";
+
+            const auto last = str.find_last_not_of(L" \t\r\n");
+            return str.substr(first, last - first + 1);
+        };
+
+        auto removeQuotes = [](const std::wstring& str) -> std::wstring
+        {
+            if (str.size() >= 2 && str.front() == L'"' && str.back() == L'"')
+                return str.substr(1, str.size() - 2);
+            return str;
+        };
+
+        while (start < pathsString.length())
+        {
+            // Handle quoted paths: find the next quote if current position is a quote
+            if (pathsString[start] == L'"')
+            {
+                // Find the closing quote
+                end = pathsString.find(L'"', start + 1);
+                if (end == std::wstring::npos) // No closing quote found
+                    end = pathsString.length();
+                else
+                    end++; // Include the closing quote in the extraction
+
+                // Find the next delimiter after the quoted string
+                std::wstring::size_type nextDelim = pathsString.find(delimiter, end);
+                if (nextDelim != std::wstring::npos)
+                    end = nextDelim;
+                else
+                    end = pathsString.length();
+            }
+            else
+            {
+                // Standard behavior: find next delimiter
+                end = pathsString.find(delimiter, start);
+                if (end == std::wstring::npos)
+                    end = pathsString.length();
+            }
+
+            // Extract and process the path
+            std::wstring rawPath = pathsString.substr(start, end - start);
+            std::wstring path = removeQuotes(trim(rawPath));
+            if (!path.empty())
+                paths.emplace_back(path);
+
+            // Move to the next path
+            start = (end == pathsString.length()) ? end : end + 1;
+        }
+
+        return paths;
+    };
+
+    auto FilterExistingPaths = [&FolderExists](std::vector<std::filesystem::path>& paths) -> bool
+    {
+        bool anyExists = false;
+
+        paths.erase(
+            std::remove_if(paths.begin(), paths.end(),
+                [&](const std::filesystem::path& path) {
+                    bool exists = FolderExists(path);
+                    anyExists |= exists;  // Track if any path exists
+                    return !exists;       // Remove if doesn't exist
+                }
+            ),
+            paths.end()
+        );
+
+        return anyExists;
+    };
+
+    sFileLoaderPaths = ParseMultiplePaths(sFileLoaderPathIniString);
+
+    if (!FilterExistingPaths(sFileLoaderPaths))
         sFileLoaderPath.clear();
-    else
-        sFileLoaderPath = sFileLoaderPath.make_preferred();
 
     if (nForceEPHook != FALSE || nDontLoadFromDllMain != FALSE)
     {
