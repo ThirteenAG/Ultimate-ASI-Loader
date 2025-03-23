@@ -75,18 +75,38 @@ Should be adjusted to:
 \Gameface\Binaries\Win64\update\Content\Movies\1080\GTA_SA_CREDITS_FINAL_1920x1080.mp4
 ```
 
-## ADDITIONAL WINDOWED MODE FEATURE
+Starting with version 7.9.0, you can use this functionality for total conversions:
 
-ASI loader has built-in wndmode.dll, which can be loaded if you create empty wndmode.ini in the folder with asi loader's dll. It will be automatically filled with example configuration at the first run of the game. Settings are not universal and should be changed in every specific case, but usually, it works as is.
+![re5dx9_update](https://github.com/user-attachments/assets/7ec4c006-2205-444f-9a7a-8d3c8f5b62fb)
+
+Two or more folders must be specified and exist for the selector dialog to appear. Define them inside global.ini under `[FileLoader]` section at `OverloadFromFolder` key. Use `|` symbol as a separator. If only one folder is specified and exists, it will be used to overload files, but the selector will not appear. Without ini file, `update` folder is always used if it exists. Example:
+
+```ini
+[FileLoader]
+OverloadFromFolder=update | nightmare
+```
+
+To create a custom header, create `update.txt` inside update/total conversion folder and insert the custom name there.
+
+`Resident Evil 5\nightmare\update.txt:`
+
+```
+Resident Evil 5 - Nightmare (Story mode mod)
+```
+
+## ADDITIONAL WINDOWED MODE FEATURE (x86 builds only)
+
+32-bit version of ASI loader has built-in wndmode.dll, which can be loaded if you create empty wndmode.ini in the folder with asi loader's dll. It will be automatically filled with example configuration at the first run of the game. Settings are not universal and should be changed in every specific case, but usually, it works as is.
 
 ## D3D8TO9
 
-Some mods, like [SkyGfx](https://github.com/aap/skygfx_vc) require [d3d8to9](https://github.com/crosire/d3d8to9). It is also a part of the ASI loader, so to use it, create global.ini inside the scripts folder with the following content:
+Some mods, like [SkyGfx](https://github.com/aap/skygfx_vc) require [d3d8to9](https://github.com/crosire/d3d8to9). It is also a part of the ASI loader, so to use it, create [global.ini](https://github.com/ThirteenAG/Ultimate-ASI-Loader/edit/master/readme.md#usage) with the following content:
 
 ```ini
 [GlobalSets]
 UseD3D8to9=1
 ```
+Asi loader must be named `d3d8.dll` in order for this feature to take effect.
 
 [See an example of global.ini here](https://github.com/ThirteenAG/Ultimate-ASI-Loader/blob/master/data/scripts/global.ini#L6).
 
