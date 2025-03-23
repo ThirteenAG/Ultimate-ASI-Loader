@@ -1817,7 +1817,16 @@ bool HookKernel32IAT(HMODULE mod, bool exe)
     auto hExecutableInstance = (size_t)mod;
     IMAGE_NT_HEADERS*           ntHeader = (IMAGE_NT_HEADERS*)(hExecutableInstance + ((IMAGE_DOS_HEADER*)hExecutableInstance)->e_lfanew);
     IMAGE_IMPORT_DESCRIPTOR*    pImports = (IMAGE_IMPORT_DESCRIPTOR*)(hExecutableInstance + ntHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress);
-    size_t                      nNumImports = ntHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].Size / sizeof(IMAGE_IMPORT_DESCRIPTOR) - 1;
+    size_t                      nNumImports = 0;
+    if (ntHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress != 0)
+    {
+        IMAGE_IMPORT_DESCRIPTOR* importDesc = pImports;
+        while (importDesc->Name != 0)
+        {
+            nNumImports++;
+            importDesc++;
+        }
+    }
 
     if (exe)
     {
@@ -2169,10 +2178,16 @@ bool HookKernel32IAT(HMODULE mod, bool exe)
     {
         IMAGE_NT_HEADERS*           ntHeader = (IMAGE_NT_HEADERS*)(hInstance + ((IMAGE_DOS_HEADER*)hInstance)->e_lfanew);
         IMAGE_IMPORT_DESCRIPTOR*    pImports = (IMAGE_IMPORT_DESCRIPTOR*)(hInstance + ntHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress);
-        size_t                      nNumImports = ntHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].Size / sizeof(IMAGE_IMPORT_DESCRIPTOR) - 1;
-
-        if (nNumImports == (size_t)-1)
-            return;
+        size_t                      nNumImports = 0;
+        if (ntHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress != 0)
+        {
+            IMAGE_IMPORT_DESCRIPTOR* importDesc = pImports;
+            while (importDesc->Name != 0)
+            {
+                nNumImports++;
+                importDesc++;
+            }
+        }
 
         for (size_t i = 0; i < nNumImports; i++)
         {
