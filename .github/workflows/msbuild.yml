@@ -21,6 +21,18 @@ on:
         options:
           - 'true'
           - 'false'
+      version_increment:
+        description: "Default semantic version release type"
+        type: choice
+        required: false
+        default: 'minor'
+        options:
+          - 'major'
+          - 'minor'
+          - 'patch'
+
+env:
+  VERINC: ${{ github.event.inputs.version_increment || 'minor' }}
 
 concurrency:
   group: ${{ github.ref }}
@@ -46,7 +58,7 @@ jobs:
       uses: MCKanpolat/auto-semver-action@v2
       id: versioning
       with:
-        releaseType: minor 
+        releaseType: ${{ env.VERINC }} 
         incrementPerCommit: false
         github_token: ${{ secrets.GITHUB_TOKEN }}
 
