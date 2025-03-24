@@ -47,6 +47,7 @@ project "Ultimate-ASI-Loader-Win32"
    targetdir "bin/Win32/%{cfg.buildcfg}"
    targetname "dinput8"
    targetextension ".dll"
+   linkoptions { "/DELAYLOAD:\"Comctl32.dll\"" }
    
    includedirs { "source" }
    includedirs { "external" }
@@ -196,6 +197,7 @@ project "Ultimate-ASI-Loader-x64"
    targetdir "bin/x64/%{cfg.buildcfg}"
    targetname "dinput8"
    targetextension ".dll"
+   linkoptions { "/DELAYLOAD:\"Comctl32.dll\"" }
    
    includedirs { "source" }
    includedirs { "external" }

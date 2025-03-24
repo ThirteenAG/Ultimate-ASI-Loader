@@ -134,16 +134,8 @@ ASI loader is now capable of generating crash minidumps and crash logs. To use t
 11. In that folder, rename **AppxBlockMap.xml** and **AppxSignature.xml** to anything else.
 12. Run the following command: `Add-AppxPackage -Register AppxManifest.xml`
 13. Place Ultimate ASI Loader DLL into the game directory. You need to find out which name works for a specific game, in the case of GTA SA I've used **d3d11.dll**, so I put **dinput8.dll** from the x86 archive and renamed it to **d3d11.dll**.
-14. Create an ini file with the same name, in this case: **d3d11.ini**, with the following content:
-
-```ini
-[GlobalSets]
-DontLoadFromDllMain=0
-```
-
-Sometimes it may not be necessary, but UWP GTA SA didn't work with the current implementation of `DontLoadFromDllMain=1`.  
-15. Create a **scripts** or **plugins** folder within the root directory and place your plugins in it.  
+14. Create a **scripts** or **plugins** folder within the root directory and place your plugins in it.  
 Rough code example of radio for all vehicles plugin [here](https://gist.github.com/ThirteenAG/868a964b46b82ce5cebbd4a0823c69e4). Compiled binary here - [GTASAUWP.RadioForAllVehicles.zip](https://github.com/ThirteenAG/Ultimate-ASI-Loader/files/7311505/GTASAUWP.RadioForAllVehicles.zip)  
-16. Click on the start menu and launch the game!  
-17. See your mods in action.  
+15. Click on the start menu and launch the game!  
+16. See your mods in action.  
 ![ApplicationFrameHost_2021-10-08_15-57-14](https://user-images.githubusercontent.com/4904157/136561208-e989119e-1ef4-42c2-8b20-c1f81f4e0931.png)

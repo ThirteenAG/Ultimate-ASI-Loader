@@ -7,6 +7,7 @@
 #include <FunctionHookMinHook.hpp>
 #include <shellapi.h>
 #include <Commctrl.h>
+#pragma comment(lib, "delayimp")
 #pragma comment(lib,"Comctl32.lib")
 #pragma comment(linker,"\"/manifestdependency:type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
 
@@ -27,6 +28,22 @@ void* ogMemModule = NULL;
 void* WINAPI GetMemoryModule()
 {
     return ogMemModule;
+}
+
+bool IsPackagedProcess()
+{
+    using LPFN_GPFN = LONG(WINAPI*)(HANDLE, UINT32*, PWSTR);
+    bool bIsPackagedProcess = false;
+
+    auto lpGetPackageFamilyName = (LPFN_GPFN)GetProcAddress(GetModuleHandle(TEXT("kernel32")), "GetPackageFamilyName");
+    if (lpGetPackageFamilyName)
+    {
+        UINT32 size = 0;
+        if (lpGetPackageFamilyName(GetCurrentProcess(), &size, NULL) == ERROR_INSUFFICIENT_BUFFER)
+            bIsPackagedProcess = true;
+    }
+
+    return bIsPackagedProcess;
 }
 
 HRESULT CALLBACK TaskDialogCallbackProc(HWND hwnd, UINT uNotification, WPARAM wParam, LPARAM lParam, LONG_PTR dwRefData)
@@ -348,6 +365,7 @@ namespace OverloadFromFolder
     std::unique_ptr<FunctionHookMinHook> mhLoadLibraryExW = { nullptr };
     std::unique_ptr<FunctionHookMinHook> mhCreateFileA = { nullptr };
     std::unique_ptr<FunctionHookMinHook> mhCreateFileW = { nullptr };
+    std::unique_ptr<FunctionHookMinHook> mhCreateFile2 = { nullptr };
     std::unique_ptr<FunctionHookMinHook> mhGetFileAttributesA = { nullptr };
     std::unique_ptr<FunctionHookMinHook> mhGetFileAttributesW = { nullptr };
     std::unique_ptr<FunctionHookMinHook> mhGetFileAttributesExA = { nullptr };
@@ -709,7 +727,10 @@ void FindFiles(WIN32_FIND_DATAW* fd)
                                 tdc.pfCallback = TaskDialogCallbackProc;
                                 tdc.lpCallbackData = 0;
 
-                                std::ignore = TaskDialogIndirect(&tdc, &nClickedBtn, NULL, &bCheckboxChecked);
+                                if (!IsPackagedProcess())
+                                    std::ignore = TaskDialogIndirect(&tdc, &nClickedBtn, NULL, &bCheckboxChecked);
+                                else
+                                    MessageBoxW(NULL, szHeader, szTitle, MB_OK | MB_ICONERROR);
                             }
                         }
                         else
@@ -970,12 +991,27 @@ void LoadPluginsAndRestoreIAT(uintptr_t retaddr, std::wstring_view calledFrom = 
             tdc.pszFooter = szFooter;
             tdc.pszFooterIcon = TD_INFORMATION_ICON;
             
-            if (SUCCEEDED(TaskDialogIndirect(&tdc, &nClickedBtn, NULL, &bCheckboxChecked)))
+            if (!IsPackagedProcess())
             {
-                if (nClickedBtn != IDCANCEL) {
+                if (SUCCEEDED(TaskDialogIndirect(&tdc, &nClickedBtn, NULL, &bCheckboxChecked)) && nClickedBtn != IDCANCEL) {
                     int selectedIndex = nClickedBtn - 1000;
                     auto& path = sFileLoaderPaths[selectedIndex];
                     sFileLoaderPath = path.make_preferred();
+                }
+            }
+            else
+            {
+                for (auto& path : sFileLoaderPaths)
+                {
+                    std::wstring message = L"Multiple folders have been specified for file overloading.\nUse this folder?\n\n";
+                    message += path.wstring() + L"\n" + std::filesystem::absolute(path, ec).wstring();
+
+                    auto result = MessageBoxW(NULL, message.c_str(), szTitle, MB_YESNO | MB_ICONQUESTION);
+                    if (result == IDYES)
+                    {
+                        sFileLoaderPath = path.make_preferred();
+                        break;
+                    }
                 }
             }
         }
@@ -1583,6 +1619,13 @@ namespace OverloadFromFolder
         return mhCreateFileW->get_original<decltype(CreateFileW)>()(value_orW(r, lpFileName), dwAccess, dwSharing, saAttributes, dwCreation, dwAttributes, hTemplate);
     }
 
+    HANDLE WINAPI shCustomCreateFile2(LPCWSTR lpFileName, DWORD dwDesiredAccess, DWORD dwShareMode, DWORD dwCreationDisposition, LPCREATEFILE2_EXTENDED_PARAMETERS pCreateExParams)
+    {
+        auto raddr = _ReturnAddress();
+        auto r = GetFilePathForOverload(lpFileName, isRecursive(raddr));
+        return mhCreateFile2->get_original<decltype(CreateFile2)>()(value_orW(r, lpFileName), dwDesiredAccess, dwShareMode, dwCreationDisposition, pCreateExParams);
+    }
+
     DWORD WINAPI shCustomGetFileAttributesA(LPCSTR lpFileName)
     {
         auto raddr = _ReturnAddress();
@@ -1772,6 +1815,7 @@ namespace OverloadFromFolder
         mhLoadLibraryExW = std::make_unique<FunctionHookMinHook>((uintptr_t)LoadLibraryExW, (uintptr_t)shCustomLoadLibraryExW);
         mhCreateFileA = std::make_unique<FunctionHookMinHook>((uintptr_t)CreateFileA, (uintptr_t)shCustomCreateFileA);
         mhCreateFileW = std::make_unique<FunctionHookMinHook>((uintptr_t)CreateFileW, (uintptr_t)shCustomCreateFileW);
+        mhCreateFile2 = std::make_unique<FunctionHookMinHook>((uintptr_t)CreateFile2, (uintptr_t)shCustomCreateFile2);
         mhGetFileAttributesA = std::make_unique<FunctionHookMinHook>((uintptr_t)GetFileAttributesA, (uintptr_t)shCustomGetFileAttributesA);
         mhGetFileAttributesW = std::make_unique<FunctionHookMinHook>((uintptr_t)GetFileAttributesW, (uintptr_t)shCustomGetFileAttributesW);
         mhGetFileAttributesExA = std::make_unique<FunctionHookMinHook>((uintptr_t)GetFileAttributesExA, (uintptr_t)shCustomGetFileAttributesExA);
@@ -1787,6 +1831,7 @@ namespace OverloadFromFolder
         mhLoadLibraryExW->create();
         mhCreateFileA->create();
         mhCreateFileW->create();
+        mhCreateFile2->create();
         mhGetFileAttributesA->create();
         mhGetFileAttributesW->create();
         mhGetFileAttributesExA->create();
@@ -2907,6 +2952,18 @@ void Init()
         {
             HookKernel32IAT(m, false);
         }
+
+        const auto clr = GetModuleHandleW(L"clr.dll");
+        const auto coreclr = GetModuleHandleW(L"coreclr.dll");
+
+        if (clr)
+        {
+            HookKernel32IAT(clr, false);
+        }
+        else if (coreclr)
+        {
+            HookKernel32IAT(coreclr, false);
+        }
     }
     else
     {
@@ -2939,6 +2996,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID /*lpReserved*/)
             using namespace OverloadFromFolder;
             mhCreateFileA = {};
             mhCreateFileW = {};
+            mhCreateFile2 = {};
             mhLoadLibraryExA = {};
             mhLoadLibraryExW = {};
             mhGetFileAttributesA = {};
