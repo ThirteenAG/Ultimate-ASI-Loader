@@ -94,6 +94,30 @@ To create a custom header, create `update.txt` inside update/total conversion fo
 Resident Evil 5 - Nightmare (Story mode mod)
 ```
 
+To get the current update path, use the `GetOverloadPathA` or `GetOverloadPathW` exports from the ASI plugin.
+
+```cpp
+bool (WINAPI* GetOverloadPathW)(wchar_t* out, size_t out_size) = nullptr;
+
+ModuleList dlls;
+dlls.Enumerate(ModuleList::SearchLocation::LocalOnly);
+for (auto& e : dlls.m_moduleList)
+{
+    auto m = std::get<HMODULE>(e);
+    if (IsModuleUAL(m)) {
+        GetOverloadPathW = (decltype(GetOverloadPathW))GetProcAddress(m, "GetOverloadPathW");
+        break;
+    }
+}
+
+std::wstring s;
+s.resize(MAX_PATH, L'\0');
+if (!GetOverloadPathW || !GetOverloadPathW(s.data(), s.size()))
+    s = GetExeModulePath() / L"update";
+
+auto updatePath = std::filesystem::path(s.data());
+```
+
 ## ADDITIONAL WINDOWED MODE FEATURE (x86 builds only)
 
 32-bit version of ASI loader has built-in wndmode.dll, which can be loaded if you create empty wndmode.ini in the folder with asi loader's dll. It will be automatically filled with example configuration at the first run of the game. Settings are not universal and should be changed in every specific case, but usually, it works as is.
@@ -108,7 +132,7 @@ UseD3D8to9=1
 ```
 Asi loader must be named `d3d8.dll` in order for this feature to take effect.
 
-[See an example of global.ini here](https://github.com/ThirteenAG/Ultimate-ASI-Loader/blob/master/data/scripts/global.ini#L6).
+[See an example of global.ini here](https://github.com/ThirteenAG/Ultimate-ASI-Loader/blob/master/data/scripts/global.ini#L8).
 
 ## CrashDumps
 

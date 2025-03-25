@@ -1,4 +1,5 @@
 #pragma once
+#define ISOLATION_AWARE_ENABLED 1
 #include <windows.h>
 #include <cctype>
 #include <string>
