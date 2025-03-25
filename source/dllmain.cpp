@@ -10,6 +10,11 @@
 #pragma comment(lib, "delayimp")
 #pragma comment(lib,"Comctl32.lib")
 #pragma comment(linker,"\"/manifestdependency:type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
+#define _WIDEN(x) L ## x
+#define WIDEN(x) _WIDEN(x)
+#define ws_UpdateUrl WIDEN(rsc_UpdateUrl)
+LPCWSTR szFooter = L"<a href=\"" ws_UpdateUrl "\">" ws_UpdateUrl "</a>";
+constexpr auto DEFAULT_BUTTON = 1000;
 
 #if !X64
 #include <d3d8to9\source\d3d8to9.hpp>
@@ -48,11 +53,88 @@ bool IsPackagedProcess()
 
 HRESULT CALLBACK TaskDialogCallbackProc(HWND hwnd, UINT uNotification, WPARAM wParam, LPARAM lParam, LONG_PTR dwRefData)
 {
+    constexpr int countdownSeconds = 10;
+    static bool userInteracted = false;
+    static UINT_PTR timerID = 1;
+    static int remainingSeconds = countdownSeconds;
+    static auto mainDialogHwnd = hwnd;
+
     switch (uNotification)
     {
+    case TDN_CREATED:
+    {
+        // Initialize progress bar
+        SendMessage(hwnd, TDM_SET_PROGRESS_BAR_RANGE, 0, MAKELPARAM(0, countdownSeconds));
+        SendMessage(hwnd, TDM_SET_PROGRESS_BAR_POS, countdownSeconds, 0);
+
+        // Set timer for countdown (1000ms = 1 second)
+        timerID = SetTimer(mainDialogHwnd, timerID, 1000, NULL);
+
+        // Create a hook to capture ALL window messages for this thread
+        // This is more reliable than window subclassing for complex dialogs
+        SetWindowsHookEx(WH_GETMESSAGE, [](int nCode, WPARAM wParam, LPARAM lParam) -> LRESULT
+        {
+            if (nCode >= 0 && wParam == PM_REMOVE)
+            {
+                MSG* msg = (MSG*)lParam;
+                switch (msg->message)
+                {
+                case WM_MOUSEMOVE:
+                case WM_KEYDOWN:
+                case WM_LBUTTONDOWN:
+                case WM_RBUTTONDOWN:
+                case WM_MBUTTONDOWN:
+                case WM_NCHITTEST:
+                case WM_SETCURSOR:
+                    if (!userInteracted)
+                    {
+                        if (msg->message == WM_MOUSEMOVE && remainingSeconds >= countdownSeconds - 1)
+                            break;
+
+                        userInteracted = true;
+                        KillTimer(mainDialogHwnd, timerID);
+                        SendMessage(mainDialogHwnd, TDM_SET_ELEMENT_TEXT, TDE_FOOTER, (LPARAM)szFooter);
+                        SendMessage(mainDialogHwnd, TDM_SET_PROGRESS_BAR_POS, 0, 0);
+                    }
+                    break;
+                }
+            }
+            return CallNextHookEx(NULL, nCode, wParam, lParam);
+        }, NULL, GetCurrentThreadId());
+    }
+    break;
+    case TDN_TIMER:
+        if (remainingSeconds > 0 && !userInteracted)
+        {
+            remainingSeconds--;
+            SendMessage(hwnd, TDM_SET_PROGRESS_BAR_POS, remainingSeconds, 0);
+
+            std::wstring progressText = L"Auto-closing in " + std::to_wstring(remainingSeconds) + L" seconds...";
+            SendMessage(hwnd, TDM_SET_ELEMENT_TEXT, TDE_FOOTER, (LPARAM)progressText.c_str());
+
+            if (remainingSeconds == 0)
+            {
+                KillTimer(hwnd, timerID);
+                SendMessage(hwnd, TDM_CLICK_BUTTON, DEFAULT_BUTTON, 0);
+            }
+        }
+    break;
+    case TDN_BUTTON_CLICKED:
+        if (!userInteracted) {
+            userInteracted = true;
+            KillTimer(hwnd, timerID);
+            SendMessage(hwnd, TDM_SET_PROGRESS_BAR_POS, 0, 0);
+        }
+    break;
     case TDN_HYPERLINK_CLICKED:
         ShellExecuteW(hwnd, L"open", (LPCWSTR)lParam, NULL, NULL, SW_SHOW);
-        break;
+        if (!userInteracted) {
+            userInteracted = true;
+            KillTimer(hwnd, timerID);
+            SendMessage(hwnd, TDM_SET_ELEMENT_TEXT, TDE_FOOTER, (LPARAM)szFooter);
+            SendMessage(hwnd, TDM_SET_PROGRESS_BAR_POS, 0, 0);
+        }
+    break;
     }
 
     return S_OK;
@@ -704,7 +786,7 @@ void FindFiles(WIN32_FIND_DATAW* fd)
                                 int nClickedBtn;
                                 BOOL bCheckboxChecked;
                                 LPCWSTR szTitle = L"ASI Loader", szHeader = L"", szContent = L"";
-                                TASKDIALOG_BUTTON aCustomButtons[] = { { 1000, L"Continue" } };
+                                TASKDIALOG_BUTTON aCustomButtons[] = { { DEFAULT_BUTTON, L"Continue" } };
 
                                 std::wstring msg = L"Unable to load " + std::wstring(fd->cFileName) + L". Error: " + std::to_wstring(e);
                                 szHeader = msg.c_str();
@@ -933,7 +1015,7 @@ void LoadPluginsAndRestoreIAT(uintptr_t retaddr, std::wstring_view calledFrom = 
 
         if (sFileLoaderPaths.size() > 1)
         {
-            int buttonId = 1000;
+            int buttonId = DEFAULT_BUTTON;
             std::vector<TASKDIALOG_BUTTON> aButtons;
             aButtons.reserve(sFileLoaderPaths.size() + 1);
             std::vector<std::wstring> buttonTexts;
@@ -975,7 +1057,6 @@ void LoadPluginsAndRestoreIAT(uintptr_t retaddr, std::wstring_view calledFrom = 
             LPCWSTR szTitle = L"ASI Loader";
             LPCWSTR szHeader = L"Select Override (Update) Folder";
             LPCWSTR szContent = L"Multiple folders have been specified for file overloading.\nPlease select which folder you want to use:";
-            LPCWSTR szFooter = L"<a href=\"https://github.com/ThirteenAG/Ultimate-ASI-Loader\">https://github.com/ThirteenAG/Ultimate-ASI-Loader</a>";
             
             tdc.hwndParent = NULL;
             tdc.dwFlags = TDF_USE_COMMAND_LINKS | TDF_ENABLE_HYPERLINKS | TDF_SIZE_TO_CONTENT | TDF_CAN_BE_MINIMIZED;
@@ -987,14 +1068,18 @@ void LoadPluginsAndRestoreIAT(uintptr_t retaddr, std::wstring_view calledFrom = 
             tdc.pszContent = szContent;
             tdc.pfCallback = TaskDialogCallbackProc;
             tdc.lpCallbackData = 0;
-            tdc.nDefaultButton = 1000;
+            tdc.nDefaultButton = DEFAULT_BUTTON;
             tdc.pszFooter = szFooter;
             tdc.pszFooterIcon = TD_INFORMATION_ICON;
             
             if (!IsPackagedProcess())
             {
+                // Configure the TaskDialog with progress bar and timer
+                tdc.dwFlags |= TDF_SHOW_PROGRESS_BAR | TDF_CALLBACK_TIMER;
+                tdc.pfCallback = TaskDialogCallbackProc;
+
                 if (SUCCEEDED(TaskDialogIndirect(&tdc, &nClickedBtn, NULL, &bCheckboxChecked)) && nClickedBtn != IDCANCEL) {
-                    int selectedIndex = nClickedBtn - 1000;
+                    int selectedIndex = nClickedBtn - DEFAULT_BUTTON;
                     auto& path = sFileLoaderPaths[selectedIndex];
                     sFileLoaderPath = path.make_preferred();
                 }
