@@ -2,7 +2,7 @@ newoption {
     trigger     = "with-version",
     value       = "STRING",
     description = "Current UAL version",
-    default     = "7.0.0",
+    default     = "8.0.0",
 }
 
 -- x86

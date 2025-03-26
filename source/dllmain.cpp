@@ -438,8 +438,16 @@ enum OLE32ExportsNames
     OLE32ExportsNamesCount
 };
 
+enum vccorlibExportsNames
+{
+    eGetCmdArguments,
+
+    vccorlibExportsNamesCount
+};
+
 size_t Kernel32Data[Kernel32ExportsNamesCount][Kernel32ExportsDataCount];
 size_t OLE32Data[OLE32ExportsNamesCount][Kernel32ExportsDataCount];
+size_t vccorlibData[vccorlibExportsNamesCount][Kernel32ExportsDataCount];
 
 namespace OverloadFromFolder
 {
@@ -558,6 +566,54 @@ void LoadOriginalLibrary()
             winhttp.LoadOriginalLibrary(LoadLib(szLocalPath));
         else
             winhttp.LoadOriginalLibrary(LoadLib(szSystemPath));
+    }
+    else if (iequals(szSelfName, L"xinput1_1.dll"))
+    {
+        szLocalPath += L"xinput1_1Hooked.dll";
+        if (std::filesystem::exists(szLocalPath))
+            xinput.LoadOriginalLibrary(LoadLib(szLocalPath));
+        else
+            xinput.LoadOriginalLibrary(LoadLib(szSystemPath));
+    }
+    else if (iequals(szSelfName, L"xinput1_2.dll"))
+    {
+        szLocalPath += L"xinput1_2Hooked.dll";
+        if (std::filesystem::exists(szLocalPath))
+            xinput.LoadOriginalLibrary(LoadLib(szLocalPath));
+        else
+            xinput.LoadOriginalLibrary(LoadLib(szSystemPath));
+    }
+    else if (iequals(szSelfName, L"xinput1_3.dll"))
+    {
+        szLocalPath += L"xinput1_3Hooked.dll";
+        if (std::filesystem::exists(szLocalPath))
+            xinput.LoadOriginalLibrary(LoadLib(szLocalPath));
+        else
+            xinput.LoadOriginalLibrary(LoadLib(szSystemPath));
+    }
+    else if (iequals(szSelfName, L"XInput1_4.dll"))
+    {
+        szLocalPath += L"XInput1_4Hooked.dll";
+        if (std::filesystem::exists(szLocalPath))
+            xinput.LoadOriginalLibrary(LoadLib(szLocalPath));
+        else
+            xinput.LoadOriginalLibrary(LoadLib(szSystemPath));
+    }
+    else if (iequals(szSelfName, L"XInput9_1_0.dll"))
+    {
+        szLocalPath += L"XInput9_1_0Hooked.dll";
+        if (std::filesystem::exists(szLocalPath))
+            xinput.LoadOriginalLibrary(LoadLib(szLocalPath));
+        else
+            xinput.LoadOriginalLibrary(LoadLib(szSystemPath));
+    }
+    else if (iequals(szSelfName, L"XInputUap.dll"))
+    {
+        szLocalPath += L"XInputUapHooked.dll";
+        if (std::filesystem::exists(szLocalPath))
+            xinput.LoadOriginalLibrary(LoadLib(szLocalPath));
+        else
+            xinput.LoadOriginalLibrary(LoadLib(szSystemPath));
     }
     else
 #if !X64
@@ -1654,6 +1710,13 @@ HRESULT WINAPI CustomCoCreateInstance(REFCLSID rclsid, LPUNKNOWN pUnkOuter, DWOR
     return hr;
 }
 
+LPWSTR WINAPI CustomGetCmdArguments(int* argc)
+{
+    auto fnGetCmdArguments = reinterpret_cast<decltype(&CustomGetCmdArguments)>(vccorlibData[eGetCmdArguments][ProcAddress]);
+    LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress(), L"GetCmdArguments");
+    return fnGetCmdArguments(argc);
+}
+
 namespace OverloadFromFolder
 {
     template<typename Callable>
@@ -1941,7 +2004,7 @@ namespace OverloadFromFolder
     }
 }
 
-std::vector<std::string> importedModulesList;
+std::set<std::string> importedModulesList;
 bool HookKernel32IAT(HMODULE mod, bool exe)
 {
     auto hExecutableInstance = (size_t)mod;
@@ -2266,6 +2329,49 @@ bool HookKernel32IAT(HMODULE mod, bool exe)
         }
     };
 
+    auto Patchvccorlib = [&](const char* dllname, size_t start, size_t end, size_t exe_end)
+    {
+        auto hHandle = GetModuleHandleA(dllname);
+        if (!hHandle)
+            return;
+
+        for (size_t i = 0; i < nNumImports; i++)
+        {
+            if (hExecutableInstance + (pImports + i)->FirstThunk > start && !(end && hExecutableInstance + (pImports + i)->FirstThunk > end))
+                end = hExecutableInstance + (pImports + i)->FirstThunk;
+        }
+
+        if (!end) { end = start + 0x100; }
+        if (end > exe_end) //for very broken exes
+        {
+            start = hExecutableInstance;
+            end = exe_end;
+        }
+
+        if (exe)
+            vccorlibData[eGetCmdArguments][ProcAddress] = (size_t)GetProcAddress(hHandle, "?GetCmdArguments@Details@Platform@@YAPEAPEA_WPEAH@Z");
+
+        for (auto i = start; i < end; i += sizeof(size_t))
+        {
+            DWORD dwProtect[2];
+            VirtualProtect((size_t*)i, sizeof(size_t), PAGE_EXECUTE_READWRITE, &dwProtect[0]);
+
+            auto ptr = *(size_t*)i;
+            if (!ptr)
+                continue;
+
+            if (ptr == vccorlibData[eGetCmdArguments][ProcAddress])
+            {
+                if (exe) vccorlibData[eGetCmdArguments][IATPtr] = i;
+                *(size_t*)i = (size_t)CustomGetCmdArguments;
+                VirtualProtect((size_t*)i, sizeof(size_t), dwProtect[0], &dwProtect[1]);
+                break;
+            }
+
+            VirtualProtect((size_t*)i, sizeof(size_t), dwProtect[0], &dwProtect[1]);
+        }
+    };
+
     static auto getSection = [](const PIMAGE_NT_HEADERS nt_headers, unsigned section) -> PIMAGE_SECTION_HEADER
     {
         return reinterpret_cast<PIMAGE_SECTION_HEADER>(
@@ -2293,11 +2399,18 @@ bool HookKernel32IAT(HMODULE mod, bool exe)
     {
         if ((size_t)(hExecutableInstance + (pImports + i)->Name) < hExecutableInstance_end)
         {
-            if (!_stricmp((const char*)(hExecutableInstance + (pImports + i)->Name), "KERNEL32.DLL"))
+            auto szName = (const char*)(hExecutableInstance + (pImports + i)->Name);
+            auto dllname = std::string(szName);
+            std::transform(dllname.begin(), dllname.end(), dllname.begin(), [](char c) { return ::tolower(c); });
+
+            if (dllname == "kernel32.dll")
                 PatchIAT(hExecutableInstance + (pImports + i)->FirstThunk, 0, hExecutableInstance_end);
-            else if (!_stricmp((const char*)(hExecutableInstance + (pImports + i)->Name), "OLE32.DLL"))
+            else if (dllname == "ole32.dll")
                 PatchCoCreateInstance(hExecutableInstance + (pImports + i)->FirstThunk, 0, hExecutableInstance_end);
-            importedModulesList.emplace_back((const char*)(hExecutableInstance + (pImports + i)->Name));
+            else if (dllname.contains("vccorlib"))
+                Patchvccorlib(szName, hExecutableInstance + (pImports + i)->FirstThunk, 0, hExecutableInstance_end);
+
+            importedModulesList.insert(dllname);
         }
     }
 
@@ -2731,6 +2844,261 @@ bool HookKernel32IAT(HMODULE mod, bool exe)
                                     break;
                                 }
                             }
+                            else if (iequals(szSelfName, L"xinput1_1.dll") || iequals(szSelfName, L"xinput1_2.dll"))
+                            {
+                                DWORD Protect;
+                                VirtualProtect(&p[j], 4, PAGE_EXECUTE_READWRITE, &Protect);
+                            
+                                const enum exinput1_1
+                                {
+                                    DllMain = 1,
+                                    XInputEnable = 2,
+                                    XInputGetCapabilities = 3,
+                                    XInputGetDSoundAudioDeviceGuids = 4,
+                                    XInputGetState = 5,
+                                    XInputSetState = 6,
+                                };
+                            
+                                switch (IMAGE_ORDINAL(thunk->u1.Ordinal))
+                                {
+                                case exinput1_1::DllMain:
+                                    p[j] = _DllMain;
+                                    break;
+                                case exinput1_1::XInputEnable:
+                                    p[j] = _XInputEnable;
+                                    break;
+                                case exinput1_1::XInputGetCapabilities:
+                                    p[j] = _XInputGetCapabilities;
+                                    break;
+                                case exinput1_1::XInputGetDSoundAudioDeviceGuids:
+                                    p[j] = _XInputGetDSoundAudioDeviceGuids;
+                                    break;
+                                case exinput1_1::XInputGetState:
+                                    p[j] = _XInputGetState;
+                                    break;
+                                case exinput1_1::XInputSetState:
+                                    p[j] = _XInputSetState;
+                                    break;
+                                default:
+                                    break;
+                                }
+                            }
+                            else if (iequals(szSelfName, L"xinput1_3.dll"))
+                            {
+                                DWORD Protect;
+                                VirtualProtect(&p[j], 4, PAGE_EXECUTE_READWRITE, &Protect);
+
+                                const enum exinput1_3
+                                {
+                                    DllMain = 1,
+                                    XInputGetState = 2,
+                                    XInputSetState = 3,
+                                    XInputGetCapabilities = 4,
+                                    XInputEnable = 5,
+                                    XInputGetDSoundAudioDeviceGuids = 6,
+                                    XInputGetBatteryInformation = 7,
+                                    XInputGetKeystroke = 8,
+                                    XInputGetStateEx = 100,
+                                    XInputWaitForGuideButton = 101,
+                                    XInputCancelGuideButtonWait = 102,
+                                    XInputPowerOffController = 103,
+                                };
+
+                                switch (IMAGE_ORDINAL(thunk->u1.Ordinal))
+                                {
+                                case exinput1_3::DllMain:
+                                    p[j] = _DllMain;
+                                    break;
+                                case exinput1_3::XInputGetState:
+                                    p[j] = _XInputGetState;
+                                    break;
+                                case exinput1_3::XInputSetState:
+                                    p[j] = _XInputSetState;
+                                    break;
+                                case exinput1_3::XInputGetCapabilities:
+                                    p[j] = _XInputGetCapabilities;
+                                    break;
+                                case exinput1_3::XInputEnable:
+                                    p[j] = _XInputEnable;
+                                    break;
+                                case exinput1_3::XInputGetDSoundAudioDeviceGuids:
+                                    p[j] = _XInputGetDSoundAudioDeviceGuids;
+                                    break;
+                                case exinput1_3::XInputGetBatteryInformation:
+                                    p[j] = _XInputGetBatteryInformation;
+                                    break;
+                                case exinput1_3::XInputGetKeystroke:
+                                    p[j] = _XInputGetKeystroke;
+                                    break;
+                                case exinput1_3::XInputGetStateEx:
+                                    p[j] = _XInputGetStateEx;
+                                    break;
+                                case exinput1_3::XInputWaitForGuideButton:
+                                    p[j] = _XInputWaitForGuideButton;
+                                    break;
+                                case exinput1_3::XInputCancelGuideButtonWait:
+                                    p[j] = _XInputCancelGuideButtonWait;
+                                    break;
+                                case exinput1_3::XInputPowerOffController:
+                                    p[j] = _XInputPowerOffController;
+                                    break;
+                                default:
+                                    break;
+                                }
+                            }
+                            else if (iequals(szSelfName, L"xinput1_4.dll"))
+                            {
+                                DWORD Protect;
+                                VirtualProtect(&p[j], 4, PAGE_EXECUTE_READWRITE, &Protect);
+
+                                const enum exinput1_4
+                                {
+                                    DllMain = 1,
+                                    XInputGetState = 2,
+                                    XInputSetState = 3,
+                                    XInputGetCapabilities = 4,
+                                    XInputEnable = 5,
+                                    XInputGetBatteryInformation = 7,
+                                    XInputGetKeystroke = 8,
+                                    XInputGetAudioDeviceIds = 10,
+                                    XInputGetStateEx = 100,
+                                    XInputWaitForGuideButton = 101,
+                                    XInputCancelGuideButtonWait = 102,
+                                    XInputPowerOffController = 103,
+                                    XInputGetBaseBusInformation = 104,
+                                    XInputGetCapabilitiesEx = 108,
+                                };
+
+                                switch (IMAGE_ORDINAL(thunk->u1.Ordinal))
+                                {
+                                case exinput1_4::DllMain:
+                                    p[j] = _DllMain;
+                                    break;
+                                case exinput1_4::XInputGetState:
+                                    p[j] = _XInputGetState;
+                                    break;
+                                case exinput1_4::XInputSetState:
+                                    p[j] = _XInputSetState;
+                                    break;
+                                case exinput1_4::XInputGetCapabilities:
+                                    p[j] = _XInputGetCapabilities;
+                                    break;
+                                case exinput1_4::XInputEnable:
+                                    p[j] = _XInputEnable;
+                                    break;
+                                case exinput1_4::XInputGetBatteryInformation:
+                                    p[j] = _XInputGetBatteryInformation;
+                                    break;
+                                case exinput1_4::XInputGetKeystroke:
+                                    p[j] = _XInputGetKeystroke;
+                                    break;
+                                case exinput1_4::XInputGetAudioDeviceIds:
+                                    p[j] = _XInputGetAudioDeviceIds;
+                                    break;
+                                case exinput1_4::XInputGetStateEx:
+                                    p[j] = _XInputGetStateEx;
+                                    break;
+                                case exinput1_4::XInputWaitForGuideButton:
+                                    p[j] = _XInputWaitForGuideButton;
+                                    break;
+                                case exinput1_4::XInputCancelGuideButtonWait:
+                                    p[j] = _XInputCancelGuideButtonWait;
+                                    break;
+                                case exinput1_4::XInputPowerOffController:
+                                    p[j] = _XInputPowerOffController;
+                                    break;
+                                case exinput1_4::XInputGetBaseBusInformation:
+                                    p[j] = _XInputGetBaseBusInformation;
+                                    break;
+                                case exinput1_4::XInputGetCapabilitiesEx:
+                                    p[j] = _XInputGetCapabilitiesEx;
+                                    break;
+                                default:
+                                    break;
+                                }
+                            }
+                            else if (iequals(szSelfName, L"xinput9_1_0.dll"))
+                            {
+                                DWORD Protect;
+                                VirtualProtect(&p[j], 4, PAGE_EXECUTE_READWRITE, &Protect);
+
+                                const enum exinput9_1_0
+                                {
+                                    DllMain = 1,
+                                    XInputGetCapabilities = 2,
+                                    XInputGetDSoundAudioDeviceGuids = 3,
+                                    XInputGetState = 4,
+                                    XInputSetState = 5,
+                                };
+
+                                switch (IMAGE_ORDINAL(thunk->u1.Ordinal))
+                                {
+                                case exinput9_1_0::DllMain:
+                                    p[j] = _DllMain;
+                                    break;
+                                case exinput9_1_0::XInputGetCapabilities:
+                                    p[j] = _XInputGetCapabilities;
+                                    break;
+                                case exinput9_1_0::XInputGetDSoundAudioDeviceGuids:
+                                    p[j] = _XInputGetDSoundAudioDeviceGuids;
+                                    break;
+                                case exinput9_1_0::XInputGetState:
+                                    p[j] = _XInputGetState;
+                                    break;
+                                case exinput9_1_0::XInputSetState:
+                                    p[j] = _XInputSetState;
+                                    break;
+                                default:
+                                    break;
+                                }
+                            }
+                            else if (iequals(szSelfName, L"xinputuap.dll"))
+                            {
+                                DWORD Protect;
+                                VirtualProtect(&p[j], 4, PAGE_EXECUTE_READWRITE, &Protect);
+
+                                const enum exinputuap
+                                {
+                                    DllMain = 1,
+                                    XInputEnable = 2,
+                                    XInputGetAudioDeviceIds = 3,
+                                    XInputGetBatteryInformation = 4,
+                                    XInputGetCapabilities = 5,
+                                    XInputGetKeystroke = 6,
+                                    XInputGetState = 7,
+                                    XInputSetState = 8,
+                                };
+
+                                switch (IMAGE_ORDINAL(thunk->u1.Ordinal))
+                                {
+                                case exinputuap::DllMain:
+                                    p[j] = _DllMain;
+                                    break;
+                                case exinputuap::XInputEnable:
+                                    p[j] = _XInputEnable;
+                                    break;
+                                case exinputuap::XInputGetAudioDeviceIds:
+                                    p[j] = _XInputGetAudioDeviceIds;
+                                    break;
+                                case exinputuap::XInputGetBatteryInformation:
+                                    p[j] = _XInputGetBatteryInformation;
+                                    break;
+                                case exinputuap::XInputGetCapabilities:
+                                    p[j] = _XInputGetCapabilities;
+                                    break;
+                                case exinputuap::XInputGetKeystroke:
+                                    p[j] = _XInputGetKeystroke;
+                                    break;
+                                case exinputuap::XInputGetState:
+                                    p[j] = _XInputGetState;
+                                    break;
+                                case exinputuap::XInputSetState:
+                                    p[j] = _XInputSetState;
+                                    break;
+                                default:
+                                    break;
+                                }
+                            }
                             ++j;
                         }
                         ++thunk;
@@ -2997,14 +3365,14 @@ void Init()
             LoadOriginalLibrary();
         }
 
-        const auto it = std::find_if(std::begin(importedModulesList), std::end(importedModulesList), [&](const auto& str) { return iequals(L"unityplayer.dll", to_wstring(str)); } );
+        const auto it = std::find_if(std::begin(importedModulesList), std::end(importedModulesList), [&](const auto& str) { return str == "unityplayer.dll"; } );
         const auto bUnityPlayerImported = it != std::end(importedModulesList);
 
         HMODULE m = mainModule;
         if (nFindModule || importedModulesList.size() <= 2 || bUnityPlayerImported)
         {
             ModuleList dlls;
-            dlls.Enumerate(ModuleList::SearchLocation::LocalOnly);
+            dlls.Enumerate(ModuleList::SearchLocation::All);
 
             auto ual = std::find_if(dlls.m_moduleList.begin(), dlls.m_moduleList.end(), [](auto const& it)
             {
@@ -3015,13 +3383,14 @@ void Init()
             {
                 auto str1 = std::get<std::wstring>(*ual);
                 auto str2 = std::get<std::wstring>(it);
+                auto bIsLocal = std::get<bool>(it);
                 std::transform(str1.begin(), str1.end(), str1.begin(), [](wchar_t c) { return ::towlower(c); });
                 std::transform(str2.begin(), str2.end(), str2.begin(), [](wchar_t c) { return ::towlower(c); });
 
-                if (str2 == L"unityplayer")
+                if (str2 == L"unityplayer" || str2 == L"clr" || str2 == L"coreclr")
                     return true;
 
-                return (str2 != str1) && (str2.find(str1) != std::wstring::npos);
+                return bIsLocal && (str2 != str1) && (str2.find(str1) != std::wstring::npos);
             });
 
             if (ual != dlls.m_moduleList.begin())
@@ -3036,18 +3405,6 @@ void Init()
         if (m != mainModule)
         {
             HookKernel32IAT(m, false);
-        }
-
-        const auto clr = GetModuleHandleW(L"clr.dll");
-        const auto coreclr = GetModuleHandleW(L"coreclr.dll");
-
-        if (clr)
-        {
-            HookKernel32IAT(clr, false);
-        }
-        else if (coreclr)
-        {
-            HookKernel32IAT(coreclr, false);
         }
     }
     else

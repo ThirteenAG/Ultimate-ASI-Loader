@@ -1655,6 +1655,46 @@ struct winhttp_dll
     }
 } winhttp;
 
+struct xinput_dll
+{
+    HMODULE dll;
+    FARPROC DllMain;
+    FARPROC XInputEnable;
+    FARPROC XInputGetCapabilities;
+    FARPROC XInputGetDSoundAudioDeviceGuids;
+    FARPROC XInputGetState;
+    FARPROC XInputSetState;
+    FARPROC XInputGetBatteryInformation;
+    FARPROC XInputGetKeystroke;
+    FARPROC XInputGetAudioDeviceIds;
+    FARPROC XInputGetStateEx;
+    FARPROC XInputWaitForGuideButton;
+    FARPROC XInputCancelGuideButtonWait;
+    FARPROC XInputPowerOffController;
+    FARPROC XInputGetBaseBusInformation;
+    FARPROC XInputGetCapabilitiesEx;
+
+    void LoadOriginalLibrary(HMODULE module)
+    {
+        dll = module;
+        DllMain = GetProcAddress(dll, "DllMain");
+        XInputEnable = GetProcAddress(dll, "XInputEnable");
+        XInputGetCapabilities = GetProcAddress(dll, "XInputGetCapabilities");
+        XInputGetDSoundAudioDeviceGuids = GetProcAddress(dll, "XInputGetDSoundAudioDeviceGuids");
+        XInputGetState = GetProcAddress(dll, "XInputGetState");
+        XInputSetState = GetProcAddress(dll, "XInputSetState");
+        XInputGetBatteryInformation = GetProcAddress(dll, "XInputGetBatteryInformation");
+        XInputGetKeystroke = GetProcAddress(dll, "XInputGetKeystroke");
+        XInputGetAudioDeviceIds = GetProcAddress(dll, "XInputGetAudioDeviceIds");
+        XInputGetStateEx = GetProcAddress(dll, (LPCSTR)100);
+        XInputWaitForGuideButton = GetProcAddress(dll, (LPCSTR)101);
+        XInputCancelGuideButtonWait = GetProcAddress(dll, (LPCSTR)102);
+        XInputPowerOffController = GetProcAddress(dll, (LPCSTR)103);
+        XInputGetBaseBusInformation = GetProcAddress(dll, (LPCSTR)104);
+        XInputGetCapabilitiesEx = GetProcAddress(dll, (LPCSTR)108);
+    }
+} xinput;
+
 #if X64
 struct bink2w64_dll
 {
@@ -3019,6 +3059,22 @@ __declspec(naked) void _WinHttpWebSocketSend() { _asm { jmp [winhttp.WinHttpWebS
 __declspec(naked) void _WinHttpWebSocketShutdown() { _asm { jmp [winhttp.WinHttpWebSocketShutdown] } }
 __declspec(naked) void _WinHttpWriteData() { _asm { jmp [winhttp.WinHttpWriteData] } }
 __declspec(naked) void _WinHttpWriteProxySettings() { _asm { jmp [winhttp.WinHttpWriteProxySettings] } }
+
+__declspec(naked) void _DllMain() { _asm { jmp[xinput.DllMain] } }
+__declspec(naked) void _XInputEnable() { _asm { jmp[xinput.XInputEnable] } }
+__declspec(naked) void _XInputGetCapabilities() { _asm { jmp[xinput.XInputGetCapabilities] } }
+__declspec(naked) void _XInputGetDSoundAudioDeviceGuids() { _asm { jmp[xinput.XInputGetDSoundAudioDeviceGuids] } }
+__declspec(naked) void _XInputGetState() { _asm { jmp[xinput.XInputGetState] } }
+__declspec(naked) void _XInputSetState() { _asm { jmp[xinput.XInputSetState] } }
+__declspec(naked) void _XInputGetBatteryInformation() { _asm { jmp[xinput.XInputGetBatteryInformation] } }
+__declspec(naked) void _XInputGetKeystroke() { _asm { jmp[xinput.XInputGetKeystroke] } }
+__declspec(naked) void _XInputGetStateEx() { _asm { jmp[xinput.XInputGetStateEx] } }
+__declspec(naked) void _XInputWaitForGuideButton() { _asm { jmp[xinput.XInputWaitForGuideButton] } }
+__declspec(naked) void _XInputCancelGuideButtonWait() { _asm { jmp[xinput.XInputCancelGuideButtonWait] } }
+__declspec(naked) void _XInputPowerOffController() { _asm { jmp[xinput.XInputPowerOffController] } }
+__declspec(naked) void _XInputGetAudioDeviceIds() { _asm { jmp[xinput.XInputGetAudioDeviceIds] } }
+__declspec(naked) void _XInputGetBaseBusInformation() { _asm { jmp[xinput.XInputGetBaseBusInformation] } }
+__declspec(naked) void _XInputGetCapabilitiesEx() { _asm { jmp[xinput.XInputGetCapabilitiesEx] } }
 
 __declspec(naked) void _acmDriverAddA() { _asm { jmp[msacm32.acmDriverAddA] } }
 __declspec(naked) void _acmDriverAddW() { _asm { jmp[msacm32.acmDriverAddW] } }
@@ -4460,6 +4516,22 @@ void _WinHttpWebSocketSend() { winhttp.WinHttpWebSocketSend(); }
 void _WinHttpWebSocketShutdown() { winhttp.WinHttpWebSocketShutdown(); }
 void _WinHttpWriteData() { winhttp.WinHttpWriteData(); }
 void _WinHttpWriteProxySettings() { winhttp.WinHttpWriteProxySettings(); }
+
+void _DllMain() { xinput.DllMain(); }
+void _XInputEnable() { xinput.XInputEnable(); }
+void _XInputGetCapabilities() { xinput.XInputGetCapabilities(); }
+void _XInputGetDSoundAudioDeviceGuids() { xinput.XInputGetDSoundAudioDeviceGuids(); }
+void _XInputGetState() { xinput.XInputGetState(); }
+void _XInputSetState() { xinput.XInputSetState(); }
+void _XInputGetBatteryInformation() { xinput.XInputGetBatteryInformation(); }
+void _XInputGetKeystroke() { xinput.XInputGetKeystroke(); }
+void _XInputGetStateEx() { xinput.XInputGetStateEx(); }
+void _XInputWaitForGuideButton() { xinput.XInputWaitForGuideButton(); }
+void _XInputCancelGuideButtonWait() { xinput.XInputCancelGuideButtonWait(); }
+void _XInputPowerOffController() { xinput.XInputPowerOffController(); }
+void _XInputGetAudioDeviceIds() { xinput.XInputGetAudioDeviceIds(); }
+void _XInputGetBaseBusInformation() { xinput.XInputGetBaseBusInformation(); }
+void _XInputGetCapabilitiesEx() { xinput.XInputGetCapabilitiesEx(); }
 
 #pragma runtime_checks( "", restore )
 #endif
