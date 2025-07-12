@@ -1368,17 +1368,17 @@ WinHttpWriteProxySettings = _WinHttpWriteProxySettings
 LIBRARY "xinput"
 EXPORTS
 DllMain = _DllMain
-XInputEnable= _XInputEnable
+XInputEnable = _XInputEnable
 XInputGetCapabilities = _XInputGetCapabilities
 XInputGetDSoundAudioDeviceGuids = _XInputGetDSoundAudioDeviceGuids
-XInputGetState= _XInputGetState
-XInputSetState= _XInputSetState
+XInputGetState = _XInputGetState
+XInputSetState = _XInputSetState
 XInputGetBatteryInformation = _XInputGetBatteryInformation
-XInputGetKeystroke= _XInputGetKeystroke
-XInputGetStateEx= _XInputGetStateEx
-XInputWaitForGuideButton= _XInputWaitForGuideButton
+XInputGetKeystroke = _XInputGetKeystroke
+XInputGetStateEx = _XInputGetStateEx
+XInputWaitForGuideButton = _XInputWaitForGuideButton
 XInputCancelGuideButtonWait = _XInputCancelGuideButtonWait
-XInputPowerOffController= _XInputPowerOffController
+XInputPowerOffController = _XInputPowerOffController
 XInputGetAudioDeviceIds = _XInputGetAudioDeviceIds
 XInputGetBaseBusInformation = _XInputGetBaseBusInformation
 XInputGetCapabilitiesEx = _XInputGetCapabilitiesEx
