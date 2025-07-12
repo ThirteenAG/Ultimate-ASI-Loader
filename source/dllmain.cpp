@@ -40,12 +40,16 @@ bool IsPackagedProcess()
     using LPFN_GPFN = LONG(WINAPI*)(HANDLE, UINT32*, PWSTR);
     bool bIsPackagedProcess = false;
 
-    auto lpGetPackageFamilyName = (LPFN_GPFN)GetProcAddress(GetModuleHandle(TEXT("kernel32")), "GetPackageFamilyName");
-    if (lpGetPackageFamilyName)
+    auto pKernel32 = GetModuleHandle(TEXT("kernel32"));
+    if (pKernel32)
     {
-        UINT32 size = 0;
-        if (lpGetPackageFamilyName(GetCurrentProcess(), &size, NULL) == ERROR_INSUFFICIENT_BUFFER)
-            bIsPackagedProcess = true;
+        auto lpGetPackageFamilyName = (LPFN_GPFN)GetProcAddress(pKernel32, "GetPackageFamilyName");
+        if (lpGetPackageFamilyName)
+        {
+            UINT32 size = 0;
+            if (lpGetPackageFamilyName(GetCurrentProcess(), &size, NULL) == ERROR_INSUFFICIENT_BUFFER)
+                bIsPackagedProcess = true;
+        }
     }
 
     return bIsPackagedProcess;
@@ -84,8 +88,6 @@ HRESULT CALLBACK TaskDialogCallbackProc(HWND hwnd, UINT uNotification, WPARAM wP
                 case WM_LBUTTONDOWN:
                 case WM_RBUTTONDOWN:
                 case WM_MBUTTONDOWN:
-                case WM_NCHITTEST:
-                case WM_SETCURSOR:
                     if (!userInteracted)
                     {
                         if (msg->message == WM_MOUSEMOVE && remainingSeconds >= countdownSeconds - 1)
@@ -995,7 +997,7 @@ void LoadPlugins()
 
     if (nWantsToLoadPlugins)
     {
-        WIN32_FIND_DATAW fd;
+        WIN32_FIND_DATAW fd{};
         if (!nWantsToLoadFromScriptsOnly)
         {
             SetCurrentDirectoryW(szSelfPath.c_str());
@@ -1071,6 +1073,15 @@ void LoadPluginsAndRestoreIAT(uintptr_t retaddr, std::wstring_view calledFrom = 
 
         if (sFileLoaderPaths.size() > 1)
         {
+            constexpr auto dialogMutexName = L"Global\\UltimateASILoader-FolderSelectDialog-Mutex";
+            auto hDialogMutex = CreateMutexW(NULL, TRUE, dialogMutexName);
+
+            if (hDialogMutex && GetLastError() == ERROR_ALREADY_EXISTS)
+            {
+                CloseHandle(hDialogMutex);
+                ExitProcess(0);
+            }
+
             int buttonId = DEFAULT_BUTTON;
             std::vector<TASKDIALOG_BUTTON> aButtons;
             aButtons.reserve(sFileLoaderPaths.size() + 1);
@@ -1154,6 +1165,12 @@ void LoadPluginsAndRestoreIAT(uintptr_t retaddr, std::wstring_view calledFrom = 
                         break;
                     }
                 }
+            }
+
+            if (hDialogMutex)
+            {
+                ReleaseMutex(hDialogMutex);
+                CloseHandle(hDialogMutex);
             }
         }
 
@@ -1771,7 +1788,7 @@ namespace OverloadFromFolder
     {
         auto raddr = _ReturnAddress();
         auto r = GetFilePathForOverload(lpFileName, isRecursive(raddr));
-        return mhCreateFile2->get_original<decltype(CreateFile2)>()(value_orW(r, lpFileName), dwDesiredAccess, dwShareMode, dwCreationDisposition, pCreateExParams);
+        return mhCreateFile2->get_original<decltype(shCustomCreateFile2)>()(value_orW(r, lpFileName), dwDesiredAccess, dwShareMode, dwCreationDisposition, pCreateExParams);
     }
 
     DWORD WINAPI shCustomGetFileAttributesA(LPCSTR lpFileName)
@@ -1963,7 +1980,9 @@ namespace OverloadFromFolder
         mhLoadLibraryExW = std::make_unique<FunctionHookMinHook>((uintptr_t)LoadLibraryExW, (uintptr_t)shCustomLoadLibraryExW);
         mhCreateFileA = std::make_unique<FunctionHookMinHook>((uintptr_t)CreateFileA, (uintptr_t)shCustomCreateFileA);
         mhCreateFileW = std::make_unique<FunctionHookMinHook>((uintptr_t)CreateFileW, (uintptr_t)shCustomCreateFileW);
-        mhCreateFile2 = std::make_unique<FunctionHookMinHook>((uintptr_t)CreateFile2, (uintptr_t)shCustomCreateFile2);
+        if (auto pKernel32 = GetModuleHandle(TEXT("kernel32.dll")))
+            if (auto pCreateFile2 = (uintptr_t)GetProcAddress(pKernel32, "CreateFile2"))
+                mhCreateFile2 = std::make_unique<FunctionHookMinHook>(pCreateFile2, (uintptr_t)shCustomCreateFile2);
         mhGetFileAttributesA = std::make_unique<FunctionHookMinHook>((uintptr_t)GetFileAttributesA, (uintptr_t)shCustomGetFileAttributesA);
         mhGetFileAttributesW = std::make_unique<FunctionHookMinHook>((uintptr_t)GetFileAttributesW, (uintptr_t)shCustomGetFileAttributesW);
         mhGetFileAttributesExA = std::make_unique<FunctionHookMinHook>((uintptr_t)GetFileAttributesExA, (uintptr_t)shCustomGetFileAttributesExA);
@@ -2306,7 +2325,8 @@ bool HookKernel32IAT(HMODULE mod, bool exe)
         }
 
         if (exe)
-            OLE32Data[eCoCreateInstance][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("OLE32.DLL")), "CoCreateInstance");
+            if (auto pOLE32 = GetModuleHandle(TEXT("OLE32.DLL")))
+                OLE32Data[eCoCreateInstance][ProcAddress] = (size_t)GetProcAddress(pOLE32, "CoCreateInstance");
 
         for (auto i = start; i < end; i += sizeof(size_t))
         {
