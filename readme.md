@@ -1,6 +1,10 @@
 [![AppVeyor](https://img.shields.io/appveyor/build/ThirteenAG/Ultimate-ASI-Loader?label=AppVeyor%20Build&logo=Appveyor&logoColor=white)](https://ci.appveyor.com/project/ThirteenAG/ultimate-asi-loader)
 [![GitHub Actions Build](https://github.com/ThirteenAG/Ultimate-ASI-Loader/actions/workflows/msbuild.yml/badge.svg)](https://github.com/ThirteenAG/Ultimate-ASI-Loader/actions/workflows/msbuild.yml)
 
+<p align="center">
+  <img width="400" src="https://raw.githubusercontent.com/ThirteenAG/Ultimate-ASI-Loader/refs/heads/master/source/resources/logo.svg">
+</p>
+
 # Ultimate ASI Loader
 
 ## DESCRIPTION
