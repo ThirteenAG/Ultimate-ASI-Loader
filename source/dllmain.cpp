@@ -1998,7 +1998,8 @@ namespace OverloadFromFolder
         mhLoadLibraryExW->create();
         mhCreateFileA->create();
         mhCreateFileW->create();
-        mhCreateFile2->create();
+        if (mhCreateFile2)
+            mhCreateFile2->create();
         mhGetFileAttributesA->create();
         mhGetFileAttributesW->create();
         mhGetFileAttributesExA->create();
