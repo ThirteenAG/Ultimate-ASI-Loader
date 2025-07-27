@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <fstream>
 #include <memory>
+#include <map>
 #include <FunctionHookMinHook.hpp>
 #include <shellapi.h>
 #include <Commctrl.h>
@@ -23,6 +24,11 @@ extern "C" Direct3D8* WINAPI Direct3DCreate8(UINT SDKVersion);
 
 extern "C" IMAGE_DOS_HEADER __ImageBase;
 typedef NTSTATUS(NTAPI* LdrAddRefDll_t)(ULONG, HMODULE);
+
+namespace OverloadFromFolder
+{
+    void HookAPIForOverload();
+}
 
 bool WINAPI IsUltimateASILoader()
 {
@@ -148,17 +154,14 @@ std::filesystem::path sFileLoaderPath;
 std::vector<std::filesystem::path> sFileLoaderPaths;
 std::filesystem::path gamePath;
 std::wstring sLoadFromAPI;
-std::vector<std::pair<std::filesystem::path, LARGE_INTEGER>> updateFilenames;
-thread_local std::string sCurrentFindFileDirA;
-thread_local std::wstring sCurrentFindFileDirW;
+thread_local std::unordered_map<HANDLE, std::string> mFindFileDirsA;
+thread_local std::unordered_map<HANDLE, std::wstring> mFindFileDirsW;
 
 bool iequals(std::wstring_view s1, std::wstring_view s2)
 {
-    std::wstring str1(std::move(s1));
-    std::wstring str2(std::move(s2));
-    std::transform(str1.begin(), str1.end(), str1.begin(), [](wchar_t c) { return ::towlower(c); });
-    std::transform(str2.begin(), str2.end(), str2.begin(), [](wchar_t c) { return ::towlower(c); });
-    return (str1 == str2);
+    if (s1.size() != s2.size()) return false;
+    return std::equal(s1.begin(), s1.end(), s2.begin(), s2.end(),
+        [](wchar_t a, wchar_t b) { return ::towlower(a) == ::towlower(b); });
 }
 
 std::filesystem::path lexicallyRelativeCaseIns(const std::filesystem::path& path, const std::filesystem::path& base)
@@ -210,68 +213,13 @@ std::filesystem::path lexicallyRelativeCaseIns(const std::filesystem::path& path
     return result;
 }
 
-void FillUpdateFilenames()
-{
-    if (updateFilenames.empty())
-    {
-        auto path = gamePath / sFileLoaderPath;
-        std::error_code ec;
-        constexpr auto perms = std::filesystem::directory_options::skip_permission_denied | std::filesystem::directory_options::follow_directory_symlink;
-        for (const auto& it : std::filesystem::recursive_directory_iterator(path, perms, ec))
-        {
-            if (!it.is_directory(ec))
-            {
-                LARGE_INTEGER Integer;
-                Integer.QuadPart = std::filesystem::file_size(it, ec);
-                updateFilenames.emplace_back(lexicallyRelativeCaseIns(it.path(), path), Integer);
-            }
-        }
-    }
-}
-
-LARGE_INTEGER FindFileCheckOverloadedPath(CHAR* filename)
-{
-    FillUpdateFilenames();
-
-    if (!updateFilenames.empty())
-    {
-        auto it = std::find_if(updateFilenames.begin(), updateFilenames.end(), [&](const auto& val)
-        {
-            return (sCurrentFindFileDirA.starts_with(val.first.parent_path().string()) && val.first.string().ends_with(filename));
-        });
-
-        if (it != updateFilenames.end())
-            return it->second;
-    }
-
-    return {};
-}
-
-LARGE_INTEGER FindFileCheckOverloadedPath(WCHAR* filename)
-{
-    FillUpdateFilenames();
-
-    if (!updateFilenames.empty())
-    {
-        auto it = std::find_if(updateFilenames.begin(), updateFilenames.end(), [&](const auto& val)
-        {
-            return (sCurrentFindFileDirW.starts_with(val.first.parent_path().wstring()) && val.first.wstring().ends_with(filename));
-        });
-
-        if (it != updateFilenames.end())
-            return it->second;
-    }
-
-    return {};
-}
-
 std::wstring to_wstring(std::string_view cstr)
 {
-    std::string str(std::move(cstr));
-    auto charsReturned = MultiByteToWideChar(CP_UTF8, 0, &str[0], (int)str.size(), NULL, 0);
-    std::wstring wstrTo(charsReturned, 0);
-    MultiByteToWideChar(CP_UTF8, 0, &str[0], (int)str.size(), &wstrTo[0], charsReturned);
-    return wstrTo;
+    if (cstr.empty()) return std::wstring();
+    auto charsReturned = MultiByteToWideChar(CP_UTF8, 0, cstr.data(), static_cast<int>(cstr.size()), nullptr, 0);
+    std::wstring wstr(charsReturned, L'\0');
+    MultiByteToWideChar(CP_UTF8, 0, cstr.data(), static_cast<int>(cstr.size()), wstr.data(), charsReturned);
+    return wstr;
 }
 
 std::wstring SHGetKnownFolderPath(REFKNOWNFOLDERID rfid, DWORD dwFlags, HANDLE hToken)
@@ -450,27 +398,6 @@ enum vccorlibExportsNames
 size_t Kernel32Data[Kernel32ExportsNamesCount][Kernel32ExportsDataCount];
 size_t OLE32Data[OLE32ExportsNamesCount][Kernel32ExportsDataCount];
 size_t vccorlibData[vccorlibExportsNamesCount][Kernel32ExportsDataCount];
-
-namespace OverloadFromFolder
-{
-    std::unique_ptr<FunctionHookMinHook> mhLoadLibraryExA = { nullptr };
-    std::unique_ptr<FunctionHookMinHook> mhLoadLibraryExW = { nullptr };
-    std::unique_ptr<FunctionHookMinHook> mhCreateFileA = { nullptr };
-    std::unique_ptr<FunctionHookMinHook> mhCreateFileW = { nullptr };
-    std::unique_ptr<FunctionHookMinHook> mhCreateFile2 = { nullptr };
-    std::unique_ptr<FunctionHookMinHook> mhGetFileAttributesA = { nullptr };
-    std::unique_ptr<FunctionHookMinHook> mhGetFileAttributesW = { nullptr };
-    std::unique_ptr<FunctionHookMinHook> mhGetFileAttributesExA = { nullptr };
-    std::unique_ptr<FunctionHookMinHook> mhGetFileAttributesExW = { nullptr };
-    std::unique_ptr<FunctionHookMinHook> mhFindFirstFileA = { nullptr };
-    std::unique_ptr<FunctionHookMinHook> mhFindNextFileA = { nullptr };
-    std::unique_ptr<FunctionHookMinHook> mhFindFirstFileW = { nullptr };
-    std::unique_ptr<FunctionHookMinHook> mhFindNextFileW = { nullptr };
-    std::unique_ptr<FunctionHookMinHook> mhFindFirstFileExA = { nullptr };
-    std::unique_ptr<FunctionHookMinHook> mhFindFirstFileExW = { nullptr };
-
-    void HookAPIForOverload();
-}
 
 #if !X64
 #define IDR_VORBISF    101
@@ -1182,155 +1109,9 @@ void LoadPluginsAndRestoreIAT(uintptr_t retaddr, std::wstring_view calledFrom = 
     LoadEverything();
 }
 
-std::filesystem::path WINAPI GetOverloadedFilePath(std::filesystem::path lpFilename)
-{
-    try
-    {
-        std::error_code ec;
-
-        static auto starts_with = [](const std::filesystem::path& path, const std::filesystem::path& base) -> bool {
-            std::wstring str1(path.wstring()); std::wstring str2(base.wstring());
-            std::transform(str1.begin(), str1.end(), str1.begin(), ::tolower);
-            std::transform(str2.begin(), str2.end(), str2.begin(), ::tolower);
-            return str1.starts_with(str2);
-        };
-
-        if (gamePath.empty())
-            gamePath = std::filesystem::path(GetExeModulePath());
-
-        auto filePath = lpFilename;
-        auto absolutePath = std::filesystem::absolute(filePath, ec);
-        auto relativePath = lexicallyRelativeCaseIns(absolutePath, gamePath);
-        auto commonPath = gamePath;
-
-        if (starts_with(relativePath, ".."))
-        {
-            auto common = std::mismatch(absolutePath.begin(), absolutePath.end(), gamePath.begin());
-            for (auto& iter = common.second; iter != gamePath.end(); ++iter)
-                commonPath = commonPath.parent_path();
-
-            std::filesystem::path rp;
-            for (auto& p : relativePath)
-            {
-                if (p != "..")
-                    rp = rp / p;
-            }
-            relativePath = rp;
-        }
-
-        if (starts_with(std::filesystem::path(absolutePath).remove_filename(), gamePath) || starts_with(std::filesystem::path(absolutePath).remove_filename(), commonPath))
-        {
-            auto newPath = gamePath / sFileLoaderPath / relativePath;
-            if (std::filesystem::exists(newPath, ec) && !std::filesystem::is_directory(newPath, ec))
-                return newPath;
-            }
-        }
-    catch (...) {}
-
-    return {};
-}
-
-bool WINAPI GetOverloadedFilePathA(const char* lpFilename, char* out, size_t out_size)
-{
-    try
-    {
-        if (!sFileLoaderPath.empty())
-        {
-            auto path = GetOverloadedFilePath(lpFilename);
-            if (!path.empty())
-            {
-                if (out && out_size)
-                {
-                    if (!std::filesystem::path(lpFilename).is_absolute())
-                        path = lexicallyRelativeCaseIns(path, gamePath);
-                    out[path.string().copy(out, out_size, 0)] = '\0';
-                }
-                return true;
-            }
-        }
-    }
-    catch (...) {}
-    return false;
-}
-
-bool WINAPI GetOverloadedFilePathW(const wchar_t* lpFilename, wchar_t* out, size_t out_size)
-{
-    try
-    {
-        if (!sFileLoaderPath.empty())
-        {
-            auto path = GetOverloadedFilePath(lpFilename);
-            if (!path.empty())
-            {
-                if (out && out_size)
-                {
-                    if (!std::filesystem::path(lpFilename).is_absolute())
-                        path = lexicallyRelativeCaseIns(path, gamePath);
-                    out[path.wstring().copy(out, out_size, 0)] = L'\0';
-                }
-                return true;
-            }
-        }
-    }
-    catch (...) {}
-    return false;
-}
-
-bool WINAPI GetOverloadPathA(char* out, size_t out_size)
-{
-    try
-    {
-        if (!sFileLoaderPath.empty())
-        {
-            if (out && out_size)
-            {
-                auto path = gamePath / sFileLoaderPath;
-                out[path.string().copy(out, out_size, 0)] = '\0';
-                return true;
-            }
-        }
-    }
-    catch (...) {}
-    return false;
-}
-
-bool WINAPI GetOverloadPathW(wchar_t* out, size_t out_size)
-{
-    try
-    {
-        if (!sFileLoaderPath.empty())
-        {
-            if (out && out_size)
-            {
-                auto path = gamePath / sFileLoaderPath;
-                out[path.wstring().copy(out, out_size, 0)] = L'\0';
-                return true;
-            }
-        }
-    }
-    catch (...) {}
-    return false;
-}
-
-std::filesystem::path GetFilePathForOverload(auto path)
-{
-    try
-    {
-        if (!sFileLoaderPath.empty())
-            return GetOverloadedFilePath(path);
-    }
-    catch (...) {}
-
-    return {};
-}
-
-#define value_orA(path1, path2) (path1.empty() ? path2 : path1.string().c_str())
-#define value_orW(path1, path2) (path1.empty() ? path2 : path1.wstring().c_str())
-
 HMODULE LoadLib(const std::wstring& lpLibFileName)
 {
-    auto r = GetFilePathForOverload(lpLibFileName);
-    return LoadLibraryW(value_orW(r, lpLibFileName.c_str()));
+    return LoadLibraryW(lpLibFileName.c_str());
 }
 
 void WINAPI CustomGetStartupInfoA(LPSTARTUPINFOA lpStartupInfo)
@@ -1372,33 +1153,25 @@ DWORD WINAPI CustomGetShortPathNameA(LPCSTR lpszLongPath, LPSTR lpszShortPath, D
 HMODULE WINAPI CustomLoadLibraryExA(LPCSTR lpLibFileName, HANDLE hFile, DWORD dwFlags)
 {
     LoadOriginalLibrary();
-
-    auto r = GetFilePathForOverload(lpLibFileName);
-    return LoadLibraryExA(value_orA(r, lpLibFileName), hFile, dwFlags);
+    return LoadLibraryExA(lpLibFileName, hFile, dwFlags);
 }
 
 HMODULE WINAPI CustomLoadLibraryExW(LPCWSTR lpLibFileName, HANDLE hFile, DWORD dwFlags)
 {
     LoadOriginalLibrary();
-
-    auto r = GetFilePathForOverload(lpLibFileName);
-    return LoadLibraryExW(value_orW(r, lpLibFileName), hFile, dwFlags);
+    return LoadLibraryExW(lpLibFileName, hFile, dwFlags);
 }
 
 HMODULE WINAPI CustomLoadLibraryA(LPCSTR lpLibFileName)
 {
     LoadOriginalLibrary();
-
-    auto r = GetFilePathForOverload(lpLibFileName);
-    return LoadLibraryA(value_orA(r, lpLibFileName));
+    return LoadLibraryA(lpLibFileName);
 }
 
 HMODULE WINAPI CustomLoadLibraryW(LPCWSTR lpLibFileName)
 {
     LoadOriginalLibrary();
-
-    auto r = GetFilePathForOverload(lpLibFileName);
-    return LoadLibraryW(value_orW(r, lpLibFileName));
+    return LoadLibraryW(lpLibFileName);
 }
 
 BOOL WINAPI CustomFreeLibrary(HMODULE hLibModule)
@@ -1477,9 +1250,7 @@ HANDLE WINAPI CustomCreateFileA(LPCSTR lpFileName, DWORD dwAccess, DWORD dwShari
         LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress(), L"CreateFileA");
         once = true;
     }
-
-    auto r = GetFilePathForOverload(lpFileName);
-    return CreateFileA(value_orA(r, lpFileName), dwAccess, dwSharing, saAttributes, dwCreation, dwAttributes, hTemplate);
+    return CreateFileA(lpFileName, dwAccess, dwSharing, saAttributes, dwCreation, dwAttributes, hTemplate);
 }
 
 HANDLE WINAPI CustomCreateFileW(LPCWSTR lpFileName, DWORD dwAccess, DWORD dwSharing, LPSECURITY_ATTRIBUTES saAttributes, DWORD dwCreation, DWORD dwAttributes, HANDLE hTemplate)
@@ -1490,9 +1261,7 @@ HANDLE WINAPI CustomCreateFileW(LPCWSTR lpFileName, DWORD dwAccess, DWORD dwShar
         LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress(), L"CreateFileW");
         once = true;
     }
-
-    auto r = GetFilePathForOverload(lpFileName);
-    return CreateFileW(value_orW(r, lpFileName), dwAccess, dwSharing, saAttributes, dwCreation, dwAttributes, hTemplate);
+    return CreateFileW(lpFileName, dwAccess, dwSharing, saAttributes, dwCreation, dwAttributes, hTemplate);
 }
 
 DWORD WINAPI CustomGetFileAttributesA(LPCSTR lpFileName)
@@ -1503,9 +1272,7 @@ DWORD WINAPI CustomGetFileAttributesA(LPCSTR lpFileName)
         LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress(), L"GetFileAttributesA");
         once = true;
     }
-
-    auto r = GetFilePathForOverload(lpFileName);
-    return GetFileAttributesA(value_orA(r, lpFileName));
+    return GetFileAttributesA(lpFileName);
 }
 
 DWORD WINAPI CustomGetFileAttributesW(LPCWSTR lpFileName)
@@ -1516,9 +1283,7 @@ DWORD WINAPI CustomGetFileAttributesW(LPCWSTR lpFileName)
         LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress(), L"GetFileAttributesW");
         once = true;
     }
-
-    auto r = GetFilePathForOverload(lpFileName);
-    return GetFileAttributesW(value_orW(r, lpFileName));
+    return GetFileAttributesW(lpFileName);
 }
 
 BOOL WINAPI CustomGetFileAttributesExA(LPCSTR lpFileName, GET_FILEEX_INFO_LEVELS fInfoLevelId, LPVOID lpFileInformation)
@@ -1529,9 +1294,7 @@ BOOL WINAPI CustomGetFileAttributesExA(LPCSTR lpFileName, GET_FILEEX_INFO_LEVELS
         LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress(), L"GetFileAttributesExA");
         once = true;
     }
-
-    auto r = GetFilePathForOverload(lpFileName);
-    return GetFileAttributesExA(value_orA(r, lpFileName), fInfoLevelId, lpFileInformation);
+    return GetFileAttributesExA(lpFileName, fInfoLevelId, lpFileInformation);
 }
 
 BOOL WINAPI CustomGetFileAttributesExW(LPCWSTR lpFileName, GET_FILEEX_INFO_LEVELS fInfoLevelId, LPVOID lpFileInformation)
@@ -1542,9 +1305,7 @@ BOOL WINAPI CustomGetFileAttributesExW(LPCWSTR lpFileName, GET_FILEEX_INFO_LEVEL
         LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress(), L"GetFileAttributesExW");
         once = true;
     }
-
-    auto r = GetFilePathForOverload(lpFileName);
-    return GetFileAttributesExW(value_orW(r, lpFileName), fInfoLevelId, lpFileInformation);
+    return GetFileAttributesExW(lpFileName, fInfoLevelId, lpFileInformation);
 }
 
 HANDLE WINAPI CustomFindFirstFileA(LPCSTR lpFileName, LPWIN32_FIND_DATAA lpFindFileData)
@@ -1555,19 +1316,7 @@ HANDLE WINAPI CustomFindFirstFileA(LPCSTR lpFileName, LPWIN32_FIND_DATAA lpFindF
         LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress(), L"FindFirstFileA");
         once = true;
     }
-
-    auto ret = FindFirstFileA(lpFileName, lpFindFileData);
-
-    sCurrentFindFileDirA = lpFileName;
-
-    auto i = FindFileCheckOverloadedPath(lpFindFileData->cFileName);
-    if (i.QuadPart)
-    {
-        lpFindFileData->nFileSizeHigh = i.HighPart;
-        lpFindFileData->nFileSizeLow = i.LowPart;
-    }
-
-    return ret;
+    return FindFirstFileA(lpFileName, lpFindFileData);
 }
 
 BOOL WINAPI CustomFindNextFileA(HANDLE hFindFile, LPWIN32_FIND_DATAA lpFindFileData)
@@ -1578,17 +1327,7 @@ BOOL WINAPI CustomFindNextFileA(HANDLE hFindFile, LPWIN32_FIND_DATAA lpFindFileD
         LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress(), L"FindNextFileA");
         once = true;
     }
-
-    auto ret = FindNextFileA(hFindFile, lpFindFileData);
-
-    auto i = FindFileCheckOverloadedPath(lpFindFileData->cFileName);
-    if (i.QuadPart)
-    {
-        lpFindFileData->nFileSizeHigh = i.HighPart;
-        lpFindFileData->nFileSizeLow = i.LowPart;
-    }
-
-    return ret;
+    return FindNextFileA(hFindFile, lpFindFileData);
 }
 
 HANDLE WINAPI CustomFindFirstFileW(LPCWSTR lpFileName, LPWIN32_FIND_DATAW lpFindFileData)
@@ -1599,19 +1338,7 @@ HANDLE WINAPI CustomFindFirstFileW(LPCWSTR lpFileName, LPWIN32_FIND_DATAW lpFind
         LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress(), L"FindFirstFileW");
         once = true;
     }
-
-    auto ret = FindFirstFileW(lpFileName, lpFindFileData);
-
-    sCurrentFindFileDirW = lpFileName;
-
-    auto i = FindFileCheckOverloadedPath(lpFindFileData->cFileName);
-    if (i.QuadPart)
-    {
-        lpFindFileData->nFileSizeHigh = i.HighPart;
-        lpFindFileData->nFileSizeLow = i.LowPart;
-    }
-
-    return ret;
+    return FindFirstFileW(lpFileName, lpFindFileData);
 }
 
 BOOL WINAPI CustomFindNextFileW(HANDLE hFindFile, LPWIN32_FIND_DATAW lpFindFileData)
@@ -1622,17 +1349,7 @@ BOOL WINAPI CustomFindNextFileW(HANDLE hFindFile, LPWIN32_FIND_DATAW lpFindFileD
         LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress(), L"FindNextFileW");
         once = true;
     }
-
-    auto ret = FindNextFileW(hFindFile, lpFindFileData);
-
-    auto i = FindFileCheckOverloadedPath(lpFindFileData->cFileName);
-    if (i.QuadPart)
-    {
-        lpFindFileData->nFileSizeHigh = i.HighPart;
-        lpFindFileData->nFileSizeLow = i.LowPart;
-    }
-
-    return ret;
+    return FindNextFileW(hFindFile, lpFindFileData);
 }
 
 HANDLE WINAPI CustomFindFirstFileExA(LPCSTR lpFileName, FINDEX_INFO_LEVELS fInfoLevelId, WIN32_FIND_DATAA* lpFindFileData, FINDEX_SEARCH_OPS fSearchOp, LPVOID lpSearchFilter, DWORD dwAdditionalFlags)
@@ -1643,22 +1360,7 @@ HANDLE WINAPI CustomFindFirstFileExA(LPCSTR lpFileName, FINDEX_INFO_LEVELS fInfo
         LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress(), L"FindFirstFileExA");
         once = true;
     }
-
-    auto ret = FindFirstFileExA(lpFileName, fInfoLevelId, lpFindFileData, fSearchOp, lpSearchFilter, dwAdditionalFlags);
-
-    if (fInfoLevelId != FindExInfoMaxInfoLevel)
-    {
-        sCurrentFindFileDirA = lpFileName;
-
-        auto i = FindFileCheckOverloadedPath(lpFindFileData->cFileName);
-        if (i.QuadPart)
-        {
-            lpFindFileData->nFileSizeHigh = i.HighPart;
-            lpFindFileData->nFileSizeLow = i.LowPart;
-        }
-    }
-
-    return ret;
+    return FindFirstFileExA(lpFileName, fInfoLevelId, lpFindFileData, fSearchOp, lpSearchFilter, dwAdditionalFlags);
 }
 
 HANDLE WINAPI CustomFindFirstFileExW(LPCWSTR lpFileName, FINDEX_INFO_LEVELS fInfoLevelId, WIN32_FIND_DATAW* lpFindFileData, FINDEX_SEARCH_OPS fSearchOp, LPVOID lpSearchFilter, DWORD dwAdditionalFlags)
@@ -1669,22 +1371,7 @@ HANDLE WINAPI CustomFindFirstFileExW(LPCWSTR lpFileName, FINDEX_INFO_LEVELS fInf
         LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress(), L"FindFirstFileExW");
         once = true;
     }
-
-    auto ret = FindFirstFileExW(lpFileName, fInfoLevelId, lpFindFileData, fSearchOp, lpSearchFilter, dwAdditionalFlags);
-
-    if (fInfoLevelId != FindExInfoMaxInfoLevel)
-    {
-        sCurrentFindFileDirW = lpFileName;
-
-        auto i = FindFileCheckOverloadedPath(lpFindFileData->cFileName);
-        if (i.QuadPart)
-        {
-            lpFindFileData->nFileSizeHigh = i.HighPart;
-            lpFindFileData->nFileSizeLow = i.LowPart;
-        }
-    }
-
-    return ret;
+    return FindFirstFileExW(lpFileName, fInfoLevelId, lpFindFileData, fSearchOp, lpSearchFilter, dwAdditionalFlags);
 }
 
 DEFINE_GUID(CLSID_DirectInput, 0x25E609E0, 0xB259, 0x11CF, 0xBF, 0xC7, 0x44, 0x45, 0x53, 0x54, 0x00, 0x00);
@@ -1736,8 +1423,190 @@ LPWSTR WINAPI CustomGetCmdArguments(int* argc)
 
 namespace OverloadFromFolder
 {
-    template<typename Callable>
-    using ReturnType = typename decltype(std::function{ std::declval<Callable>() })::result_type;
+    std::unique_ptr<FunctionHookMinHook> mhLoadLibraryExA = { nullptr };
+    std::unique_ptr<FunctionHookMinHook> mhLoadLibraryExW = { nullptr };
+    std::unique_ptr<FunctionHookMinHook> mhCreateFileA = { nullptr };
+    std::unique_ptr<FunctionHookMinHook> mhCreateFileW = { nullptr };
+    std::unique_ptr<FunctionHookMinHook> mhCreateFile2 = { nullptr };
+    std::unique_ptr<FunctionHookMinHook> mhCreateFile3 = { nullptr };
+    std::unique_ptr<FunctionHookMinHook> mhGetFileAttributesA = { nullptr };
+    std::unique_ptr<FunctionHookMinHook> mhGetFileAttributesW = { nullptr };
+    std::unique_ptr<FunctionHookMinHook> mhGetFileAttributesExA = { nullptr };
+    std::unique_ptr<FunctionHookMinHook> mhGetFileAttributesExW = { nullptr };
+    std::unique_ptr<FunctionHookMinHook> mhFindFirstFileA = { nullptr };
+    std::unique_ptr<FunctionHookMinHook> mhFindNextFileA = { nullptr };
+    std::unique_ptr<FunctionHookMinHook> mhFindFirstFileW = { nullptr };
+    std::unique_ptr<FunctionHookMinHook> mhFindNextFileW = { nullptr };
+    std::unique_ptr<FunctionHookMinHook> mhFindFirstFileExA = { nullptr };
+    std::unique_ptr<FunctionHookMinHook> mhFindFirstFileExW = { nullptr };
+    std::unique_ptr<FunctionHookMinHook> mhFindClose = { nullptr };
+
+    std::filesystem::path WINAPI GetOverloadedFilePath(std::filesystem::path lpFilename)
+    {
+        try
+        {
+            std::error_code ec;
+
+            static auto starts_with = [](const std::filesystem::path& path, const std::filesystem::path& base) -> bool
+            {
+                std::wstring str1(path.wstring()); std::wstring str2(base.wstring());
+                std::transform(str1.begin(), str1.end(), str1.begin(), ::tolower);
+                std::transform(str2.begin(), str2.end(), str2.begin(), ::tolower);
+                return str1.starts_with(str2);
+            };
+
+            if (gamePath.empty())
+                gamePath = std::filesystem::path(GetExeModulePath());
+
+            auto filePath = lpFilename;
+            auto absolutePath = std::filesystem::absolute(filePath, ec);
+            auto relativePath = lexicallyRelativeCaseIns(absolutePath, gamePath);
+
+            if (*relativePath.begin() == sFileLoaderPath)
+                return {};
+
+            auto commonPath = gamePath;
+            if (starts_with(relativePath, ".."))
+            {
+                auto common = std::mismatch(absolutePath.begin(), absolutePath.end(), gamePath.begin());
+                for (auto& iter = common.second; iter != gamePath.end(); ++iter)
+                    commonPath = commonPath.parent_path();
+
+                std::filesystem::path rp;
+                for (auto& p : relativePath)
+                {
+                    if (p != "..")
+                        rp = rp / p;
+                }
+                relativePath = rp;
+            }
+
+            if (starts_with(std::filesystem::path(absolutePath).remove_filename(), gamePath) || starts_with(std::filesystem::path(absolutePath).remove_filename(), commonPath))
+            {
+                auto newPath = gamePath / sFileLoaderPath / relativePath;
+                if (std::filesystem::exists(newPath, ec) && !std::filesystem::is_directory(newPath, ec))
+                    return newPath;
+            }
+        }
+        catch (...) {}
+
+        return {};
+    }
+
+    bool WINAPI GetOverloadedFilePathA(const char* lpFilename, char* out, size_t out_size)
+    {
+        try
+        {
+            if (!sFileLoaderPath.empty())
+            {
+                auto path = GetOverloadedFilePath(lpFilename);
+                if (!path.empty())
+                {
+                    if (out && out_size)
+                    {
+                        if (!std::filesystem::path(lpFilename).is_absolute())
+                            path = lexicallyRelativeCaseIns(path, gamePath);
+                        out[path.string().copy(out, out_size, 0)] = '\0';
+                    }
+                    return true;
+                }
+            }
+        }
+        catch (...) {}
+        return false;
+    }
+
+    bool WINAPI GetOverloadedFilePathW(const wchar_t* lpFilename, wchar_t* out, size_t out_size)
+    {
+        try
+        {
+            if (!sFileLoaderPath.empty())
+            {
+                auto path = GetOverloadedFilePath(lpFilename);
+                if (!path.empty())
+                {
+                    if (out && out_size)
+                    {
+                        if (!std::filesystem::path(lpFilename).is_absolute())
+                            path = lexicallyRelativeCaseIns(path, gamePath);
+                        out[path.wstring().copy(out, out_size, 0)] = L'\0';
+                    }
+                    return true;
+                }
+            }
+        }
+        catch (...) {}
+        return false;
+    }
+
+    bool WINAPI GetOverloadPathA(char* out, size_t out_size)
+    {
+        try
+        {
+            if (!sFileLoaderPath.empty())
+            {
+                if (out && out_size)
+                {
+                    auto path = gamePath / sFileLoaderPath;
+                    out[path.string().copy(out, out_size, 0)] = '\0';
+                    return true;
+                }
+            }
+        }
+        catch (...) {}
+        return false;
+    }
+
+    bool WINAPI GetOverloadPathW(wchar_t* out, size_t out_size)
+    {
+        try
+        {
+            if (!sFileLoaderPath.empty())
+            {
+                if (out && out_size)
+                {
+                    auto path = gamePath / sFileLoaderPath;
+                    out[path.wstring().copy(out, out_size, 0)] = L'\0';
+                    return true;
+                }
+            }
+        }
+        catch (...) {}
+        return false;
+    }
+
+    std::filesystem::path GetFilePathForOverload(auto path)
+    {
+        try
+        {
+            if (!sFileLoaderPath.empty())
+                return GetOverloadedFilePath(path);
+        }
+        catch (...) {}
+
+        return {};
+    }
+
+    #define value_orA(path1, path2) (path1.empty() ? path2 : path1.string().c_str())
+    #define value_orW(path1, path2) (path1.empty() ? path2 : path1.wstring().c_str())
+
+    LARGE_INTEGER FindFileCheckOverloadedPath(auto dir, auto filename)
+    {
+        std::error_code ec;
+        LARGE_INTEGER result = {};
+
+        auto fullpath = std::filesystem::path(dir).remove_filename() / filename;
+        auto name = fullpath.filename();
+        if (name == "." || name == ".." || name == "*" || name == "?")
+            return result;
+
+        auto newPath = GetFilePathForOverload(fullpath);
+
+        if (!newPath.empty() && std::filesystem::is_regular_file(newPath, ec))
+            result.QuadPart = std::filesystem::file_size(newPath, ec);
+
+        return result;
+    }
 
     bool isRecursive(auto addr)
     {
@@ -1753,7 +1622,7 @@ namespace OverloadFromFolder
         if (bRecursive)
             return {};
 
-        return ::GetFilePathForOverload(lpLibFileName);
+        return GetFilePathForOverload(lpLibFileName);
     }
 
     HMODULE WINAPI shCustomLoadLibraryExA(LPCSTR lpLibFileName, HANDLE hFile, DWORD dwFlags)
@@ -1791,6 +1660,13 @@ namespace OverloadFromFolder
         return mhCreateFile2->get_original<decltype(shCustomCreateFile2)>()(value_orW(r, lpFileName), dwDesiredAccess, dwShareMode, dwCreationDisposition, pCreateExParams);
     }
 
+    HANDLE WINAPI shCustomCreateFile3(LPCWSTR lpFileName, DWORD dwDesiredAccess, DWORD dwShareMode, DWORD dwCreationDisposition, LPCREATEFILE3_EXTENDED_PARAMETERS pCreateExParams)
+    {
+        auto raddr = _ReturnAddress();
+        auto r = GetFilePathForOverload(lpFileName, isRecursive(raddr));
+        return mhCreateFile3->get_original<decltype(shCustomCreateFile3)>()(value_orW(r, lpFileName), dwDesiredAccess, dwShareMode, dwCreationDisposition, pCreateExParams);
+    }
+
     DWORD WINAPI shCustomGetFileAttributesA(LPCSTR lpFileName)
     {
         auto raddr = _ReturnAddress();
@@ -1819,7 +1695,6 @@ namespace OverloadFromFolder
         return mhGetFileAttributesExW->get_original<decltype(GetFileAttributesExW)>()(value_orW(r, lpFileName), fInfoLevelId, lpFileInformation);
     }
 
-    typedef HANDLE(WINAPI* tFindFirstFileA)(LPCSTR lpFileName, LPWIN32_FIND_DATAA lpFindFileData);
     HANDLE WINAPI shCustomFindFirstFileA(LPCSTR lpFileName, LPWIN32_FIND_DATAA lpFindFileData)
     {
         auto raddr = _ReturnAddress();
@@ -1828,22 +1703,18 @@ namespace OverloadFromFolder
         if (isRecursive(raddr))
             return ret;
 
-        if (!sFileLoaderPath.empty())
-        {
-            sCurrentFindFileDirA = lpFileName;
+        mFindFileDirsA[ret] = lpFileName;
 
-            auto i = FindFileCheckOverloadedPath(lpFindFileData->cFileName);
-            if (i.QuadPart)
-            {
-                lpFindFileData->nFileSizeHigh = i.HighPart;
-                lpFindFileData->nFileSizeLow = i.LowPart;
-            }
+        auto i = FindFileCheckOverloadedPath(lpFileName, lpFindFileData->cFileName);
+        if (i.QuadPart)
+        {
+            lpFindFileData->nFileSizeHigh = i.HighPart;
+            lpFindFileData->nFileSizeLow = i.LowPart;
         }
 
         return ret;
     }
 
-    typedef BOOL(WINAPI* tFindNextFileA)(HANDLE hFindFile, LPWIN32_FIND_DATAA lpFindFileData);
     BOOL WINAPI shCustomFindNextFileA(HANDLE hFindFile, LPWIN32_FIND_DATAA lpFindFileData)
     {
         auto raddr = _ReturnAddress();
@@ -1852,9 +1723,10 @@ namespace OverloadFromFolder
         if (isRecursive(raddr))
             return ret;
 
-        if (!sFileLoaderPath.empty())
+        auto it = mFindFileDirsA.find(hFindFile);
+        if (it != mFindFileDirsA.end())
         {
-            auto i = FindFileCheckOverloadedPath(lpFindFileData->cFileName);
+            auto i = FindFileCheckOverloadedPath(it->second, lpFindFileData->cFileName);
             if (i.QuadPart)
             {
                 lpFindFileData->nFileSizeHigh = i.HighPart;
@@ -1865,7 +1737,6 @@ namespace OverloadFromFolder
         return ret;
     }
 
-    typedef HANDLE(WINAPI* tFindFirstFileW)(LPCWSTR lpFileName, LPWIN32_FIND_DATAW lpFindFileData);
     HANDLE WINAPI shCustomFindFirstFileW(LPCWSTR lpFileName, LPWIN32_FIND_DATAW lpFindFileData)
     {
         auto raddr = _ReturnAddress();
@@ -1874,22 +1745,18 @@ namespace OverloadFromFolder
         if (isRecursive(raddr))
             return ret;
 
-        if (!sFileLoaderPath.empty())
-        {
-            sCurrentFindFileDirW = lpFileName;
+        mFindFileDirsW[ret] = lpFileName;
 
-            auto i = FindFileCheckOverloadedPath(lpFindFileData->cFileName);
-            if (i.QuadPart)
-            {
-                lpFindFileData->nFileSizeHigh = i.HighPart;
-                lpFindFileData->nFileSizeLow = i.LowPart;
-            }
+        auto i = FindFileCheckOverloadedPath(lpFileName, lpFindFileData->cFileName);
+        if (i.QuadPart)
+        {
+            lpFindFileData->nFileSizeHigh = i.HighPart;
+            lpFindFileData->nFileSizeLow = i.LowPart;
         }
 
         return ret;
     }
 
-    typedef BOOL(WINAPI* tFindNextFileW)(HANDLE hFindFile, LPWIN32_FIND_DATAW lpFindFileData);
     BOOL WINAPI shCustomFindNextFileW(HANDLE hFindFile, LPWIN32_FIND_DATAW lpFindFileData)
     {
         auto raddr = _ReturnAddress();
@@ -1898,9 +1765,10 @@ namespace OverloadFromFolder
         if (isRecursive(raddr))
             return ret;
 
-        if (!sFileLoaderPath.empty())
+        auto it = mFindFileDirsW.find(hFindFile);
+        if (it != mFindFileDirsW.end())
         {
-            auto i = FindFileCheckOverloadedPath(lpFindFileData->cFileName);
+            auto i = FindFileCheckOverloadedPath(it->second, lpFindFileData->cFileName);
             if (i.QuadPart)
             {
                 lpFindFileData->nFileSizeHigh = i.HighPart;
@@ -1919,11 +1787,11 @@ namespace OverloadFromFolder
         if (isRecursive(raddr))
             return ret;
 
-        if (fInfoLevelId != FindExInfoMaxInfoLevel && !sFileLoaderPath.empty())
+        if (fInfoLevelId != FindExInfoMaxInfoLevel)
         {
-            sCurrentFindFileDirA = lpFileName;
+            mFindFileDirsA[ret] = lpFileName;
 
-            auto i = FindFileCheckOverloadedPath(lpFindFileData->cFileName);
+            auto i = FindFileCheckOverloadedPath(lpFileName, lpFindFileData->cFileName);
             if (i.QuadPart)
             {
                 lpFindFileData->nFileSizeHigh = i.HighPart;
@@ -1942,16 +1810,30 @@ namespace OverloadFromFolder
         if (isRecursive(raddr))
             return ret;
 
-        if (fInfoLevelId != FindExInfoMaxInfoLevel && !sFileLoaderPath.empty())
+        if (fInfoLevelId != FindExInfoMaxInfoLevel)
         {
-            sCurrentFindFileDirW = lpFileName;
+            mFindFileDirsW[ret] = lpFileName;
 
-            auto i = FindFileCheckOverloadedPath(lpFindFileData->cFileName);
+            auto i = FindFileCheckOverloadedPath(lpFileName, lpFindFileData->cFileName);
             if (i.QuadPart)
             {
                 lpFindFileData->nFileSizeHigh = i.HighPart;
                 lpFindFileData->nFileSizeLow = i.LowPart;
             }
+        }
+
+        return ret;
+    }
+
+    BOOL WINAPI shCustomFindClose(HANDLE hFindFile)
+    {
+        auto raddr = _ReturnAddress();
+        auto ret = mhFindClose->get_original<decltype(FindClose)>()(hFindFile);
+
+        if (!isRecursive(raddr))
+        {
+            mFindFileDirsA.erase(hFindFile);
+            mFindFileDirsW.erase(hFindFile);
         }
 
         return ret;
@@ -1981,8 +1863,12 @@ namespace OverloadFromFolder
         mhCreateFileA = std::make_unique<FunctionHookMinHook>((uintptr_t)CreateFileA, (uintptr_t)shCustomCreateFileA);
         mhCreateFileW = std::make_unique<FunctionHookMinHook>((uintptr_t)CreateFileW, (uintptr_t)shCustomCreateFileW);
         if (auto pKernel32 = GetModuleHandle(TEXT("kernel32.dll")))
+        {
             if (auto pCreateFile2 = (uintptr_t)GetProcAddress(pKernel32, "CreateFile2"))
                 mhCreateFile2 = std::make_unique<FunctionHookMinHook>(pCreateFile2, (uintptr_t)shCustomCreateFile2);
+            if (auto pCreateFile3 = (uintptr_t)GetProcAddress(pKernel32, "CreateFile3"))
+                mhCreateFile3 = std::make_unique<FunctionHookMinHook>(pCreateFile3, (uintptr_t)shCustomCreateFile3);
+        }
         mhGetFileAttributesA = std::make_unique<FunctionHookMinHook>((uintptr_t)GetFileAttributesA, (uintptr_t)shCustomGetFileAttributesA);
         mhGetFileAttributesW = std::make_unique<FunctionHookMinHook>((uintptr_t)GetFileAttributesW, (uintptr_t)shCustomGetFileAttributesW);
         mhGetFileAttributesExA = std::make_unique<FunctionHookMinHook>((uintptr_t)GetFileAttributesExA, (uintptr_t)shCustomGetFileAttributesExA);
@@ -1993,6 +1879,7 @@ namespace OverloadFromFolder
         mhFindNextFileW = std::make_unique<FunctionHookMinHook>((uintptr_t)FindNextFileW, (uintptr_t)shCustomFindNextFileW);
         mhFindFirstFileExA = std::make_unique<FunctionHookMinHook>((uintptr_t)FindFirstFileExA, (uintptr_t)shCustomFindFirstFileExA);
         mhFindFirstFileExW = std::make_unique<FunctionHookMinHook>((uintptr_t)FindFirstFileExW, (uintptr_t)shCustomFindFirstFileExW);
+        mhFindClose = std::make_unique<FunctionHookMinHook>((uintptr_t)FindClose, (uintptr_t)shCustomFindClose);
 
         mhLoadLibraryExA->create();
         mhLoadLibraryExW->create();
@@ -2000,6 +1887,8 @@ namespace OverloadFromFolder
         mhCreateFileW->create();
         if (mhCreateFile2)
             mhCreateFile2->create();
+        if (mhCreateFile3)
+            mhCreateFile3->create();
         mhGetFileAttributesA->create();
         mhGetFileAttributesW->create();
         mhGetFileAttributesExA->create();
@@ -2010,6 +1899,7 @@ namespace OverloadFromFolder
         mhFindNextFileW->create();
         mhFindFirstFileExA->create();
         mhFindFirstFileExW->create();
+        mhFindClose->create();
 
         // increase the ref count in case this dll is unloaded before the game exit
         auto hNtdll = GetModuleHandleW(L"ntdll.dll");
@@ -3460,6 +3350,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID /*lpReserved*/)
             mhCreateFileA = {};
             mhCreateFileW = {};
             mhCreateFile2 = {};
+            mhCreateFile3 = {};
             mhLoadLibraryExA = {};
             mhLoadLibraryExW = {};
             mhGetFileAttributesA = {};
@@ -3472,6 +3363,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID /*lpReserved*/)
             mhFindNextFileW = {};
             mhFindFirstFileExA = {};
             mhFindFirstFileExW = {};
+            mhFindClose = {};
         }
     }
     return TRUE;
