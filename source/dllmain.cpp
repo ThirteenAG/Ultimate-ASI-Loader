@@ -1461,11 +1461,8 @@ namespace OverloadFromFolder
             auto filePath = lpFilename;
             auto absolutePath = std::filesystem::absolute(filePath, ec);
             auto relativePath = lexicallyRelativeCaseIns(absolutePath, gamePath);
-
-            if (*relativePath.begin() == sFileLoaderPath)
-                return {};
-
             auto commonPath = gamePath;
+
             if (starts_with(relativePath, ".."))
             {
                 auto common = std::mismatch(absolutePath.begin(), absolutePath.end(), gamePath.begin());
@@ -1480,6 +1477,9 @@ namespace OverloadFromFolder
                 }
                 relativePath = rp;
             }
+
+            if (*relativePath.begin() == sFileLoaderPath)
+                return {};
 
             if (starts_with(std::filesystem::path(absolutePath).remove_filename(), gamePath) || starts_with(std::filesystem::path(absolutePath).remove_filename(), commonPath))
             {
@@ -1595,6 +1595,9 @@ namespace OverloadFromFolder
         std::error_code ec;
         LARGE_INTEGER result = {};
 
+        if (!filename || filename[0] == 0)
+            return result;
+
         auto fullpath = std::filesystem::path(dir).remove_filename() / filename;
         auto name = fullpath.filename();
         if (name == "." || name == ".." || name == "*" || name == "?")
@@ -1703,91 +1706,7 @@ namespace OverloadFromFolder
         if (isRecursive(raddr))
             return ret;
 
-        mFindFileDirsA[ret] = lpFileName;
-
-        auto i = FindFileCheckOverloadedPath(lpFileName, lpFindFileData->cFileName);
-        if (i.QuadPart)
-        {
-            lpFindFileData->nFileSizeHigh = i.HighPart;
-            lpFindFileData->nFileSizeLow = i.LowPart;
-        }
-
-        return ret;
-    }
-
-    BOOL WINAPI shCustomFindNextFileA(HANDLE hFindFile, LPWIN32_FIND_DATAA lpFindFileData)
-    {
-        auto raddr = _ReturnAddress();
-        auto ret = mhFindNextFileA->get_original<decltype(FindNextFileA)>()(hFindFile, lpFindFileData);
-
-        if (isRecursive(raddr))
-            return ret;
-
-        auto it = mFindFileDirsA.find(hFindFile);
-        if (it != mFindFileDirsA.end())
-        {
-            auto i = FindFileCheckOverloadedPath(it->second, lpFindFileData->cFileName);
-            if (i.QuadPart)
-            {
-                lpFindFileData->nFileSizeHigh = i.HighPart;
-                lpFindFileData->nFileSizeLow = i.LowPart;
-            }
-        }
-
-        return ret;
-    }
-
-    HANDLE WINAPI shCustomFindFirstFileW(LPCWSTR lpFileName, LPWIN32_FIND_DATAW lpFindFileData)
-    {
-        auto raddr = _ReturnAddress();
-        auto ret = mhFindFirstFileW->get_original<decltype(FindFirstFileW)>()(lpFileName, lpFindFileData);
-
-        if (isRecursive(raddr))
-            return ret;
-
-        mFindFileDirsW[ret] = lpFileName;
-
-        auto i = FindFileCheckOverloadedPath(lpFileName, lpFindFileData->cFileName);
-        if (i.QuadPart)
-        {
-            lpFindFileData->nFileSizeHigh = i.HighPart;
-            lpFindFileData->nFileSizeLow = i.LowPart;
-        }
-
-        return ret;
-    }
-
-    BOOL WINAPI shCustomFindNextFileW(HANDLE hFindFile, LPWIN32_FIND_DATAW lpFindFileData)
-    {
-        auto raddr = _ReturnAddress();
-        auto ret = mhFindNextFileW->get_original<decltype(FindNextFileW)>()(hFindFile, lpFindFileData);
-
-        if (isRecursive(raddr))
-            return ret;
-
-        auto it = mFindFileDirsW.find(hFindFile);
-        if (it != mFindFileDirsW.end())
-        {
-            auto i = FindFileCheckOverloadedPath(it->second, lpFindFileData->cFileName);
-            if (i.QuadPart)
-            {
-                lpFindFileData->nFileSizeHigh = i.HighPart;
-                lpFindFileData->nFileSizeLow = i.LowPart;
-            }
-        }
-
-        return ret;
-    }
-
-    HANDLE WINAPI shCustomFindFirstFileExA(LPCSTR lpFileName, FINDEX_INFO_LEVELS fInfoLevelId, WIN32_FIND_DATAA* lpFindFileData, FINDEX_SEARCH_OPS fSearchOp, LPVOID lpSearchFilter, DWORD dwAdditionalFlags)
-    {
-        auto raddr = _ReturnAddress();
-        auto ret = mhFindFirstFileExA->get_original<decltype(FindFirstFileExA)>()(lpFileName, fInfoLevelId, lpFindFileData, fSearchOp, lpSearchFilter, dwAdditionalFlags);
-
-        if (isRecursive(raddr))
-            return ret;
-
-        if (fInfoLevelId != FindExInfoMaxInfoLevel)
+        if (ret != INVALID_HANDLE_VALUE)
         {
             mFindFileDirsA[ret] = lpFileName;
 
@@ -1802,15 +1721,40 @@ namespace OverloadFromFolder
         return ret;
     }
 
-    HANDLE WINAPI shCustomFindFirstFileExW(LPCWSTR lpFileName, FINDEX_INFO_LEVELS fInfoLevelId, WIN32_FIND_DATAW* lpFindFileData, FINDEX_SEARCH_OPS fSearchOp, LPVOID lpSearchFilter, DWORD dwAdditionalFlags)
+    BOOL WINAPI shCustomFindNextFileA(HANDLE hFindFile, LPWIN32_FIND_DATAA lpFindFileData)
     {
         auto raddr = _ReturnAddress();
-        auto ret = mhFindFirstFileExW->get_original<decltype(FindFirstFileExW)>()(lpFileName, fInfoLevelId, lpFindFileData, fSearchOp, lpSearchFilter, dwAdditionalFlags);
+        auto ret = mhFindNextFileA->get_original<decltype(FindNextFileA)>()(hFindFile, lpFindFileData);
 
         if (isRecursive(raddr))
             return ret;
 
-        if (fInfoLevelId != FindExInfoMaxInfoLevel)
+        if (ret)
+        {
+            auto it = mFindFileDirsA.find(hFindFile);
+            if (it != mFindFileDirsA.end())
+            {
+                auto i = FindFileCheckOverloadedPath(it->second, lpFindFileData->cFileName);
+                if (i.QuadPart)
+                {
+                    lpFindFileData->nFileSizeHigh = i.HighPart;
+                    lpFindFileData->nFileSizeLow = i.LowPart;
+                }
+            }
+        }
+
+        return ret;
+    }
+
+    HANDLE WINAPI shCustomFindFirstFileW(LPCWSTR lpFileName, LPWIN32_FIND_DATAW lpFindFileData)
+    {
+        auto raddr = _ReturnAddress();
+        auto ret = mhFindFirstFileW->get_original<decltype(FindFirstFileW)>()(lpFileName, lpFindFileData);
+
+        if (isRecursive(raddr))
+            return ret;
+
+        if (ret != INVALID_HANDLE_VALUE)
         {
             mFindFileDirsW[ret] = lpFileName;
 
@@ -1819,6 +1763,83 @@ namespace OverloadFromFolder
             {
                 lpFindFileData->nFileSizeHigh = i.HighPart;
                 lpFindFileData->nFileSizeLow = i.LowPart;
+            }
+        }
+
+        return ret;
+    }
+
+    BOOL WINAPI shCustomFindNextFileW(HANDLE hFindFile, LPWIN32_FIND_DATAW lpFindFileData)
+    {
+        auto raddr = _ReturnAddress();
+        auto ret = mhFindNextFileW->get_original<decltype(FindNextFileW)>()(hFindFile, lpFindFileData);
+
+        if (isRecursive(raddr))
+            return ret;
+
+        if (ret)
+        {
+            auto it = mFindFileDirsW.find(hFindFile);
+            if (it != mFindFileDirsW.end())
+            {
+                auto i = FindFileCheckOverloadedPath(it->second, lpFindFileData->cFileName);
+                if (i.QuadPart)
+                {
+                    lpFindFileData->nFileSizeHigh = i.HighPart;
+                    lpFindFileData->nFileSizeLow = i.LowPart;
+                }
+            }
+        }
+
+        return ret;
+    }
+
+    HANDLE WINAPI shCustomFindFirstFileExA(LPCSTR lpFileName, FINDEX_INFO_LEVELS fInfoLevelId, WIN32_FIND_DATAA* lpFindFileData, FINDEX_SEARCH_OPS fSearchOp, LPVOID lpSearchFilter, DWORD dwAdditionalFlags)
+    {
+        auto raddr = _ReturnAddress();
+        auto ret = mhFindFirstFileExA->get_original<decltype(FindFirstFileExA)>()(lpFileName, fInfoLevelId, lpFindFileData, fSearchOp, lpSearchFilter, dwAdditionalFlags);
+
+        if (isRecursive(raddr))
+            return ret;
+
+        if (ret != INVALID_HANDLE_VALUE)
+        {
+            if (fInfoLevelId != FindExInfoMaxInfoLevel)
+            {
+                mFindFileDirsA[ret] = lpFileName;
+
+                auto i = FindFileCheckOverloadedPath(lpFileName, lpFindFileData->cFileName);
+                if (i.QuadPart)
+                {
+                    lpFindFileData->nFileSizeHigh = i.HighPart;
+                    lpFindFileData->nFileSizeLow = i.LowPart;
+                }
+            }
+        }
+
+        return ret;
+    }
+
+    HANDLE WINAPI shCustomFindFirstFileExW(LPCWSTR lpFileName, FINDEX_INFO_LEVELS fInfoLevelId, WIN32_FIND_DATAW* lpFindFileData, FINDEX_SEARCH_OPS fSearchOp, LPVOID lpSearchFilter, DWORD dwAdditionalFlags)
+    {
+        auto raddr = _ReturnAddress();
+        auto ret = mhFindFirstFileExW->get_original<decltype(FindFirstFileExW)>()(lpFileName, fInfoLevelId, lpFindFileData, fSearchOp, lpSearchFilter, dwAdditionalFlags);
+
+        if (isRecursive(raddr))
+            return ret;
+
+        if (ret != INVALID_HANDLE_VALUE)
+        {
+            if (fInfoLevelId != FindExInfoMaxInfoLevel)
+            {
+                mFindFileDirsW[ret] = lpFileName;
+
+                auto i = FindFileCheckOverloadedPath(lpFileName, lpFindFileData->cFileName);
+                if (i.QuadPart)
+                {
+                    lpFindFileData->nFileSizeHigh = i.HighPart;
+                    lpFindFileData->nFileSizeLow = i.LowPart;
+                }
             }
         }
 
