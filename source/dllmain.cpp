@@ -1590,25 +1590,29 @@ namespace OverloadFromFolder
     #define value_orA(path1, path2) (path1.empty() ? path2 : path1.string().c_str())
     #define value_orW(path1, path2) (path1.empty() ? path2 : path1.wstring().c_str())
 
-    LARGE_INTEGER FindFileCheckOverloadedPath(auto dir, auto filename)
+    void FindFileCheckOverloadedPath(auto dir, auto lpFindFileData, auto filename)
     {
-        std::error_code ec;
-        LARGE_INTEGER result = {};
-
         if (!filename || filename[0] == 0)
-            return result;
+            return;
 
         auto fullpath = std::filesystem::path(dir).remove_filename() / filename;
         auto name = fullpath.filename();
         if (name == "." || name == ".." || name == "*" || name == "?")
-            return result;
+            return;
 
         auto newPath = GetFilePathForOverload(fullpath);
 
+        std::error_code ec;
         if (!newPath.empty() && std::filesystem::is_regular_file(newPath, ec))
-            result.QuadPart = std::filesystem::file_size(newPath, ec);
-
-        return result;
+        {
+            lpFindFileData->dwFileAttributes = FILE_ATTRIBUTE_NORMAL;
+            auto fileSize = std::filesystem::file_size(newPath, ec);
+            lpFindFileData->nFileSizeHigh = static_cast<DWORD>(fileSize >> 32);
+            lpFindFileData->nFileSizeLow = static_cast<DWORD>(fileSize & 0xFFFFFFFF);
+            //lpFindFileData->ftCreationTime;
+            //lpFindFileData->ftLastAccessTime;
+            //lpFindFileData->ftLastWriteTime;
+        }
     }
 
     bool isRecursive(auto addr)
@@ -1709,13 +1713,7 @@ namespace OverloadFromFolder
         if (ret != INVALID_HANDLE_VALUE)
         {
             mFindFileDirsA[ret] = lpFileName;
-
-            auto i = FindFileCheckOverloadedPath(lpFileName, lpFindFileData->cFileName);
-            if (i.QuadPart)
-            {
-                lpFindFileData->nFileSizeHigh = i.HighPart;
-                lpFindFileData->nFileSizeLow = i.LowPart;
-            }
+            FindFileCheckOverloadedPath(lpFileName, lpFindFileData, lpFindFileData->cFileName);
         }
 
         return ret;
@@ -1733,14 +1731,7 @@ namespace OverloadFromFolder
         {
             auto it = mFindFileDirsA.find(hFindFile);
             if (it != mFindFileDirsA.end())
-            {
-                auto i = FindFileCheckOverloadedPath(it->second, lpFindFileData->cFileName);
-                if (i.QuadPart)
-                {
-                    lpFindFileData->nFileSizeHigh = i.HighPart;
-                    lpFindFileData->nFileSizeLow = i.LowPart;
-                }
-            }
+                FindFileCheckOverloadedPath(it->second, lpFindFileData, lpFindFileData->cFileName);
         }
 
         return ret;
@@ -1757,13 +1748,7 @@ namespace OverloadFromFolder
         if (ret != INVALID_HANDLE_VALUE)
         {
             mFindFileDirsW[ret] = lpFileName;
-
-            auto i = FindFileCheckOverloadedPath(lpFileName, lpFindFileData->cFileName);
-            if (i.QuadPart)
-            {
-                lpFindFileData->nFileSizeHigh = i.HighPart;
-                lpFindFileData->nFileSizeLow = i.LowPart;
-            }
+            FindFileCheckOverloadedPath(lpFileName, lpFindFileData, lpFindFileData->cFileName);
         }
 
         return ret;
@@ -1781,14 +1766,7 @@ namespace OverloadFromFolder
         {
             auto it = mFindFileDirsW.find(hFindFile);
             if (it != mFindFileDirsW.end())
-            {
-                auto i = FindFileCheckOverloadedPath(it->second, lpFindFileData->cFileName);
-                if (i.QuadPart)
-                {
-                    lpFindFileData->nFileSizeHigh = i.HighPart;
-                    lpFindFileData->nFileSizeLow = i.LowPart;
-                }
-            }
+                FindFileCheckOverloadedPath(it->second, lpFindFileData, lpFindFileData->cFileName);
         }
 
         return ret;
@@ -1807,13 +1785,7 @@ namespace OverloadFromFolder
             if (fInfoLevelId != FindExInfoMaxInfoLevel)
             {
                 mFindFileDirsA[ret] = lpFileName;
-
-                auto i = FindFileCheckOverloadedPath(lpFileName, lpFindFileData->cFileName);
-                if (i.QuadPart)
-                {
-                    lpFindFileData->nFileSizeHigh = i.HighPart;
-                    lpFindFileData->nFileSizeLow = i.LowPart;
-                }
+                FindFileCheckOverloadedPath(lpFileName, lpFindFileData, lpFindFileData->cFileName);
             }
         }
 
@@ -1833,13 +1805,7 @@ namespace OverloadFromFolder
             if (fInfoLevelId != FindExInfoMaxInfoLevel)
             {
                 mFindFileDirsW[ret] = lpFileName;
-
-                auto i = FindFileCheckOverloadedPath(lpFileName, lpFindFileData->cFileName);
-                if (i.QuadPart)
-                {
-                    lpFindFileData->nFileSizeHigh = i.HighPart;
-                    lpFindFileData->nFileSizeLow = i.LowPart;
-                }
+                FindFileCheckOverloadedPath(lpFileName, lpFindFileData, lpFindFileData->cFileName);
             }
         }
 
