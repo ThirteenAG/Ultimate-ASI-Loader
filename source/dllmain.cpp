@@ -61,27 +61,65 @@ bool IsPackagedProcess()
     return bIsPackagedProcess;
 }
 
+static bool g_userInteracted = false;
+static UINT_PTR g_timerID = 1;
+static int g_remainingSeconds = 10;
+static HWND g_mainDialogHwnd = NULL;
+static POINT g_lastMousePos = { -1, -1 };
+static HHOOK g_hMouseHook = NULL;
+
+LRESULT CALLBACK LowLevelMouseProc(int nCode, WPARAM wParam, LPARAM lParam)
+{
+    if (nCode == HC_ACTION && wParam == WM_MOUSEMOVE)
+    {
+        MSLLHOOKSTRUCT* pMouseStruct = (MSLLHOOKSTRUCT*)lParam;
+        if (pMouseStruct)
+        {
+            if (g_lastMousePos.x != -1 && (g_lastMousePos.x != pMouseStruct->pt.x || g_lastMousePos.y != pMouseStruct->pt.y))
+            {
+                if (!g_userInteracted)
+                {
+                    g_userInteracted = true;
+                    KillTimer(g_mainDialogHwnd, g_timerID);
+                    SendMessage(g_mainDialogHwnd, TDM_SET_ELEMENT_TEXT, TDE_FOOTER, (LPARAM)szFooter);
+                    SendMessage(g_mainDialogHwnd, TDM_SET_PROGRESS_BAR_POS, 0, 0);
+                    if (g_hMouseHook)
+                    {
+                        UnhookWindowsHookEx(g_hMouseHook);
+                        g_hMouseHook = NULL;
+                    }
+                }
+            }
+            g_lastMousePos = pMouseStruct->pt;
+        }
+    }
+    return CallNextHookEx(g_hMouseHook, nCode, wParam, lParam);
+}
+
 HRESULT CALLBACK TaskDialogCallbackProc(HWND hwnd, UINT uNotification, WPARAM wParam, LPARAM lParam, LONG_PTR dwRefData)
 {
     constexpr int countdownSeconds = 10;
-    static bool userInteracted = false;
-    static UINT_PTR timerID = 1;
-    static int remainingSeconds = countdownSeconds;
-    static auto mainDialogHwnd = hwnd;
 
     switch (uNotification)
     {
     case TDN_CREATED:
     {
+        g_mainDialogHwnd = hwnd;
+        g_userInteracted = false;
+        g_remainingSeconds = countdownSeconds;
+        g_lastMousePos = { -1, -1 };
+
         // Initialize progress bar
         SendMessage(hwnd, TDM_SET_PROGRESS_BAR_RANGE, 0, MAKELPARAM(0, countdownSeconds));
         SendMessage(hwnd, TDM_SET_PROGRESS_BAR_POS, countdownSeconds, 0);
 
         // Set timer for countdown (1000ms = 1 second)
-        timerID = SetTimer(mainDialogHwnd, timerID, 1000, NULL);
+        g_timerID = SetTimer(g_mainDialogHwnd, g_timerID, 1000, NULL);
 
-        // Create a hook to capture ALL window messages for this thread
-        // This is more reliable than window subclassing for complex dialogs
+        // Set up a low-level mouse hook to detect any mouse movement.
+        g_hMouseHook = SetWindowsHookEx(WH_MOUSE_LL, LowLevelMouseProc, GetModuleHandle(NULL), 0);
+
+        // Create a hook to capture other messages for this thread
         SetWindowsHookEx(WH_GETMESSAGE, [](int nCode, WPARAM wParam, LPARAM lParam) -> LRESULT
         {
             if (nCode >= 0 && wParam == PM_REMOVE)
@@ -89,20 +127,21 @@ HRESULT CALLBACK TaskDialogCallbackProc(HWND hwnd, UINT uNotification, WPARAM wP
                 MSG* msg = (MSG*)lParam;
                 switch (msg->message)
                 {
-                case WM_MOUSEMOVE:
                 case WM_KEYDOWN:
                 case WM_LBUTTONDOWN:
                 case WM_RBUTTONDOWN:
                 case WM_MBUTTONDOWN:
-                    if (!userInteracted)
+                    if (!g_userInteracted)
                     {
-                        if (msg->message == WM_MOUSEMOVE && remainingSeconds >= countdownSeconds - 1)
-                            break;
-
-                        userInteracted = true;
-                        KillTimer(mainDialogHwnd, timerID);
-                        SendMessage(mainDialogHwnd, TDM_SET_ELEMENT_TEXT, TDE_FOOTER, (LPARAM)szFooter);
-                        SendMessage(mainDialogHwnd, TDM_SET_PROGRESS_BAR_POS, 0, 0);
+                        g_userInteracted = true;
+                        KillTimer(g_mainDialogHwnd, g_timerID);
+                        SendMessage(g_mainDialogHwnd, TDM_SET_ELEMENT_TEXT, TDE_FOOTER, (LPARAM)szFooter);
+                        SendMessage(g_mainDialogHwnd, TDM_SET_PROGRESS_BAR_POS, 0, 0);
+                        if (g_hMouseHook)
+                        {
+                            UnhookWindowsHookEx(g_hMouseHook);
+                            g_hMouseHook = NULL;
+                        }
                     }
                     break;
                 }
@@ -111,38 +150,47 @@ HRESULT CALLBACK TaskDialogCallbackProc(HWND hwnd, UINT uNotification, WPARAM wP
         }, NULL, GetCurrentThreadId());
     }
     break;
-    case TDN_TIMER:
-        if (remainingSeconds > 0 && !userInteracted)
+    case TDN_DESTROYED:
+        if (g_hMouseHook)
         {
-            remainingSeconds--;
-            SendMessage(hwnd, TDM_SET_PROGRESS_BAR_POS, remainingSeconds, 0);
+            UnhookWindowsHookEx(g_hMouseHook);
+            g_hMouseHook = NULL;
+        }
+        break;
+    case TDN_TIMER:
+        if (g_remainingSeconds > 0 && !g_userInteracted)
+        {
+            g_remainingSeconds--;
+            SendMessage(hwnd, TDM_SET_PROGRESS_BAR_POS, g_remainingSeconds, 0);
 
-            std::wstring progressText = L"Auto-closing in " + std::to_wstring(remainingSeconds) + L" seconds...";
+            std::wstring progressText = L"Auto-closing in " + std::to_wstring(g_remainingSeconds) + L" seconds...";
             SendMessage(hwnd, TDM_SET_ELEMENT_TEXT, TDE_FOOTER, (LPARAM)progressText.c_str());
 
-            if (remainingSeconds == 0)
+            if (g_remainingSeconds == 0)
             {
-                KillTimer(hwnd, timerID);
+                KillTimer(hwnd, g_timerID);
                 SendMessage(hwnd, TDM_CLICK_BUTTON, DEFAULT_BUTTON, 0);
             }
         }
-    break;
+        break;
     case TDN_BUTTON_CLICKED:
-        if (!userInteracted) {
-            userInteracted = true;
-            KillTimer(hwnd, timerID);
+        if (!g_userInteracted)
+        {
+            g_userInteracted = true;
+            KillTimer(hwnd, g_timerID);
             SendMessage(hwnd, TDM_SET_PROGRESS_BAR_POS, 0, 0);
         }
-    break;
+        break;
     case TDN_HYPERLINK_CLICKED:
         ShellExecuteW(hwnd, L"open", (LPCWSTR)lParam, NULL, NULL, SW_SHOW);
-        if (!userInteracted) {
-            userInteracted = true;
-            KillTimer(hwnd, timerID);
+        if (!g_userInteracted)
+        {
+            g_userInteracted = true;
+            KillTimer(hwnd, g_timerID);
             SendMessage(hwnd, TDM_SET_ELEMENT_TEXT, TDE_FOOTER, (LPARAM)szFooter);
             SendMessage(hwnd, TDM_SET_PROGRESS_BAR_POS, 0, 0);
         }
-    break;
+        break;
     }
 
     return S_OK;
