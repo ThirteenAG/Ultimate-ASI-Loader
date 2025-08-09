@@ -27,7 +27,20 @@ typedef NTSTATUS(NTAPI* LdrAddRefDll_t)(ULONG, HMODULE);
 
 namespace OverloadFromFolder
 {
+    struct FileLoaderPathEntry
+    {
+        std::filesystem::path path;
+        std::vector<std::filesystem::path> dependencies;
+        int priority;
+        bool isLessThanDependency = false; // true for '<', false for '>'
+    };
+
+    std::filesystem::path gamePath;
+    std::vector<FileLoaderPathEntry> sFileLoaderEntries;
+    std::vector<std::filesystem::path> sActiveDirectories;
+
     void HookAPIForOverload();
+    std::vector<std::filesystem::path> DetermineActiveDirectories(const std::vector<FileLoaderPathEntry>& entries, const std::filesystem::path& selectedPath);
 }
 
 bool WINAPI IsUltimateASILoader()
@@ -198,12 +211,7 @@ HRESULT CALLBACK TaskDialogCallbackProc(HWND hwnd, UINT uNotification, WPARAM wP
 
 HMODULE hm;
 std::vector<std::wstring> iniPaths;
-std::filesystem::path sFileLoaderPath;
-std::vector<std::filesystem::path> sFileLoaderPaths;
-std::filesystem::path gamePath;
 std::wstring sLoadFromAPI;
-thread_local std::unordered_map<HANDLE, std::string> mFindFileDirsA;
-thread_local std::unordered_map<HANDLE, std::wstring> mFindFileDirsW;
 
 bool iequals(std::wstring_view s1, std::wstring_view s2)
 {
@@ -259,6 +267,23 @@ std::filesystem::path lexicallyRelativeCaseIns(const std::filesystem::path& path
         result /= element;
     }
     return result;
+}
+
+bool FolderExists(auto szPath)
+{
+    try
+    {
+        auto path = std::filesystem::path(szPath);
+        if (path.is_absolute())
+            return std::filesystem::is_directory(path);
+        else
+            return std::filesystem::is_directory(std::filesystem::path(GetModuleFileNameW(NULL)).parent_path() / path);
+    }
+    catch (...)
+    {
+    }
+
+    return false;
 }
 
 std::wstring to_wstring(std::string_view cstr)
@@ -980,17 +1005,18 @@ void LoadPlugins()
         }
 
         FindPlugins(
-          fd, L"scripts", szSelfPath.c_str(), nWantsToLoadRecursively);
+            fd, L"scripts", szSelfPath.c_str(), nWantsToLoadRecursively);
 
         FindPlugins(
-          fd, L"plugins", szSelfPath.c_str(), nWantsToLoadRecursively);
+            fd, L"plugins", szSelfPath.c_str(), nWantsToLoadRecursively);
 
-        if (!sFileLoaderPath.empty())
+        // Load plugins from active directories if they exist
+        for (const auto& activeDir : OverloadFromFolder::sActiveDirectories)
         {
             FindPlugins(fd,
-                        sFileLoaderPath.c_str(),
-                        szSelfPath.c_str(),
-                        nWantsToLoadRecursively);
+                activeDir.c_str(),
+                szSelfPath.c_str(),
+                nWantsToLoadRecursively);
         }
     }
 
@@ -1042,12 +1068,16 @@ void LoadPluginsAndRestoreIAT(uintptr_t retaddr, std::wstring_view calledFrom = 
         }
     }
 
-    if (sFileLoaderPaths.size() >= 1)
     {
-        sFileLoaderPath = sFileLoaderPaths.front().make_preferred();
-
-        if (sFileLoaderPaths.size() > 1)
+        using namespace OverloadFromFolder;
+        if (sFileLoaderEntries.size() > 1)
         {
+            std::vector<std::filesystem::path> pathsForDialog;
+            for (const auto& entry : sFileLoaderEntries)
+            {
+                pathsForDialog.push_back(entry.path);
+            }
+
             constexpr auto dialogMutexName = L"Global\\UltimateASILoader-FolderSelectDialog-Mutex";
             auto hDialogMutex = CreateMutexW(NULL, TRUE, dialogMutexName);
 
@@ -1059,12 +1089,12 @@ void LoadPluginsAndRestoreIAT(uintptr_t retaddr, std::wstring_view calledFrom = 
 
             int buttonId = DEFAULT_BUTTON;
             std::vector<TASKDIALOG_BUTTON> aButtons;
-            aButtons.reserve(sFileLoaderPaths.size() + 1);
+            aButtons.reserve(pathsForDialog.size());
             std::vector<std::wstring> buttonTexts;
-            buttonTexts.reserve(sFileLoaderPaths.size() + 1);
-            
+            buttonTexts.reserve(pathsForDialog.size());
+
             std::error_code ec;
-            for (const auto& path : sFileLoaderPaths)
+            for (const auto& path : pathsForDialog)
             {
                 auto header = path.wstring();
                 auto updateTxtPath = path / "update.txt";
@@ -1083,11 +1113,23 @@ void LoadPluginsAndRestoreIAT(uintptr_t retaddr, std::wstring_view calledFrom = 
                     }
                 }
 
-                std::wstring buttonText = std::wstring(L"&") + header + L"\n" + std::filesystem::absolute(path, ec).wstring();
+                auto activeDirs = DetermineActiveDirectories(sFileLoaderEntries, path);
+                auto pathWithRelations = std::filesystem::absolute(path, ec).wstring();
+                if (activeDirs.size() > 1)
+                {
+                    pathWithRelations += L" + ";
+                    for (size_t i = 1; i < activeDirs.size(); ++i)
+                    {
+                        if (i > 1) pathWithRelations += L" + ";
+                        pathWithRelations += activeDirs[i].filename().wstring();
+                    }
+                }
+
+                std::wstring buttonText = std::wstring(L"&") + header + L"\n" + pathWithRelations;
                 buttonTexts.push_back(buttonText);
                 aButtons.push_back({ buttonId++, buttonTexts.back().c_str() });
             }
-            
+
             // Add a "Cancel" option
             //buttonTexts.push_back(L"Cancel");
             //aButtons.push_back({ IDCANCEL, buttonTexts.back().c_str() });
@@ -1099,7 +1141,7 @@ void LoadPluginsAndRestoreIAT(uintptr_t retaddr, std::wstring_view calledFrom = 
             LPCWSTR szTitle = L"ASI Loader";
             LPCWSTR szHeader = L"Select Override (Update) Folder";
             LPCWSTR szContent = L"Multiple folders have been specified for file overloading.\nPlease select which folder you want to use:";
-            
+
             tdc.hwndParent = NULL;
             tdc.dwFlags = TDF_USE_COMMAND_LINKS | TDF_ENABLE_HYPERLINKS | TDF_SIZE_TO_CONTENT | TDF_CAN_BE_MINIMIZED;
             tdc.pButtons = aButtons.data();
@@ -1113,30 +1155,33 @@ void LoadPluginsAndRestoreIAT(uintptr_t retaddr, std::wstring_view calledFrom = 
             tdc.nDefaultButton = DEFAULT_BUTTON;
             tdc.pszFooter = szFooter;
             tdc.pszFooterIcon = TD_INFORMATION_ICON;
-            
+
             if (!IsPackagedProcess())
             {
-                // Configure the TaskDialog with progress bar and timer
                 tdc.dwFlags |= TDF_SHOW_PROGRESS_BAR | TDF_CALLBACK_TIMER;
                 tdc.pfCallback = TaskDialogCallbackProc;
 
-                if (SUCCEEDED(TaskDialogIndirect(&tdc, &nClickedBtn, NULL, &bCheckboxChecked)) && nClickedBtn != IDCANCEL) {
+                if (SUCCEEDED(TaskDialogIndirect(&tdc, &nClickedBtn, NULL, &bCheckboxChecked)) && nClickedBtn != IDCANCEL)
+                {
                     int selectedIndex = nClickedBtn - DEFAULT_BUTTON;
-                    auto& path = sFileLoaderPaths[selectedIndex];
-                    sFileLoaderPath = path.make_preferred();
+                    auto& selectedPath = pathsForDialog[selectedIndex];
+
+                    // Set active directories based on user selection
+                    sActiveDirectories = DetermineActiveDirectories(sFileLoaderEntries, selectedPath);
                 }
             }
             else
             {
-                for (auto& path : sFileLoaderPaths)
+                for (size_t i = 0; i < pathsForDialog.size(); ++i)
                 {
+                    const auto& path = pathsForDialog[i];
                     std::wstring message = L"Multiple folders have been specified for file overloading.\nUse this folder?\n\n";
                     message += path.wstring() + L"\n" + std::filesystem::absolute(path, ec).wstring();
 
                     auto result = MessageBoxW(NULL, message.c_str(), szTitle, MB_YESNO | MB_ICONQUESTION);
                     if (result == IDYES)
                     {
-                        sFileLoaderPath = path.make_preferred();
+                        sActiveDirectories = DetermineActiveDirectories(sFileLoaderEntries, path);
                         break;
                     }
                 }
@@ -1147,11 +1192,14 @@ void LoadPluginsAndRestoreIAT(uintptr_t retaddr, std::wstring_view calledFrom = 
                 ReleaseMutex(hDialogMutex);
                 CloseHandle(hDialogMutex);
             }
+
+            HookAPIForOverload();
         }
-
-        OverloadFromFolder::HookAPIForOverload();
-
-        sFileLoaderPaths.clear();
+        else if (sFileLoaderEntries.size() == 1)
+        {
+            sActiveDirectories = DetermineActiveDirectories(sFileLoaderEntries, sFileLoaderEntries[0].path);
+            HookAPIForOverload();
+        }
     }
 
     LoadEverything();
@@ -1489,6 +1537,240 @@ namespace OverloadFromFolder
     std::unique_ptr<FunctionHookMinHook> mhFindFirstFileExW = { nullptr };
     std::unique_ptr<FunctionHookMinHook> mhFindClose = { nullptr };
 
+    thread_local std::unordered_map<HANDLE, std::string> mFindFileDirsA;
+    thread_local std::unordered_map<HANDLE, std::wstring> mFindFileDirsW;
+
+    std::vector<FileLoaderPathEntry> ParseMultiplePathsWithPriority(const std::wstring& pathsString)
+    {
+        std::vector<FileLoaderPathEntry> entries;
+        std::wstring::size_type start = 0;
+
+        auto trim = [](const std::wstring& str) -> std::wstring {
+            const auto first = str.find_first_not_of(L" \t\r\n");
+            if (first == std::wstring::npos)
+                return L"";
+            const auto last = str.find_last_not_of(L" \t\r\n");
+            return str.substr(first, last - first + 1);
+        };
+
+        auto removeQuotes = [](const std::wstring& str) -> std::wstring {
+            if (str.size() >= 2 && str.front() == L'"' && str.back() == L'"')
+                return str.substr(1, str.size() - 2);
+            return str;
+        };
+
+        auto findLastOfBefore = [](const std::wstring& str, const std::wstring& chars, std::wstring::size_type pos) -> std::wstring::size_type {
+            if (pos == 0) return std::wstring::npos;
+            for (std::wstring::size_type i = pos - 1; i != std::wstring::npos; --i)
+            {
+                if (chars.find(str[i]) != std::wstring::npos)
+                    return i;
+            }
+            return std::wstring::npos;
+        };
+
+        int currentPriority = 1000; // Start with high priority
+
+        // First pass: Parse paths and handle '<' dependencies
+        while (start < pathsString.length())
+        {
+            auto end = pathsString.find_first_of(L"|<>", start);
+            if (end == std::wstring::npos) end = pathsString.length();
+
+            std::wstring rawPath = pathsString.substr(start, end - start);
+            std::wstring cleanPath = removeQuotes(trim(rawPath));
+
+            if (!cleanPath.empty())
+            {
+                FileLoaderPathEntry entry;
+                entry.path = cleanPath;
+                entry.priority = currentPriority--;
+
+                // Handle '<' dependency during first pass
+                if (end < pathsString.length())
+                {
+                    wchar_t separator = pathsString[end];
+                    if (separator == L'<')
+                    {
+                        auto nextStart = end + 1;
+                        auto nextEnd = pathsString.find_first_of(L"|<>", nextStart);
+                        if (nextEnd == std::wstring::npos) nextEnd = pathsString.length();
+                        std::wstring nextPath = removeQuotes(trim(pathsString.substr(nextStart, nextEnd - nextStart)));
+                        if (!nextPath.empty())
+                        {
+                            entry.dependencies.push_back(nextPath);
+                            entry.isLessThanDependency = true; // '<' syntax
+                        }
+                    }
+                }
+                entries.push_back(entry);
+            }
+
+            start = end == pathsString.length() ? end : end + 1;
+            while (start < pathsString.length() && ::iswspace(pathsString[start]))
+            {
+                start++;
+            }
+        }
+
+        // Second pass: Handle '>' dependencies
+        for (std::wstring::size_type pos = 0; pos < pathsString.length(); ++pos)
+        {
+            if (pathsString[pos] == L'>')
+            {
+                auto beforeStart = findLastOfBefore(pathsString, L"|<>", pos);
+                if (beforeStart == std::wstring::npos) beforeStart = 0;
+                else beforeStart++;
+                auto afterEnd = pathsString.find_first_of(L"|<>", pos + 1);
+                if (afterEnd == std::wstring::npos) afterEnd = pathsString.length();
+
+                std::wstring beforePath = removeQuotes(trim(pathsString.substr(beforeStart, pos - beforeStart)));
+                std::wstring afterPath = removeQuotes(trim(pathsString.substr(pos + 1, afterEnd - pos - 1)));
+
+                // Find the beforePath entry (left side of >) and add afterPath as its dependency
+                for (auto& entry : entries)
+                {
+                    if (entry.path == beforePath)
+                    {
+                        entry.dependencies.push_back(afterPath);
+                        entry.isLessThanDependency = false; // '>' syntax
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Adjust priorities based on dependencies
+        // X < Y = Y has higher priority, X > Y = X has higher priority
+        for (auto& entry : entries)
+        {
+            if (!entry.dependencies.empty())
+            {
+                for (const auto& dep : entry.dependencies)
+                {
+                    for (auto& depEntry : entries)
+                    {
+                        if (depEntry.path == dep)
+                        {
+                            if (entry.isLessThanDependency)
+                            {
+                                // '<' syntax: entry < dep, so dep should have higher priority
+                                if (depEntry.priority <= entry.priority)
+                                {
+                                    depEntry.priority = entry.priority + 1;
+                                }
+                            }
+                            else
+                            {
+                                // '>' syntax: entry > dep, so entry should have higher priority
+                                if (entry.priority <= depEntry.priority)
+                                {
+                                    entry.priority = depEntry.priority + 1;
+                                }
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        return entries;
+    }
+
+    auto FilterExistingPathEntries = [](std::vector<FileLoaderPathEntry>& entries) -> bool {
+        bool anyExists = false;
+        entries.erase(std::remove_if(entries.begin(), entries.end(), [&](const FileLoaderPathEntry& entry)
+        {
+            bool exists = FolderExists(entry.path);
+            anyExists |= exists;
+            return !exists;
+        }), entries.end());
+        return anyExists;
+    };
+
+    std::vector<std::filesystem::path> DetermineActiveDirectories(const std::vector<FileLoaderPathEntry>& entries, const std::filesystem::path& selectedPath)
+    {
+        std::set<std::filesystem::path> pathsToKeep;
+        std::set<std::filesystem::path> processed;
+
+        // Lambda to recursively find all dependencies
+        std::function<void(const std::filesystem::path&)> addPathAndDependencies = [&](const std::filesystem::path& currentPath) {
+            if (processed.count(currentPath) > 0)
+                return; // Already processed
+            processed.insert(currentPath);
+            pathsToKeep.insert(currentPath);
+
+            // Find the entry for current path
+            const FileLoaderPathEntry* currentEntry = nullptr;
+            for (const auto& entry : entries)
+            {
+                if (entry.path == currentPath)
+                {
+                    currentEntry = &entry;
+                    break;
+                }
+            }
+
+            if (currentEntry)
+            {
+                // For '>' syntax: when selecting left side, also load right side (dependency)
+                if (!currentEntry->isLessThanDependency && !currentEntry->dependencies.empty())
+                {
+                    for (const auto& dep : currentEntry->dependencies)
+                    {
+                        addPathAndDependencies(dep); // Recursive call
+                    }
+                }
+            }
+
+            // For '<' syntax: when selecting right side, also load left side (dependent)
+            for (const auto& entry : entries)
+            {
+                if (entry.isLessThanDependency)
+                {
+                    for (const auto& dep : entry.dependencies)
+                    {
+                        if (dep == currentPath)
+                        {
+                            addPathAndDependencies(entry.path); // Recursive call
+                            break;
+                        }
+                    }
+                }
+            }
+        };
+
+        // Start the recursive process with the selected path
+        addPathAndDependencies(selectedPath);
+
+        // Convert set to vector and sort by priority for proper overriding order
+        std::vector<std::pair<std::filesystem::path, int>> pathsWithPriority;
+        for (const auto& path : pathsToKeep)
+        {
+            for (const auto& entry : entries)
+            {
+                if (entry.path == path)
+                {
+                    pathsWithPriority.emplace_back(path, entry.priority);
+                    break;
+                }
+            }
+        }
+
+        // Sort by priority (higher priority numbers first for file overriding)
+        std::sort(pathsWithPriority.begin(), pathsWithPriority.end(),
+            [](const auto& a, const auto& b) { return a.second > b.second; });
+
+        std::vector<std::filesystem::path> result;
+        for (const auto& pair : pathsWithPriority)
+        {
+            result.push_back(pair.first);
+        }
+
+        return result;
+    }
+
     std::filesystem::path WINAPI GetOverloadedFilePath(std::filesystem::path lpFilename)
     {
         try
@@ -1502,9 +1784,6 @@ namespace OverloadFromFolder
                 std::transform(str2.begin(), str2.end(), str2.begin(), ::tolower);
                 return str1.starts_with(str2);
             };
-
-            if (gamePath.empty())
-                gamePath = std::filesystem::path(GetExeModulePath());
 
             auto filePath = lpFilename;
             auto absolutePath = std::filesystem::absolute(filePath, ec);
@@ -1526,14 +1805,22 @@ namespace OverloadFromFolder
                 relativePath = rp;
             }
 
-            if (*relativePath.begin() == sFileLoaderPath)
-                return {};
+            // Check if file is from any active directory (skip self-reference)
+            for (const auto& activeDir : sActiveDirectories)
+            {
+                if (*relativePath.begin() == activeDir)
+                    return {};
+            }
 
             if (starts_with(std::filesystem::path(absolutePath).remove_filename(), gamePath) || starts_with(std::filesystem::path(absolutePath).remove_filename(), commonPath))
             {
-                auto newPath = gamePath / sFileLoaderPath / relativePath;
-                if (std::filesystem::exists(newPath, ec) && !std::filesystem::is_directory(newPath, ec))
-                    return newPath;
+                // Try each active directory in priority order (first = highest priority)
+                for (const auto& activeDir : sActiveDirectories)
+                {
+                    auto newPath = gamePath / activeDir / relativePath;
+                    if (std::filesystem::exists(newPath, ec) && !std::filesystem::is_directory(newPath, ec))
+                        return newPath;
+                }
             }
         }
         catch (...) {}
@@ -1545,7 +1832,7 @@ namespace OverloadFromFolder
     {
         try
         {
-            if (!sFileLoaderPath.empty())
+            if (!sActiveDirectories.empty())
             {
                 auto path = GetOverloadedFilePath(lpFilename);
                 if (!path.empty())
@@ -1568,7 +1855,7 @@ namespace OverloadFromFolder
     {
         try
         {
-            if (!sFileLoaderPath.empty())
+            if (!sActiveDirectories.empty())
             {
                 auto path = GetOverloadedFilePath(lpFilename);
                 if (!path.empty())
@@ -1591,11 +1878,11 @@ namespace OverloadFromFolder
     {
         try
         {
-            if (!sFileLoaderPath.empty())
+            if (!sActiveDirectories.empty())
             {
                 if (out && out_size)
                 {
-                    auto path = gamePath / sFileLoaderPath;
+                    auto path = gamePath / sActiveDirectories[0]; // Use first active directory
                     out[path.string().copy(out, out_size, 0)] = '\0';
                     return true;
                 }
@@ -1609,11 +1896,11 @@ namespace OverloadFromFolder
     {
         try
         {
-            if (!sFileLoaderPath.empty())
+            if (!sActiveDirectories.empty())
             {
                 if (out && out_size)
                 {
-                    auto path = gamePath / sFileLoaderPath;
+                    auto path = gamePath / sActiveDirectories[0]; // Use first active directory
                     out[path.wstring().copy(out, out_size, 0)] = L'\0';
                     return true;
                 }
@@ -1627,7 +1914,7 @@ namespace OverloadFromFolder
     {
         try
         {
-            if (!sFileLoaderPath.empty())
+            if (!sActiveDirectories.empty())
                 return GetOverloadedFilePath(path);
         }
         catch (...) {}
@@ -3171,32 +3458,17 @@ void Init()
     auto nDisableCrashDumps = GetPrivateProfileIntW(TEXT("globalsets"), TEXT("disablecrashdumps"), FALSE, iniPaths);
     auto sFileLoaderPathIniString = GetPrivateProfileStringW(TEXT("fileloader"), TEXT("overloadfromfolder"), TEXT("update"), iniPaths);
 
-    auto FolderExists = [](auto szPath) -> bool
-    {
-        try
-        {
-            auto path = std::filesystem::path(szPath);
-            if (path.is_absolute())
-                return std::filesystem::is_directory(path);
-            else
-                return std::filesystem::is_directory(std::filesystem::path(GetModuleFileNameW(NULL)).parent_path() / path);
-        }
-        catch (...) {}
-        
-        return false;
-    };
-
     if (!nDisableCrashDumps)
     {
         if (FolderExists(L"CrashDumps"))
         {
             SetUnhandledExceptionFilter(CustomUnhandledExceptionFilter);
             // Now stub out CustomUnhandledExceptionFilter so NO ONE ELSE can set it!
-#if !X64
+            #if !X64
             uint32_t ret = 0x900004C2; //ret4
-#else
+            #else
             uint32_t ret = 0x909090C3; //ret
-#endif
+            #endif
             DWORD protect[2];
             VirtualProtect(&SetUnhandledExceptionFilter, sizeof(ret), PAGE_EXECUTE_READWRITE, &protect[0]);
             memcpy(&SetUnhandledExceptionFilter, &ret, sizeof(ret));
@@ -3204,91 +3476,17 @@ void Init()
         }
     }
 
-    auto ParseMultiplePaths = [](const std::wstring& pathsString, wchar_t delimiter = L'|') -> std::vector<std::filesystem::path>
     {
-        std::vector<std::filesystem::path> paths;
-        std::wstring::size_type start = 0;
-        std::wstring::size_type end = 0;
-
-        auto trim = [](const std::wstring& str) -> std::wstring
+        using namespace OverloadFromFolder;
+        gamePath = std::filesystem::path(GetExeModulePath());
+        sFileLoaderEntries = ParseMultiplePathsWithPriority(sFileLoaderPathIniString);
+        if (!FilterExistingPathEntries(sFileLoaderEntries))
         {
-            const auto first = str.find_first_not_of(L" \t\r\n");
-            if (first == std::wstring::npos)
-                return L"";
-
-            const auto last = str.find_last_not_of(L" \t\r\n");
-            return str.substr(first, last - first + 1);
-        };
-
-        auto removeQuotes = [](const std::wstring& str) -> std::wstring
-        {
-            if (str.size() >= 2 && str.front() == L'"' && str.back() == L'"')
-                return str.substr(1, str.size() - 2);
-            return str;
-        };
-
-        while (start < pathsString.length())
-        {
-            // Handle quoted paths: find the next quote if current position is a quote
-            if (pathsString[start] == L'"')
-            {
-                // Find the closing quote
-                end = pathsString.find(L'"', start + 1);
-                if (end == std::wstring::npos) // No closing quote found
-                    end = pathsString.length();
-                else
-                    end++; // Include the closing quote in the extraction
-
-                // Find the next delimiter after the quoted string
-                std::wstring::size_type nextDelim = pathsString.find(delimiter, end);
-                if (nextDelim != std::wstring::npos)
-                    end = nextDelim;
-                else
-                    end = pathsString.length();
-            }
-            else
-            {
-                // Standard behavior: find next delimiter
-                end = pathsString.find(delimiter, start);
-                if (end == std::wstring::npos)
-                    end = pathsString.length();
-            }
-
-            // Extract and process the path
-            std::wstring rawPath = pathsString.substr(start, end - start);
-            std::wstring path = removeQuotes(trim(rawPath));
-            if (!path.empty())
-                paths.emplace_back(path);
-
-            // Move to the next path
-            start = (end == pathsString.length()) ? end : end + 1;
+            // No valid paths exist - clear everything
+            sFileLoaderEntries.clear();
+            sActiveDirectories.clear();
         }
-
-        return paths;
-    };
-
-    auto FilterExistingPaths = [&FolderExists](std::vector<std::filesystem::path>& paths) -> bool
-    {
-        bool anyExists = false;
-
-        paths.erase(
-            std::remove_if(paths.begin(), paths.end(),
-                [&](const std::filesystem::path& path) {
-                    bool exists = FolderExists(path);
-                    anyExists |= exists;  // Track if any path exists
-                    return !exists;       // Remove if doesn't exist
-                }
-            ),
-            paths.end()
-        );
-
-        return anyExists;
-    };
-
-    sFileLoaderPaths = ParseMultiplePaths(sFileLoaderPathIniString);
-
-    if (!FilterExistingPaths(sFileLoaderPaths))
-        sFileLoaderPath.clear();
+    }
 
     if (nForceEPHook != FALSE || nDontLoadFromDllMain != FALSE)
     {
@@ -3311,7 +3509,7 @@ void Init()
             LoadOriginalLibrary();
         }
 
-        const auto it = std::find_if(std::begin(importedModulesList), std::end(importedModulesList), [&](const auto& str) { return str == "unityplayer.dll"; } );
+        const auto it = std::find_if(std::begin(importedModulesList), std::end(importedModulesList), [&](const auto& str) { return str == "unityplayer.dll"; });
         const auto bUnityPlayerImported = it != std::end(importedModulesList);
 
         HMODULE m = mainModule;
