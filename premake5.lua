@@ -70,7 +70,7 @@ project "Ultimate-ASI-Loader-Win32"
    files { "source/dllmain.h", "source/dllmain.cpp" }
    files { "source/x86.def" }
    files { "source/xlive/xliveless.h", "source/xlive/xliveless.cpp", "source/xlive/xliveless.rc"}
-   files { "source/resources/*.rc" }
+   files { "source/resources/Versioninfo.rc", "source/resources/UALx86.rc" }
    files { "external/d3d8to9/source/*.hpp", "external/d3d8to9/source/*.cpp" }
    files { "external/MemoryModule/*.h", "external/MemoryModule/*.c" }
    files { "external/ModuleList/*.hpp" }
@@ -229,7 +229,7 @@ project "Ultimate-ASI-Loader-x64"
 
    files { "source/dllmain.h", "source/dllmain.cpp" }
    files { "source/x64.def" }
-   files { "source/resources/Versioninfo.rc" }
+   files { "source/resources/Versioninfo.rc", "source/resources/UALx64.rc" }
    
    characterset ("UNICODE")
    

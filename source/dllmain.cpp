@@ -472,6 +472,7 @@ size_t Kernel32Data[Kernel32ExportsNamesCount][Kernel32ExportsDataCount];
 size_t OLE32Data[OLE32ExportsNamesCount][Kernel32ExportsDataCount];
 size_t vccorlibData[vccorlibExportsNamesCount][Kernel32ExportsDataCount];
 
+#define IDI_CUSTOM_ICON 102
 #if !X64
 #define IDR_VORBISF    101
 #define IDR_WNDMODE    103
@@ -861,14 +862,24 @@ void FindFiles(WIN32_FIND_DATAW* fd)
                                 tdc.pButtons = aCustomButtons;
                                 tdc.cButtons = _countof(aCustomButtons);
                                 tdc.pszWindowTitle = szTitle;
-                                tdc.pszMainIcon = TD_ERROR_ICON;
                                 tdc.pszMainInstruction = szHeader;
                                 tdc.pszContent = szContent;
                                 tdc.pfCallback = TaskDialogCallbackProc;
                                 tdc.lpCallbackData = 0;
 
                                 if (!IsPackagedProcess())
+                                {
+                                    if (auto hCustomIcon = (HICON)LoadImage(hm, MAKEINTRESOURCE(IDI_CUSTOM_ICON), IMAGE_ICON, 0, 0, LR_DEFAULTSIZE | LR_SHARED))
+                                    {
+                                        tdc.dwFlags |= TDF_USE_HICON_MAIN;
+                                        tdc.hMainIcon = hCustomIcon;
+                                    }
+                                    else
+                                    {
+                                        tdc.pszMainIcon = TD_ERROR_ICON;
+                                    }
                                     std::ignore = TaskDialogIndirect(&tdc, &nClickedBtn, NULL, &bCheckboxChecked);
+                                }
                                 else
                                     MessageBoxW(NULL, szHeader, szTitle, MB_OK | MB_ICONERROR);
                             }
@@ -1143,11 +1154,10 @@ void LoadPluginsAndRestoreIAT(uintptr_t retaddr, std::wstring_view calledFrom = 
             LPCWSTR szContent = L"Multiple folders have been specified for file overloading.\nPlease select which folder you want to use:";
 
             tdc.hwndParent = NULL;
-            tdc.dwFlags = TDF_USE_COMMAND_LINKS | TDF_ENABLE_HYPERLINKS | TDF_SIZE_TO_CONTENT | TDF_CAN_BE_MINIMIZED;
+            tdc.dwFlags = TDF_USE_COMMAND_LINKS | TDF_ENABLE_HYPERLINKS | TDF_SIZE_TO_CONTENT | TDF_CAN_BE_MINIMIZED | TDF_SHOW_PROGRESS_BAR | TDF_CALLBACK_TIMER;
             tdc.pButtons = aButtons.data();
             tdc.cButtons = static_cast<UINT>(aButtons.size());
             tdc.pszWindowTitle = szTitle;
-            tdc.pszMainIcon = TD_WARNING_ICON;
             tdc.pszMainInstruction = szHeader;
             tdc.pszContent = szContent;
             tdc.pfCallback = TaskDialogCallbackProc;
@@ -1158,8 +1168,15 @@ void LoadPluginsAndRestoreIAT(uintptr_t retaddr, std::wstring_view calledFrom = 
 
             if (!IsPackagedProcess())
             {
-                tdc.dwFlags |= TDF_SHOW_PROGRESS_BAR | TDF_CALLBACK_TIMER;
-                tdc.pfCallback = TaskDialogCallbackProc;
+                if (auto hCustomIcon = (HICON)LoadImage(hm, MAKEINTRESOURCE(IDI_CUSTOM_ICON), IMAGE_ICON, 0, 0, LR_DEFAULTSIZE | LR_SHARED))
+                {
+                    tdc.dwFlags |= TDF_USE_HICON_MAIN;
+                    tdc.hMainIcon = hCustomIcon;
+                }
+                else
+                {
+                    tdc.pszMainIcon = TD_WARNING_ICON;
+                }
 
                 if (SUCCEEDED(TaskDialogIndirect(&tdc, &nClickedBtn, NULL, &bCheckboxChecked)) && nClickedBtn != IDCANCEL)
                 {
