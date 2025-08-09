@@ -1559,7 +1559,7 @@ namespace OverloadFromFolder
 
     std::vector<FileLoaderPathEntry> ParseMultiplePathsWithPriority(const std::wstring& pathsString)
     {
-        std::vector<FileLoaderPathEntry> entries;
+        std::map<std::wstring, FileLoaderPathEntry> entriesMap;
         std::wstring::size_type start = 0;
 
         auto trim = [](const std::wstring& str) -> std::wstring {
@@ -1588,7 +1588,7 @@ namespace OverloadFromFolder
 
         int currentPriority = 1000; // Start with high priority
 
-        // First pass: Parse paths and handle '<' dependencies
+        // First pass: Parse paths and create entries (avoiding duplicates)
         while (start < pathsString.length())
         {
             auto end = pathsString.find_first_of(L"|<>", start);
@@ -1599,9 +1599,14 @@ namespace OverloadFromFolder
 
             if (!cleanPath.empty())
             {
-                FileLoaderPathEntry entry;
-                entry.path = cleanPath;
-                entry.priority = currentPriority--;
+                // Only create entry if it doesn't exist yet
+                if (entriesMap.find(cleanPath) == entriesMap.end())
+                {
+                    FileLoaderPathEntry entry;
+                    entry.path = cleanPath;
+                    entry.priority = currentPriority--;
+                    entriesMap[cleanPath] = entry;
+                }
 
                 // Handle '<' dependency during first pass
                 if (end < pathsString.length())
@@ -1615,12 +1620,25 @@ namespace OverloadFromFolder
                         std::wstring nextPath = removeQuotes(trim(pathsString.substr(nextStart, nextEnd - nextStart)));
                         if (!nextPath.empty())
                         {
-                            entry.dependencies.push_back(nextPath);
-                            entry.isLessThanDependency = true; // '<' syntax
+                            // Ensure target entry exists
+                            if (entriesMap.find(nextPath) == entriesMap.end())
+                            {
+                                FileLoaderPathEntry nextEntry;
+                                nextEntry.path = nextPath;
+                                nextEntry.priority = currentPriority--;
+                                entriesMap[nextPath] = nextEntry;
+                            }
+
+                            // Add dependency if not already present
+                            auto& deps = entriesMap[cleanPath].dependencies;
+                            if (std::find(deps.begin(), deps.end(), nextPath) == deps.end())
+                            {
+                                deps.push_back(nextPath);
+                                entriesMap[cleanPath].isLessThanDependency = true; // '<' syntax
+                            }
                         }
                     }
                 }
-                entries.push_back(entry);
             }
 
             start = end == pathsString.length() ? end : end + 1;
@@ -1644,17 +1662,41 @@ namespace OverloadFromFolder
                 std::wstring beforePath = removeQuotes(trim(pathsString.substr(beforeStart, pos - beforeStart)));
                 std::wstring afterPath = removeQuotes(trim(pathsString.substr(pos + 1, afterEnd - pos - 1)));
 
-                // Find the beforePath entry (left side of >) and add afterPath as its dependency
-                for (auto& entry : entries)
+                if (!beforePath.empty() && !afterPath.empty())
                 {
-                    if (entry.path == beforePath)
+                    // Ensure both entries exist
+                    if (entriesMap.find(beforePath) == entriesMap.end())
                     {
-                        entry.dependencies.push_back(afterPath);
-                        entry.isLessThanDependency = false; // '>' syntax
-                        break;
+                        FileLoaderPathEntry entry;
+                        entry.path = beforePath;
+                        entry.priority = currentPriority--;
+                        entriesMap[beforePath] = entry;
+                    }
+                    if (entriesMap.find(afterPath) == entriesMap.end())
+                    {
+                        FileLoaderPathEntry entry;
+                        entry.path = afterPath;
+                        entry.priority = currentPriority--;
+                        entriesMap[afterPath] = entry;
+                    }
+
+                    // Add dependency if not already present
+                    auto& deps = entriesMap[beforePath].dependencies;
+                    if (std::find(deps.begin(), deps.end(), afterPath) == deps.end())
+                    {
+                        deps.push_back(afterPath);
+                        entriesMap[beforePath].isLessThanDependency = false; // '>' syntax
                     }
                 }
             }
+        }
+
+        // Convert map to vector
+        std::vector<FileLoaderPathEntry> entries;
+        entries.reserve(entriesMap.size());
+        for (const auto& pair : entriesMap)
+        {
+            entries.push_back(pair.second);
         }
 
         // Adjust priorities based on dependencies
