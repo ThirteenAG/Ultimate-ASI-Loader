@@ -2061,7 +2061,7 @@ namespace OverloadFromFolder
         return mhCreateFile2->get_original<decltype(shCustomCreateFile2)>()(value_orW(r, lpFileName), dwDesiredAccess, dwShareMode, dwCreationDisposition, pCreateExParams);
     }
 
-    HANDLE WINAPI shCustomCreateFile3(LPCWSTR lpFileName, DWORD dwDesiredAccess, DWORD dwShareMode, DWORD dwCreationDisposition, LPCREATEFILE3_EXTENDED_PARAMETERS pCreateExParams)
+    HANDLE WINAPI shCustomCreateFile3(LPCWSTR lpFileName, DWORD dwDesiredAccess, DWORD dwShareMode, DWORD dwCreationDisposition, /*LPCREATEFILE3_EXTENDED_PARAMETERS*/void* pCreateExParams)
     {
         auto raddr = _ReturnAddress();
         auto r = GetFilePathForOverload(lpFileName, isRecursive(raddr));
