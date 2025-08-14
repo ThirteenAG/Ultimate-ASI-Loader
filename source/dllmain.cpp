@@ -2692,6 +2692,9 @@ namespace OverloadFromFolder
 
     void HookAPIForOverload()
     {
+        if (sActiveDirectories.empty())
+            return;
+
         constexpr auto mutexName = L"Ultimate-ASI-Loader-OverloadFromFolder";
 
         auto hMutex = OpenMutexW(MUTEX_ALL_ACCESS, FALSE, mutexName);
@@ -2771,6 +2774,24 @@ namespace OverloadFromFolder
 
         if (shouldHaveHooks && !virtualFileHooksActive)
         {
+            if (sActiveDirectories.empty())
+            {
+                if (!mhCreateFileA)
+                    mhCreateFileA = std::make_unique<FunctionHookMinHook>((uintptr_t)CreateFileA, (uintptr_t)shCustomCreateFileA);
+                if (!mhCreateFileW)
+                    mhCreateFileW = std::make_unique<FunctionHookMinHook>((uintptr_t)CreateFileW, (uintptr_t)shCustomCreateFileW);
+
+                if (auto pKernel32 = GetModuleHandle(TEXT("kernel32.dll")))
+                {
+                    if (auto pCreateFile2 = (uintptr_t)GetProcAddress(pKernel32, "CreateFile2"))
+                        if (!mhCreateFile2)
+                            mhCreateFile2 = std::make_unique<FunctionHookMinHook>(pCreateFile2, (uintptr_t)shCustomCreateFile2);
+                    if (auto pCreateFile3 = (uintptr_t)GetProcAddress(pKernel32, "CreateFile3"))
+                        if (!mhCreateFile3)
+                            mhCreateFile3 = std::make_unique<FunctionHookMinHook>(pCreateFile3, (uintptr_t)shCustomCreateFile3);
+                }
+            }
+
             mhReadFile = std::make_unique<FunctionHookMinHook>((uintptr_t)ReadFile, (uintptr_t)shCustomReadFile);
             mhReadFileEx = std::make_unique<FunctionHookMinHook>((uintptr_t)ReadFileEx, (uintptr_t)shCustomReadFileEx);
             mhGetFileSize = std::make_unique<FunctionHookMinHook>((uintptr_t)GetFileSize, (uintptr_t)shCustomGetFileSize);
@@ -2781,6 +2802,18 @@ namespace OverloadFromFolder
             mhGetFileInformationByHandle = std::make_unique<FunctionHookMinHook>((uintptr_t)GetFileInformationByHandle, (uintptr_t)shCustomGetFileInformationByHandle);
             mhGetFileInformationByHandleEx = std::make_unique<FunctionHookMinHook>((uintptr_t)GetFileInformationByHandleEx, (uintptr_t)shCustomGetFileInformationByHandleEx);
             mhGetFileType = std::make_unique<FunctionHookMinHook>((uintptr_t)GetFileType, (uintptr_t)shCustomGetFileType);
+
+            if (sActiveDirectories.empty())
+            {
+                if (mhCreateFileA)
+                    mhCreateFileA->create();
+                if (mhCreateFileW)
+                    mhCreateFileW->create();
+                if (mhCreateFile2)
+                    mhCreateFile2->create();
+                if (mhCreateFile3)
+                    mhCreateFile3->create();
+            }
 
             mhReadFile->create();
             mhReadFileEx->create();
@@ -2797,6 +2830,18 @@ namespace OverloadFromFolder
         }
         else if (!shouldHaveHooks && virtualFileHooksActive)
         {
+            if (sActiveDirectories.empty())
+            {
+                if (mhCreateFileA)
+                    mhCreateFileA.reset();
+                if (mhCreateFileW)
+                    mhCreateFileW.reset();
+                if (mhCreateFile2)
+                    mhCreateFile2.reset();
+                if (mhCreateFile3)
+                    mhCreateFile3.reset();
+            }
+
             mhReadFile.reset();
             mhReadFileEx.reset();
             mhGetFileSize.reset();
