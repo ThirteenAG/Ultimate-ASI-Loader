@@ -2,11 +2,14 @@
 #include "exception.hpp"
 #include <initguid.h>
 #include <filesystem>
+#include <shared_mutex>
+#include <variant>
 #include <fstream>
 #include <memory>
 #include <map>
 #include <FunctionHookMinHook.hpp>
 #include <shellapi.h>
+#include <SubAuth.h>
 #include <Commctrl.h>
 #pragma comment(lib, "delayimp")
 #pragma comment(lib,"Comctl32.lib")
@@ -1554,8 +1557,134 @@ namespace OverloadFromFolder
     std::unique_ptr<FunctionHookMinHook> mhFindFirstFileExW = { nullptr };
     std::unique_ptr<FunctionHookMinHook> mhFindClose = { nullptr };
 
+    std::unique_ptr<FunctionHookMinHook> mhReadFile = { nullptr };
+    std::unique_ptr<FunctionHookMinHook> mhReadFileEx = { nullptr };
+    std::unique_ptr<FunctionHookMinHook> mhGetFileSize = { nullptr };
+    std::unique_ptr<FunctionHookMinHook> mhGetFileSizeEx = { nullptr };
+    std::unique_ptr<FunctionHookMinHook> mhSetFilePointer = { nullptr };
+    std::unique_ptr<FunctionHookMinHook> mhSetFilePointerEx = { nullptr };
+    std::unique_ptr<FunctionHookMinHook> mhCloseHandle = { nullptr };
+    std::unique_ptr<FunctionHookMinHook> mhGetFileInformationByHandle = { nullptr };
+    std::unique_ptr<FunctionHookMinHook> mhGetFileInformationByHandleEx = { nullptr };
+    std::unique_ptr<FunctionHookMinHook> mhGetFileType = { nullptr };
+
     thread_local std::unordered_map<HANDLE, std::string> mFindFileDirsA;
     thread_local std::unordered_map<HANDLE, std::wstring> mFindFileDirsW;
+
+    struct VirtualFile
+    {
+        std::vector<uint8_t> data;
+        int priority;
+        FILETIME creationTime;
+        FILETIME lastWriteTime;
+        FILETIME lastAccessTime;
+        std::atomic<uint64_t> position{ 0 };
+
+        VirtualFile(const uint8_t* fileData, size_t fileSize, int filePriority)
+            : data(fileData, fileData + fileSize), priority(filePriority), position(0)
+        {
+            SYSTEMTIME st;
+            GetSystemTime(&st);
+            SystemTimeToFileTime(&st, &creationTime);
+            lastWriteTime = creationTime;
+            lastAccessTime = creationTime;
+        }
+    };
+
+    std::wstring NormalizePath(const std::filesystem::path& path)
+    {
+        std::wstring relativePath = {};
+        auto normalized = std::filesystem::path(path).make_preferred();
+        if (normalized.is_absolute())
+            relativePath = lexicallyRelativeCaseIns(normalized, gamePath).make_preferred().wstring();
+        else
+            relativePath = normalized.wstring();
+        std::transform(relativePath.begin(), relativePath.end(), relativePath.begin(), ::towlower);
+        return relativePath;
+    }
+
+    static std::atomic<size_t> virtualFilesCount{ 0 };
+    static std::shared_mutex virtualFilesMutex;
+    static std::unordered_map<std::wstring, std::shared_ptr<VirtualFile>> virtualFilesByPath;
+    static std::unordered_map<HANDLE, std::shared_ptr<VirtualFile>> virtualFilesByHandle;
+
+    inline bool HasVirtualFiles()
+    {
+        return virtualFilesCount.load(std::memory_order_acquire) > 0;
+    }
+
+    inline bool IsVirtualHandle(HANDLE handle)
+    {
+        std::shared_lock lock(virtualFilesMutex);
+        return virtualFilesByHandle.find(handle) != virtualFilesByHandle.end();
+    }
+
+    bool IsVirtualFile(const std::filesystem::path& path)
+    {
+        auto normalizedPath = NormalizePath(path);
+        if (normalizedPath.empty())
+            return false;
+
+        std::shared_lock lock(virtualFilesMutex);
+        return virtualFilesByPath.find(normalizedPath) != virtualFilesByPath.end();
+    }
+
+    VirtualFile* GetVirtualFileByHandle(HANDLE handle)
+    {
+        std::shared_lock lock(virtualFilesMutex);
+        auto it = virtualFilesByHandle.find(handle);
+        return (it != virtualFilesByHandle.end()) ? it->second.get() : nullptr;
+    }
+
+    VirtualFile* GetVirtualFileByPath(const std::filesystem::path& path)
+    {
+        std::shared_lock lock(virtualFilesMutex);
+        auto it = virtualFilesByPath.find(NormalizePath(path));
+        return (it != virtualFilesByPath.end()) ? it->second.get() : nullptr;
+    }
+
+    HANDLE CreateVirtualHandle(const std::filesystem::path& path, DWORD dwDesiredAccess, DWORD dwCreationDisposition)
+    {
+        if (dwDesiredAccess & GENERIC_WRITE)
+        {
+            SetLastError(ERROR_ACCESS_DENIED);
+            return INVALID_HANDLE_VALUE;
+        }
+
+        if (dwCreationDisposition == CREATE_NEW || dwCreationDisposition == CREATE_ALWAYS)
+        {
+            SetLastError(ERROR_FILE_EXISTS);
+            return INVALID_HANDLE_VALUE;
+        }
+
+        HANDLE dummyHandle = CreateEvent(NULL, TRUE, FALSE, NULL);
+        if (dummyHandle == NULL || dummyHandle == INVALID_HANDLE_VALUE)
+            return INVALID_HANDLE_VALUE;
+
+        std::unique_lock lock(virtualFilesMutex);
+
+        // Find the virtual file by path
+        auto pathIt = virtualFilesByPath.find(NormalizePath(path));
+        if (pathIt != virtualFilesByPath.end())
+        {
+            virtualFilesByHandle[dummyHandle] = pathIt->second;
+            return dummyHandle;
+        }
+        else
+        {
+            // Path not found, clean up and return invalid handle
+            CloseHandle(dummyHandle);
+            return INVALID_HANDLE_VALUE;
+        }
+    }
+
+    void CloseVirtualHandle(HANDLE handle)
+    {
+        std::unique_lock lock(virtualFilesMutex);
+        virtualFilesByHandle.erase(handle);
+        lock.unlock();
+        CloseHandle(handle);
+    }
 
     std::vector<FileLoaderPathEntry> ParseMultiplePathsWithPriority(const std::wstring& pathsString)
     {
@@ -2003,9 +2132,13 @@ namespace OverloadFromFolder
             auto fileSize = std::filesystem::file_size(newPath, ec);
             lpFindFileData->nFileSizeHigh = static_cast<DWORD>(fileSize >> 32);
             lpFindFileData->nFileSizeLow = static_cast<DWORD>(fileSize & 0xFFFFFFFF);
-            //lpFindFileData->ftCreationTime;
-            //lpFindFileData->ftLastAccessTime;
-            //lpFindFileData->ftLastWriteTime;
+            SYSTEMTIME st;
+            FILETIME time;
+            GetSystemTime(&st);
+            SystemTimeToFileTime(&st, &time);
+            lpFindFileData->ftCreationTime = time;
+            lpFindFileData->ftLastAccessTime = time;
+            lpFindFileData->ftLastWriteTime = time;
         }
     }
 
@@ -2043,28 +2176,40 @@ namespace OverloadFromFolder
     HANDLE WINAPI shCustomCreateFileA(LPCSTR lpFileName, DWORD dwAccess, DWORD dwSharing, LPSECURITY_ATTRIBUTES saAttributes, DWORD dwCreation, DWORD dwAttributes, HANDLE hTemplate)
     {
         auto raddr = _ReturnAddress();
-        auto r = GetFilePathForOverload(lpFileName, isRecursive(raddr));
+        auto bRecursive = isRecursive(raddr);
+        if (!bRecursive && HasVirtualFiles() && IsVirtualFile(lpFileName))
+            return CreateVirtualHandle(lpFileName, dwAccess, dwCreation);
+        auto r = GetFilePathForOverload(lpFileName, bRecursive);
         return mhCreateFileA->get_original<decltype(CreateFileA)>()(value_orA(r, lpFileName), dwAccess, dwSharing, saAttributes, dwCreation, dwAttributes, hTemplate);
     }
 
     HANDLE WINAPI shCustomCreateFileW(LPCWSTR lpFileName, DWORD dwAccess, DWORD dwSharing, LPSECURITY_ATTRIBUTES saAttributes, DWORD dwCreation, DWORD dwAttributes, HANDLE hTemplate)
     {
         auto raddr = _ReturnAddress();
-        auto r = GetFilePathForOverload(lpFileName, isRecursive(raddr));
+        auto bRecursive = isRecursive(raddr);
+        if (!bRecursive && HasVirtualFiles() && IsVirtualFile(lpFileName))
+            return CreateVirtualHandle(lpFileName, dwAccess, dwCreation);
+        auto r = GetFilePathForOverload(lpFileName, bRecursive);
         return mhCreateFileW->get_original<decltype(CreateFileW)>()(value_orW(r, lpFileName), dwAccess, dwSharing, saAttributes, dwCreation, dwAttributes, hTemplate);
     }
 
     HANDLE WINAPI shCustomCreateFile2(LPCWSTR lpFileName, DWORD dwDesiredAccess, DWORD dwShareMode, DWORD dwCreationDisposition, LPCREATEFILE2_EXTENDED_PARAMETERS pCreateExParams)
     {
         auto raddr = _ReturnAddress();
-        auto r = GetFilePathForOverload(lpFileName, isRecursive(raddr));
+        auto bRecursive = isRecursive(raddr);
+        if (!bRecursive && HasVirtualFiles() && IsVirtualFile(lpFileName))
+            return CreateVirtualHandle(lpFileName, dwDesiredAccess, dwCreationDisposition);
+        auto r = GetFilePathForOverload(lpFileName, bRecursive);
         return mhCreateFile2->get_original<decltype(shCustomCreateFile2)>()(value_orW(r, lpFileName), dwDesiredAccess, dwShareMode, dwCreationDisposition, pCreateExParams);
     }
 
     HANDLE WINAPI shCustomCreateFile3(LPCWSTR lpFileName, DWORD dwDesiredAccess, DWORD dwShareMode, DWORD dwCreationDisposition, /*LPCREATEFILE3_EXTENDED_PARAMETERS*/void* pCreateExParams)
     {
         auto raddr = _ReturnAddress();
-        auto r = GetFilePathForOverload(lpFileName, isRecursive(raddr));
+        auto bRecursive = isRecursive(raddr);
+        if (!bRecursive && HasVirtualFiles() && IsVirtualFile(lpFileName))
+            return CreateVirtualHandle(lpFileName, dwDesiredAccess, dwCreationDisposition);
+        auto r = GetFilePathForOverload(lpFileName, bRecursive);
         return mhCreateFile3->get_original<decltype(shCustomCreateFile3)>()(value_orW(r, lpFileName), dwDesiredAccess, dwShareMode, dwCreationDisposition, pCreateExParams);
     }
 
@@ -2220,6 +2365,331 @@ namespace OverloadFromFolder
         return ret;
     }
 
+    BOOL ReadVirtualFile(HANDLE hFile, LPVOID lpBuffer, DWORD nNumberOfBytesToRead, LPDWORD lpNumberOfBytesRead, LPOVERLAPPED lpOverlapped, LPOVERLAPPED_COMPLETION_ROUTINE lpCompletionRoutine)
+    {
+        if (!lpBuffer)
+        {
+            SetLastError(ERROR_INVALID_PARAMETER);
+            return FALSE;
+        }
+
+        auto virtualFile = GetVirtualFileByHandle(hFile);
+        if (!virtualFile)
+        {
+            SetLastError(ERROR_INVALID_HANDLE);
+            return FALSE;
+        }
+
+        auto& data = virtualFile->data;
+        uint64_t readPosition;
+        if (lpOverlapped)
+        {
+            LARGE_INTEGER liOffset;
+            liOffset.LowPart = lpOverlapped->Offset;
+            liOffset.HighPart = lpOverlapped->OffsetHigh;
+            readPosition = liOffset.QuadPart;
+            if (static_cast<int64_t>(readPosition) < 0)
+            {
+                SetLastError(ERROR_INVALID_PARAMETER);
+                return FALSE; // Negative offset
+            }
+            lpOverlapped->InternalHigh = 0;
+        }
+        else
+        {
+            readPosition = virtualFile->position;
+        }
+
+        // Handle reads past EOF
+        if (readPosition >= data.size())
+        {
+            if (lpNumberOfBytesRead)
+                *lpNumberOfBytesRead = 0;
+            return TRUE; // No data to read, success per ReadFile
+        }
+
+        uint64_t remainingBytes = data.size() - readPosition;
+        DWORD bytesToRead = static_cast<DWORD>(min(static_cast<uint64_t>(nNumberOfBytesToRead), remainingBytes));
+
+        if (bytesToRead > 0)
+        {
+            memcpy(lpBuffer, data.data() + readPosition, bytesToRead);
+            if (!lpOverlapped)
+            {
+                virtualFile->position = readPosition + bytesToRead;
+            }
+        }
+
+        if (lpNumberOfBytesRead)
+        {
+            *lpNumberOfBytesRead = bytesToRead;
+        }
+
+        if (lpOverlapped)
+        {
+            lpOverlapped->InternalHigh = bytesToRead;
+            if (lpOverlapped->hEvent)
+            {
+                ResetEvent(lpOverlapped->hEvent); // Reset to unsignaled
+                SetEvent(lpOverlapped->hEvent);   // Signal completion
+            }
+            if (lpCompletionRoutine)
+            {
+                struct CompletionData
+                {
+                    LPOVERLAPPED_COMPLETION_ROUTINE lpCompletionRoutine;
+                    DWORD dwErrorCode;
+                    DWORD dwNumberOfBytesTransferred;
+                    LPOVERLAPPED lpOverlapped;
+                };
+
+                static auto CompletionRoutineWrapper = [](PVOID lpParameter) -> DWORD {
+                    auto* data = static_cast<CompletionData*>(lpParameter);
+                    data->lpCompletionRoutine(data->dwErrorCode, data->dwNumberOfBytesTransferred, data->lpOverlapped);
+                    delete data;
+                    return ERROR_SUCCESS;
+                };
+
+                // Queue completion routine to thread pool
+                auto* completionData = new CompletionData
+                {
+                    lpCompletionRoutine,
+                    ERROR_SUCCESS,
+                    bytesToRead,
+                    lpOverlapped
+                };
+
+                if (!QueueUserWorkItem(static_cast<DWORD(CALLBACK*)(PVOID)>(CompletionRoutineWrapper), completionData, WT_EXECUTEDEFAULT))
+                {
+                    DWORD error = GetLastError();
+                    delete completionData;
+                    SetLastError(error);
+                    return FALSE;
+                }
+            }
+        }
+
+        return TRUE;
+    }
+
+    BOOL WINAPI shCustomReadFile(HANDLE hFile, LPVOID lpBuffer, DWORD nNumberOfBytesToRead, LPDWORD lpNumberOfBytesRead, LPOVERLAPPED lpOverlapped)
+    {
+        auto raddr = _ReturnAddress();
+        if (!isRecursive(raddr) && IsVirtualHandle(hFile))
+            return ReadVirtualFile(hFile, lpBuffer, nNumberOfBytesToRead, lpNumberOfBytesRead, lpOverlapped, nullptr);
+        return mhReadFile->get_original<decltype(ReadFile)>()(hFile, lpBuffer, nNumberOfBytesToRead, lpNumberOfBytesRead, lpOverlapped);
+    }
+
+    BOOL WINAPI shCustomReadFileEx(HANDLE hFile, LPVOID lpBuffer, DWORD nNumberOfBytesToRead, LPOVERLAPPED lpOverlapped, LPOVERLAPPED_COMPLETION_ROUTINE lpCompletionRoutine)
+    {
+        auto raddr = _ReturnAddress();
+        if (!isRecursive(raddr) && IsVirtualHandle(hFile))
+            return ReadVirtualFile(hFile, lpBuffer, nNumberOfBytesToRead, nullptr, lpOverlapped, lpCompletionRoutine);
+        return mhReadFileEx->get_original<decltype(ReadFileEx)>()(hFile, lpBuffer, nNumberOfBytesToRead, lpOverlapped, lpCompletionRoutine);
+    }
+
+    DWORD WINAPI shCustomGetFileSize(HANDLE hFile, LPDWORD lpFileSizeHigh)
+    {
+        auto raddr = _ReturnAddress();
+        if (!isRecursive(raddr) && IsVirtualHandle(hFile))
+        {
+            if (auto virtualFile = GetVirtualFileByHandle(hFile))
+            {
+                DWORD64 fileSize = virtualFile->data.size();
+                if (lpFileSizeHigh)
+                    *lpFileSizeHigh = static_cast<DWORD>(fileSize >> 32);
+                return static_cast<DWORD>(fileSize & 0xFFFFFFFF);
+            }
+            return INVALID_FILE_SIZE;
+        }
+        return mhGetFileSize->get_original<decltype(GetFileSize)>()(hFile, lpFileSizeHigh);
+    }
+
+    BOOL WINAPI shCustomGetFileSizeEx(HANDLE hFile, PLARGE_INTEGER lpFileSize)
+    {
+        auto raddr = _ReturnAddress();
+        if (!isRecursive(raddr) && IsVirtualHandle(hFile))
+        {
+            auto virtualFile = GetVirtualFileByHandle(hFile);
+            if (virtualFile)
+            {
+                if (!lpFileSize)
+                {
+                    SetLastError(ERROR_INVALID_PARAMETER);
+                    return FALSE;
+                }
+                lpFileSize->QuadPart = virtualFile->data.size();
+                return TRUE;
+            }
+            return FALSE;
+        }
+        return mhGetFileSizeEx->get_original<decltype(GetFileSizeEx)>()(hFile, lpFileSize);
+    }
+
+    BOOL WINAPI shCustomSetFilePointerEx(HANDLE hFile, LARGE_INTEGER liDistanceToMove, PLARGE_INTEGER lpNewFilePointer, DWORD dwMoveMethod)
+    {
+        auto raddr = _ReturnAddress();
+        if (!isRecursive(raddr) && IsVirtualHandle(hFile))
+        {
+            if (auto virtualFile = GetVirtualFileByHandle(hFile))
+            {
+                uint64_t fileSize = virtualFile->data.size();
+                uint64_t newPosition;
+                switch (dwMoveMethod)
+                {
+                case FILE_BEGIN:
+                    if (liDistanceToMove.QuadPart < 0)
+                    {
+                        SetLastError(ERROR_NEGATIVE_SEEK);
+                        return FALSE;
+                    }
+                    newPosition = liDistanceToMove.QuadPart;
+                    break;
+                case FILE_CURRENT:
+                    if (liDistanceToMove.QuadPart < 0 && static_cast<uint64_t>(-liDistanceToMove.QuadPart) > virtualFile->position)
+                    {
+                        SetLastError(ERROR_NEGATIVE_SEEK);
+                        return FALSE;
+                    }
+                    newPosition = virtualFile->position + liDistanceToMove.QuadPart;
+                    break;
+                case FILE_END:
+                    if (liDistanceToMove.QuadPart < 0 && static_cast<uint64_t>(-liDistanceToMove.QuadPart) > fileSize)
+                    {
+                        SetLastError(ERROR_NEGATIVE_SEEK);
+                        return FALSE;
+                    }
+                    newPosition = fileSize + liDistanceToMove.QuadPart;
+                    break;
+                default:
+                    SetLastError(ERROR_INVALID_PARAMETER);
+                    return FALSE;
+                }
+                virtualFile->position = newPosition;
+                if (lpNewFilePointer)
+                {
+                    lpNewFilePointer->QuadPart = newPosition;
+                }
+                return TRUE;
+            }
+            SetLastError(ERROR_INVALID_HANDLE);
+            return FALSE;
+        }
+        return mhSetFilePointerEx->get_original<decltype(SetFilePointerEx)>()(hFile, liDistanceToMove, lpNewFilePointer, dwMoveMethod);
+    }
+
+    DWORD WINAPI shCustomSetFilePointer(HANDLE hFile, LONG lDistanceToMove, PLONG lpDistanceToMoveHigh, DWORD dwMoveMethod)
+    {
+        auto raddr = _ReturnAddress();
+        if (!isRecursive(raddr) && IsVirtualHandle(hFile))
+        {
+            LARGE_INTEGER liDistanceToMove;
+            liDistanceToMove.LowPart = lDistanceToMove;
+            liDistanceToMove.HighPart = lpDistanceToMoveHigh ? *lpDistanceToMoveHigh : 0;
+            LARGE_INTEGER liNewPosition;
+            if (!shCustomSetFilePointerEx(hFile, liDistanceToMove, &liNewPosition, dwMoveMethod))
+            {
+                return INVALID_SET_FILE_POINTER;
+            }
+            if (lpDistanceToMoveHigh)
+            {
+                *lpDistanceToMoveHigh = liNewPosition.HighPart;
+            }
+            return liNewPosition.LowPart;
+        }
+        return mhSetFilePointer->get_original<decltype(SetFilePointer)>()(hFile, lDistanceToMove, lpDistanceToMoveHigh, dwMoveMethod);
+    }
+
+    BOOL WINAPI shCustomCloseHandle(HANDLE hObject)
+    {
+        auto raddr = _ReturnAddress();
+        if (!isRecursive(raddr) && IsVirtualHandle(hObject))
+        {
+            CloseVirtualHandle(hObject);
+            return TRUE;
+        }
+        return mhCloseHandle->get_original<decltype(CloseHandle)>()(hObject);
+    }
+
+    BOOL WINAPI shCustomGetFileInformationByHandle(HANDLE hFile, LPBY_HANDLE_FILE_INFORMATION lpFileInformation)
+    {
+        auto raddr = _ReturnAddress();
+        if (!isRecursive(raddr) && IsVirtualHandle(hFile))
+        {
+            if (!lpFileInformation)
+            {
+                SetLastError(ERROR_INVALID_PARAMETER);
+                return FALSE;
+            }
+        
+            if (auto virtualFile = GetVirtualFileByHandle(hFile))
+            {
+                ZeroMemory(lpFileInformation, sizeof(BY_HANDLE_FILE_INFORMATION));
+                lpFileInformation->dwFileAttributes = FILE_ATTRIBUTE_NORMAL;
+                lpFileInformation->ftCreationTime = virtualFile->creationTime;
+                lpFileInformation->ftLastAccessTime = virtualFile->lastAccessTime;
+                lpFileInformation->ftLastWriteTime = virtualFile->lastWriteTime;
+                lpFileInformation->nFileSizeHigh = static_cast<DWORD>((static_cast<uint64_t>(virtualFile->data.size()) >> 32) & 0xFFFFFFFF);
+                lpFileInformation->nFileSizeLow = static_cast<DWORD>(virtualFile->data.size() & 0xFFFFFFFF);
+                lpFileInformation->nNumberOfLinks = 1;
+                return TRUE;
+            }
+        
+            SetLastError(ERROR_NOT_SUPPORTED);
+            return FALSE;
+        }
+        return mhGetFileInformationByHandle->get_original<decltype(GetFileInformationByHandle)>()(hFile, lpFileInformation);
+    }
+
+    BOOL WINAPI shCustomGetFileInformationByHandleEx(HANDLE hFile, FILE_INFO_BY_HANDLE_CLASS FileInformationClass, LPVOID lpFileInformation, DWORD dwBufferSize)
+    {
+        auto raddr = _ReturnAddress();
+        if (!isRecursive(raddr) && IsVirtualHandle(hFile))
+        {
+            if (FileInformationClass == FileBasicInfo && lpFileInformation && dwBufferSize >= sizeof(FILE_BASIC_INFO))
+            {
+                if (auto virtualFile = GetVirtualFileByHandle(hFile))
+                {
+                    auto fileInfo = static_cast<PFILE_BASIC_INFO>(lpFileInformation);
+                    memset(fileInfo, 0, sizeof(FILE_BASIC_INFO));
+                    fileInfo->CreationTime.QuadPart = reinterpret_cast<LONGLONG&>(virtualFile->creationTime);
+                    fileInfo->LastAccessTime.QuadPart = reinterpret_cast<LONGLONG&>(virtualFile->lastAccessTime);
+                    fileInfo->LastWriteTime.QuadPart = reinterpret_cast<LONGLONG&>(virtualFile->lastWriteTime);
+                    fileInfo->FileAttributes = FILE_ATTRIBUTE_NORMAL;
+                    return TRUE;
+                }
+            }
+            else if (FileInformationClass == FileStandardInfo && lpFileInformation && dwBufferSize >= sizeof(FILE_STANDARD_INFO))
+            {
+                if (auto virtualFile = GetVirtualFileByHandle(hFile))
+                {
+                    auto fileInfo = static_cast<PFILE_STANDARD_INFO>(lpFileInformation);
+                    memset(fileInfo, 0, sizeof(FILE_STANDARD_INFO));
+                    fileInfo->AllocationSize.QuadPart = static_cast<LONGLONG>(virtualFile->data.size());
+                    fileInfo->EndOfFile.QuadPart = static_cast<LONGLONG>(virtualFile->data.size());
+                    fileInfo->NumberOfLinks = 1;
+                    fileInfo->DeletePending = FALSE;
+                    fileInfo->Directory = FALSE;
+                    return TRUE;
+                }
+            }
+        
+            SetLastError(ERROR_NOT_SUPPORTED);
+            return FALSE;
+        }
+        return mhGetFileInformationByHandleEx->get_original<decltype(GetFileInformationByHandleEx)>()(hFile, FileInformationClass, lpFileInformation, dwBufferSize);
+    }
+
+    DWORD WINAPI shCustomGetFileType(HANDLE hFile)
+    {
+        auto raddr = _ReturnAddress();
+        if (!isRecursive(raddr) && IsVirtualHandle(hFile))
+        {
+            return FILE_TYPE_DISK;
+        }
+        return mhGetFileType->get_original<decltype(GetFileType)>()(hFile);
+    }
+
     void HookAPIForOverload()
     {
         constexpr auto mutexName = L"Ultimate-ASI-Loader-OverloadFromFolder";
@@ -2292,6 +2762,150 @@ namespace OverloadFromFolder
                 pLdrAddRefDll(0, (HMODULE)&__ImageBase);
             }
         }
+    }
+
+    void HookAPIForVirtualFiles()
+    {
+        static bool virtualFileHooksActive = false;
+        bool shouldHaveHooks = HasVirtualFiles();
+
+        if (shouldHaveHooks && !virtualFileHooksActive)
+        {
+            mhReadFile = std::make_unique<FunctionHookMinHook>((uintptr_t)ReadFile, (uintptr_t)shCustomReadFile);
+            mhReadFileEx = std::make_unique<FunctionHookMinHook>((uintptr_t)ReadFileEx, (uintptr_t)shCustomReadFileEx);
+            mhGetFileSize = std::make_unique<FunctionHookMinHook>((uintptr_t)GetFileSize, (uintptr_t)shCustomGetFileSize);
+            mhGetFileSizeEx = std::make_unique<FunctionHookMinHook>((uintptr_t)GetFileSizeEx, (uintptr_t)shCustomGetFileSizeEx);
+            mhSetFilePointer = std::make_unique<FunctionHookMinHook>((uintptr_t)SetFilePointer, (uintptr_t)shCustomSetFilePointer);
+            mhSetFilePointerEx = std::make_unique<FunctionHookMinHook>((uintptr_t)SetFilePointerEx, (uintptr_t)shCustomSetFilePointerEx);
+            mhCloseHandle = std::make_unique<FunctionHookMinHook>((uintptr_t)CloseHandle, (uintptr_t)shCustomCloseHandle);
+            mhGetFileInformationByHandle = std::make_unique<FunctionHookMinHook>((uintptr_t)GetFileInformationByHandle, (uintptr_t)shCustomGetFileInformationByHandle);
+            mhGetFileInformationByHandleEx = std::make_unique<FunctionHookMinHook>((uintptr_t)GetFileInformationByHandleEx, (uintptr_t)shCustomGetFileInformationByHandleEx);
+            mhGetFileType = std::make_unique<FunctionHookMinHook>((uintptr_t)GetFileType, (uintptr_t)shCustomGetFileType);
+
+            mhReadFile->create();
+            mhReadFileEx->create();
+            mhGetFileSize->create();
+            mhGetFileSizeEx->create();
+            mhSetFilePointer->create();
+            mhSetFilePointerEx->create();
+            mhCloseHandle->create();
+            mhGetFileInformationByHandle->create();
+            mhGetFileInformationByHandleEx->create();
+            mhGetFileType->create();
+
+            virtualFileHooksActive = true;
+        }
+        else if (!shouldHaveHooks && virtualFileHooksActive)
+        {
+            mhReadFile.reset();
+            mhReadFileEx.reset();
+            mhGetFileSize.reset();
+            mhGetFileSizeEx.reset();
+            mhSetFilePointer.reset();
+            mhSetFilePointerEx.reset();
+            mhCloseHandle.reset();
+            mhGetFileInformationByHandle.reset();
+            mhGetFileInformationByHandleEx.reset();
+            mhGetFileType.reset();
+            virtualFileHooksActive = false;
+        }
+    }
+
+    bool WINAPI AddVirtualFileForOverload(auto virtualPath, const uint8_t* data, size_t size, int priority)
+    {
+        if (!virtualPath || !data || size == 0)
+            return false;
+
+        try
+        {
+            auto filePath = NormalizePath(virtualPath);
+
+            if (filePath.empty())
+                return false;
+
+            std::unique_lock lock(virtualFilesMutex);
+
+            auto pathIt = virtualFilesByPath.find(filePath);
+
+            if (pathIt != virtualFilesByPath.end() && pathIt->second->priority >= priority)
+            {
+                return false;
+            }
+
+            bool wasNew = (pathIt == virtualFilesByPath.end());
+            auto virtualFile = std::make_shared<VirtualFile>(data, size, priority);
+            virtualFilesByPath[filePath] = virtualFile;
+
+            if (wasNew)
+                virtualFilesCount.fetch_add(1, std::memory_order_release);
+
+            HookAPIForVirtualFiles();
+
+            return true;
+        }
+        catch (...)
+        {
+            return false;
+        }
+    }
+
+    void WINAPI RemoveVirtualFileFromOverload(auto virtualPath)
+    {
+        if (!virtualPath)
+            return;
+
+        try
+        {
+            auto filePath = NormalizePath(virtualPath);
+            std::unique_lock lock(virtualFilesMutex);
+
+            auto pathIt = virtualFilesByPath.find(filePath);
+            if (pathIt != virtualFilesByPath.end())
+            {
+                auto virtualFile = pathIt->second;
+                virtualFilesByPath.erase(pathIt);
+
+                // Remove all handles that reference this virtual file
+                for (auto handleIt = virtualFilesByHandle.begin(); handleIt != virtualFilesByHandle.end();)
+                {
+                    if (handleIt->second == virtualFile)
+                    {
+                        handleIt = virtualFilesByHandle.erase(handleIt);
+                    }
+                    else
+                    {
+                        ++handleIt;
+                    }
+                }
+
+                virtualFilesCount.fetch_sub(1, std::memory_order_release);
+
+                HookAPIForVirtualFiles();
+            }
+        }
+        catch (...)
+        {
+        }
+    }
+
+    bool WINAPI AddVirtualFileForOverloadA(const char* virtualPath, const uint8_t* data, size_t size, int priority)
+    {
+        return AddVirtualFileForOverload(virtualPath, data, size, priority);
+    }
+
+    void WINAPI RemoveVirtualFileFromOverloadA(const char* virtualPath)
+    {
+        return RemoveVirtualFileFromOverload(virtualPath);
+    }
+
+    bool WINAPI AddVirtualFileForOverloadW(const wchar_t* virtualPath, const uint8_t* data, size_t size, int priority)
+    {
+        return AddVirtualFileForOverload(virtualPath, data, size, priority);
+    }
+
+    void WINAPI RemoveVirtualFileFromOverloadW(const wchar_t* virtualPath)
+    {
+        return RemoveVirtualFileFromOverload(virtualPath);
     }
 }
 
@@ -3635,27 +4249,6 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID /*lpReserved*/)
                 *ptr = OLE32Data[i][ProcAddress];
                 VirtualProtect(ptr, sizeof(size_t), dwProtect[0], &dwProtect[1]);
             }
-        }
-
-        {
-            using namespace OverloadFromFolder;
-            mhCreateFileA = {};
-            mhCreateFileW = {};
-            mhCreateFile2 = {};
-            mhCreateFile3 = {};
-            mhLoadLibraryExA = {};
-            mhLoadLibraryExW = {};
-            mhGetFileAttributesA = {};
-            mhGetFileAttributesW = {};
-            mhGetFileAttributesExA = {};
-            mhGetFileAttributesExW = {};
-            mhFindFirstFileA = {};
-            mhFindNextFileA = {};
-            mhFindFirstFileW = {};
-            mhFindNextFileW = {};
-            mhFindFirstFileExA = {};
-            mhFindFirstFileExW = {};
-            mhFindClose = {};
         }
     }
     return TRUE;

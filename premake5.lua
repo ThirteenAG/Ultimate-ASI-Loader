@@ -88,6 +88,7 @@ project "Ultimate-ASI-Loader-Win32"
    end
    
    characterset ("UNICODE")
+   defines { "_CRT_SECURE_NO_WARNINGS" }
    
    filter "configurations:Debug"
       defines { "DEBUG" }
@@ -232,6 +233,7 @@ project "Ultimate-ASI-Loader-x64"
    files { "source/resources/Versioninfo.rc", "source/resources/UALx64.rc" }
    
    characterset ("UNICODE")
+   defines { "_CRT_SECURE_NO_WARNINGS" }
    
    filter "configurations:Debug"
       defines { "DEBUG" }

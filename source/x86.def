@@ -5,6 +5,10 @@ GetOverloadedFilePathA = GetOverloadedFilePathA
 GetOverloadedFilePathW = GetOverloadedFilePathW
 GetOverloadPathA = GetOverloadPathA
 GetOverloadPathW = GetOverloadPathW
+AddVirtualFileForOverloadA = AddVirtualFileForOverloadA
+RemoveVirtualFileFromOverloadA = RemoveVirtualFileFromOverloadA
+AddVirtualFileForOverloadW = AddVirtualFileForOverloadW
+RemoveVirtualFileFromOverloadW = RemoveVirtualFileFromOverloadW
 GetMemoryModule = GetMemoryModule
 
 LIBRARY "vorbisfile"
