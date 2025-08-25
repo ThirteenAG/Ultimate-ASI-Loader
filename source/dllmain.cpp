@@ -19,6 +19,7 @@
 #define ws_UpdateUrl WIDEN(rsc_UpdateUrl)
 LPCWSTR szFooter = L"<a href=\"" ws_UpdateUrl "\">" ws_UpdateUrl "</a>";
 constexpr auto DEFAULT_BUTTON = 1000;
+#define IDI_CUSTOM_ICON 102
 
 #if !X64
 #include <d3d8to9\source\d3d8to9.hpp>
@@ -83,6 +84,7 @@ static int g_remainingSeconds = 10;
 static HWND g_mainDialogHwnd = NULL;
 static POINT g_lastMousePos = { -1, -1 };
 static HHOOK g_hMouseHook = NULL;
+static HICON hTaskbarIcon = NULL;
 
 LRESULT CALLBACK LowLevelMouseProc(int nCode, WPARAM wParam, LPARAM lParam)
 {
@@ -112,6 +114,26 @@ LRESULT CALLBACK LowLevelMouseProc(int nCode, WPARAM wParam, LPARAM lParam)
     return CallNextHookEx(g_hMouseHook, nCode, wParam, lParam);
 }
 
+HICON GetApplicationIcon()
+{
+    HICON hIcon = nullptr;
+
+    wchar_t szExePath[MAX_PATH];
+    if (GetModuleFileNameW(NULL, szExePath, MAX_PATH))
+    {
+        hIcon = ExtractIconW(GetModuleHandle(NULL), szExePath, 0);
+        if (hIcon && hIcon != (HICON)1)
+        {
+            return hIcon;
+        }
+
+        if (hIcon == (HICON)1)
+            hIcon = nullptr;
+    }
+
+    return hIcon;
+}
+
 HRESULT CALLBACK TaskDialogCallbackProc(HWND hwnd, UINT uNotification, WPARAM wParam, LPARAM lParam, LONG_PTR dwRefData)
 {
     constexpr int countdownSeconds = 10;
@@ -124,6 +146,10 @@ HRESULT CALLBACK TaskDialogCallbackProc(HWND hwnd, UINT uNotification, WPARAM wP
         g_userInteracted = false;
         g_remainingSeconds = countdownSeconds;
         g_lastMousePos = { -1, -1 };
+
+        hTaskbarIcon = GetApplicationIcon();
+        if (hTaskbarIcon)
+            SendMessage(hwnd, WM_SETICON, ICON_BIG, (LPARAM)hTaskbarIcon);
 
         // Initialize progress bar
         SendMessage(hwnd, TDM_SET_PROGRESS_BAR_RANGE, 0, MAKELPARAM(0, countdownSeconds));
@@ -171,6 +197,9 @@ HRESULT CALLBACK TaskDialogCallbackProc(HWND hwnd, UINT uNotification, WPARAM wP
         {
             UnhookWindowsHookEx(g_hMouseHook);
             g_hMouseHook = NULL;
+
+            if (hTaskbarIcon)
+                DestroyIcon(hTaskbarIcon);
         }
         break;
     case TDN_TIMER:
@@ -475,7 +504,6 @@ size_t Kernel32Data[Kernel32ExportsNamesCount][Kernel32ExportsDataCount];
 size_t OLE32Data[OLE32ExportsNamesCount][Kernel32ExportsDataCount];
 size_t vccorlibData[vccorlibExportsNamesCount][Kernel32ExportsDataCount];
 
-#define IDI_CUSTOM_ICON 102
 #if !X64
 #define IDR_VORBISF    101
 #define IDR_WNDMODE    103
