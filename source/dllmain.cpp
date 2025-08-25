@@ -1935,6 +1935,7 @@ namespace OverloadFromFolder
         if (pathIt != virtualFilesByPath.end())
         {
             virtualFilesByHandle[dummyHandle] = pathIt->second;
+            pathIt->second->position = 0; // Reset position
             return dummyHandle;
         }
         else
