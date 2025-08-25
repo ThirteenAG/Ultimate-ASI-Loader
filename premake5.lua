@@ -308,3 +308,23 @@ project "MonoLoader_x64"
       defines { "NDEBUG" }
       optimize "On"
       staticruntime "On"
+
+project "VirtualFileServer"
+   kind "ConsoleApp"
+   language "C++"
+   targetdir "bin/x64/%{cfg.buildcfg}"
+   targetextension ".exe"
+   
+   files { "source/demo_plugins/VirtualFileServer.cpp" }
+   files { "source/resources/Versioninfo.rc", "source/resources/UALx64.rc" }
+
+   characterset ("UNICODE")
+   
+   filter "configurations:Debug"
+      defines { "DEBUG" }
+      symbols "On"
+
+   filter "configurations:Release"
+      defines { "NDEBUG" }
+      optimize "On"
+      staticruntime "On"

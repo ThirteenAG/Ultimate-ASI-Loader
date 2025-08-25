@@ -408,7 +408,7 @@ std::wstring GetPrivateProfileStringW(LPCWSTR lpAppName, LPCWSTR lpKeyName, LPCW
     ret.resize(MAX_PATH);
     for (const auto& file : fileNames)
     {
-        GetPrivateProfileStringW(lpAppName, lpKeyName, ret.data(), ret.data(), ret.size(), file.c_str());
+        GetPrivateProfileStringW(lpAppName, lpKeyName, ret.data(), ret.data(), DWORD(ret.size()), file.c_str());
     }
     return ret.data();
 }
@@ -1599,9 +1599,50 @@ namespace OverloadFromFolder
     thread_local std::unordered_map<HANDLE, std::string> mFindFileDirsA;
     thread_local std::unordered_map<HANDLE, std::wstring> mFindFileDirsW;
 
-    struct VirtualFile
+    HANDLE serverPipe = INVALID_HANDLE_VALUE;
+    std::mutex serverMutex;
+
+    struct ServerCommand
+    {
+        enum Type : uint32_t
+        {
+            ADD_FILE = 1,
+            APPEND_FILE = 2,
+            REMOVE_FILE = 3,
+            GET_SIZE = 4,
+            READ_FILE = 5
+        };
+        uint32_t command;
+        uint64_t server_handle; // Used for most commands
+        uint64_t data_size;     // For ADD/APPEND/READ
+        int32_t priority;       // For ADD
+        uint64_t offset;        // For READ
+    };
+
+    struct LocalData
     {
         std::vector<uint8_t> data;
+
+        size_t GetSize() const
+        {
+            return data.size();
+        }
+    };
+
+    struct ServerData
+    {
+        uint64_t server_handle;  // Handle from 64-bit server
+        uint64_t size;
+
+        size_t GetSize() const
+        {
+            return static_cast<size_t>(size);
+        }
+    };
+
+    struct VirtualFile
+    {
+        std::variant<LocalData, ServerData> storage;
         int priority;
         FILETIME creationTime;
         FILETIME lastWriteTime;
@@ -1609,15 +1650,218 @@ namespace OverloadFromFolder
         std::atomic<uint64_t> position{ 0 };
 
         VirtualFile(const uint8_t* fileData, size_t fileSize, int filePriority)
-            : data(fileData, fileData + fileSize), priority(filePriority), position(0)
+            : priority(filePriority), position(0)
         {
             SYSTEMTIME st;
             GetSystemTime(&st);
             SystemTimeToFileTime(&st, &creationTime);
             lastWriteTime = creationTime;
             lastAccessTime = creationTime;
+
+#if !X64
+            uint64_t handle = CreateFileOnServer(fileData, fileSize, filePriority);
+            if (handle != 0)
+            {
+                storage = ServerData{ handle, static_cast<uint64_t>(fileSize) };
+            }
+            else
+            {
+                storage = LocalData{ std::vector<uint8_t>(fileData, fileData + fileSize) };
+            }
+#else
+            storage = LocalData{ std::vector<uint8_t>(fileData, fileData + fileSize) };
+#endif
         }
+
+        size_t GetSize() const
+        {
+            return std::visit([](const auto& data) -> size_t {
+                return data.GetSize();
+            }, storage);
+        }
+
+    public:
+#if !X64
+        static bool InitializeServerConnection()
+        {
+            static std::once_flag flag;
+            bool result = false;
+
+            std::call_once(flag, [&]() {
+                std::lock_guard<std::mutex> lock(serverMutex);
+                HANDLE hMutex = CreateMutexW(NULL, TRUE, L"Global\\Ultimate-ASI-Loader-VirtualFileClientMutex");
+                if (GetLastError() == ERROR_ALREADY_EXISTS)
+                {
+                    CloseHandle(hMutex);
+                    return;
+                }
+
+                auto CreateProcessInJob = [](HANDLE hJob, LPCTSTR lpApplicationName, LPTSTR lpCommandLine, LPSECURITY_ATTRIBUTES lpProcessAttributes,
+                    LPSECURITY_ATTRIBUTES lpThreadAttributes, BOOL bInheritHandles, DWORD dwCreationFlags, LPVOID lpEnvironment,
+                    LPCTSTR lpCurrentDirectory, LPSTARTUPINFO lpStartupInfo, LPPROCESS_INFORMATION ppi) -> BOOL {
+                    BOOL fRc = CreateProcess(lpApplicationName, lpCommandLine, lpProcessAttributes,
+                        lpThreadAttributes, bInheritHandles, dwCreationFlags | CREATE_SUSPENDED, lpEnvironment, lpCurrentDirectory,
+                        lpStartupInfo, ppi);
+                    if (fRc)
+                    {
+                        fRc = AssignProcessToJobObject(hJob, ppi->hProcess);
+                        if (fRc && !(dwCreationFlags & CREATE_SUSPENDED))
+                        {
+                            fRc = ResumeThread(ppi->hThread) != (DWORD)-1;
+                        }
+                        if (!fRc)
+                        {
+                            TerminateProcess(ppi->hProcess, 0);
+                            CloseHandle(ppi->hProcess);
+                            CloseHandle(ppi->hThread);
+                            ppi->hProcess = ppi->hThread = nullptr;
+                        }
+                    }
+                    return fRc;
+                };
+
+                std::error_code ec;
+                auto processPath = std::filesystem::path(GetModulePath(hm)).replace_extension(L".exe");
+                auto workingDir = std::filesystem::path(processPath).remove_filename();
+                if (std::filesystem::exists(processPath, ec))
+                {
+                    HANDLE hJob = CreateJobObject(nullptr, nullptr);
+                    JOBOBJECT_EXTENDED_LIMIT_INFORMATION info = { };
+                    info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+                    SetInformationJobObject(hJob, JobObjectExtendedLimitInformation, &info, sizeof(info));
+
+                    STARTUPINFOW si = { sizeof(si) };
+                    PROCESS_INFORMATION pi;
+                    if (CreateProcessInJob(hJob, processPath.c_str(), NULL, nullptr, nullptr, FALSE, CREATE_NO_WINDOW,
+                        nullptr, workingDir.c_str(), &si, &pi))
+                    {
+                        CloseHandle(pi.hProcess);
+                        CloseHandle(pi.hThread);
+
+                        // Retry loop for pipe creation
+                        constexpr DWORD max_attempts = 10;
+                        DWORD retry_delay_ms = 100;
+                        for (DWORD attempt = 0; attempt < max_attempts; ++attempt)
+                        {
+                            serverPipe = CreateFileW(L"\\\\.\\pipe\\Ultimate-ASI-Loader-VirtualFileServer", GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0, NULL);
+                            if (serverPipe != INVALID_HANDLE_VALUE)
+                            {
+                                DWORD pid = GetCurrentProcessId();
+                                DWORD bytes;
+                                if (WriteFile(serverPipe, &pid, sizeof(pid), &bytes, NULL) && bytes == sizeof(pid))
+                                {
+                                    result = true;
+                                    break;
+                                }
+                                CloseHandle(serverPipe);
+                                serverPipe = INVALID_HANDLE_VALUE;
+                            }
+                            Sleep(retry_delay_ms);
+                            retry_delay_ms += 50;
+                        }
+                    }
+                    else
+                    {
+                        CloseHandle(hJob);
+                    }
+                }
+                CloseHandle(hMutex);
+            });
+
+            return result;
+        }
+
+        static uint64_t CreateFileOnServer(const uint8_t* data, size_t size, int priority)
+        {
+            if (serverPipe == INVALID_HANDLE_VALUE)
+            {
+                if (!InitializeServerConnection())
+                    return 0;
+            }
+
+            std::lock_guard<std::mutex> lock(serverMutex);
+
+            ServerCommand request = {};
+            request.command = ServerCommand::ADD_FILE;
+            request.data_size = size;
+            request.priority = priority;
+
+            DWORD bytesWritten = 0;
+            if (!WriteFile(serverPipe, &request, sizeof(request), &bytesWritten, NULL) || bytesWritten != sizeof(request))
+            {
+                CloseHandle(serverPipe);
+                serverPipe = INVALID_HANDLE_VALUE;
+                return 0;
+            }
+
+            if (size > 0 && (!WriteFile(serverPipe, data, (DWORD)size, &bytesWritten, NULL) || bytesWritten != size))
+            {
+                CloseHandle(serverPipe);
+                serverPipe = INVALID_HANDLE_VALUE;
+                return 0;
+            }
+
+            uint64_t new_handle = 0;
+            DWORD bytesRead = 0;
+            if (!ReadFile(serverPipe, &new_handle, sizeof(new_handle), &bytesRead, NULL) || bytesRead != sizeof(new_handle))
+            {
+                CloseHandle(serverPipe);
+                serverPipe = INVALID_HANDLE_VALUE;
+                return 0;
+            }
+
+            return new_handle;
+        }
+
+        static bool AppendFileOnServer(uint64_t server_handle, const uint8_t* data, size_t size)
+        {
+            if (serverPipe == INVALID_HANDLE_VALUE) return false;
+
+            std::lock_guard<std::mutex> lock(serverMutex);
+
+            ServerCommand request = {};
+            request.command = ServerCommand::APPEND_FILE;
+            request.server_handle = server_handle;
+            request.data_size = size;
+
+            DWORD bytesWritten = 0;
+            if (!WriteFile(serverPipe, &request, sizeof(request), &bytesWritten, NULL) || bytesWritten != sizeof(request))
+            {
+                CloseHandle(serverPipe);
+                serverPipe = INVALID_HANDLE_VALUE;
+                return false;
+            }
+
+            if (size > 0 && (!WriteFile(serverPipe, data, (DWORD)size, &bytesWritten, NULL) || bytesWritten != size))
+            {
+                CloseHandle(serverPipe);
+                serverPipe = INVALID_HANDLE_VALUE;
+                return false;
+            }
+
+            return true;
+        }
+
+        static void RemoveFileOnServer(uint64_t server_handle)
+        {
+            if (serverPipe == INVALID_HANDLE_VALUE) return;
+
+            std::lock_guard<std::mutex> lock(serverMutex);
+
+            ServerCommand request = {};
+            request.command = ServerCommand::REMOVE_FILE;
+            request.server_handle = server_handle;
+
+            DWORD bytesWritten = 0;
+            WriteFile(serverPipe, &request, sizeof(request), &bytesWritten, NULL);
+        }
+#endif
     };
+
+    static std::atomic<size_t> virtualFilesCount{ 0 };
+    static std::shared_mutex virtualFilesMutex;
+    static std::unordered_map<std::wstring, std::shared_ptr<VirtualFile>> virtualFilesByPath;
+    static std::unordered_map<HANDLE, std::shared_ptr<VirtualFile>> virtualFilesByHandle;
 
     std::wstring NormalizePath(const std::filesystem::path& path)
     {
@@ -1630,11 +1874,6 @@ namespace OverloadFromFolder
         std::transform(relativePath.begin(), relativePath.end(), relativePath.begin(), ::towlower);
         return relativePath;
     }
-
-    static std::atomic<size_t> virtualFilesCount{ 0 };
-    static std::shared_mutex virtualFilesMutex;
-    static std::unordered_map<std::wstring, std::shared_ptr<VirtualFile>> virtualFilesByPath;
-    static std::unordered_map<HANDLE, std::shared_ptr<VirtualFile>> virtualFilesByHandle;
 
     inline bool HasVirtualFiles()
     {
@@ -2408,7 +2647,6 @@ namespace OverloadFromFolder
             return FALSE;
         }
 
-        auto& data = virtualFile->data;
         uint64_t readPosition;
         if (lpOverlapped)
         {
@@ -2419,7 +2657,7 @@ namespace OverloadFromFolder
             if (static_cast<int64_t>(readPosition) < 0)
             {
                 SetLastError(ERROR_INVALID_PARAMETER);
-                return FALSE; // Negative offset
+                return FALSE;
             }
             lpOverlapped->InternalHigh = 0;
         }
@@ -2428,76 +2666,146 @@ namespace OverloadFromFolder
             readPosition = virtualFile->position;
         }
 
-        // Handle reads past EOF
-        if (readPosition >= data.size())
-        {
-            if (lpNumberOfBytesRead)
-                *lpNumberOfBytesRead = 0;
-            return TRUE; // No data to read, success per ReadFile
-        }
+        DWORD bytesToRead = 0;
 
-        uint64_t remainingBytes = data.size() - readPosition;
-        DWORD bytesToRead = static_cast<DWORD>(min(static_cast<uint64_t>(nNumberOfBytesToRead), remainingBytes));
+        // Handle different storage types
+        return std::visit([&](const auto& storage) -> BOOL {
+            using T = std::decay_t<decltype(storage)>;
 
-        if (bytesToRead > 0)
-        {
-            memcpy(lpBuffer, data.data() + readPosition, bytesToRead);
-            if (!lpOverlapped)
+            if constexpr (std::is_same_v<T, LocalData>)
             {
-                virtualFile->position = readPosition + bytesToRead;
-            }
-        }
+                const auto& data = storage.data;
 
-        if (lpNumberOfBytesRead)
-        {
-            *lpNumberOfBytesRead = bytesToRead;
-        }
-
-        if (lpOverlapped)
-        {
-            lpOverlapped->InternalHigh = bytesToRead;
-            if (lpOverlapped->hEvent)
-            {
-                ResetEvent(lpOverlapped->hEvent); // Reset to unsignaled
-                SetEvent(lpOverlapped->hEvent);   // Signal completion
-            }
-            if (lpCompletionRoutine)
-            {
-                struct CompletionData
+                // Handle reads past EOF
+                if (readPosition >= data.size())
                 {
-                    LPOVERLAPPED_COMPLETION_ROUTINE lpCompletionRoutine;
-                    DWORD dwErrorCode;
-                    DWORD dwNumberOfBytesTransferred;
-                    LPOVERLAPPED lpOverlapped;
-                };
+                    if (lpNumberOfBytesRead)
+                        *lpNumberOfBytesRead = 0;
+                    return TRUE;
+                }
 
-                static auto CompletionRoutineWrapper = [](PVOID lpParameter) -> DWORD {
-                    auto* data = static_cast<CompletionData*>(lpParameter);
-                    data->lpCompletionRoutine(data->dwErrorCode, data->dwNumberOfBytesTransferred, data->lpOverlapped);
-                    delete data;
-                    return ERROR_SUCCESS;
-                };
+                uint64_t remainingBytes = data.size() - readPosition;
+                bytesToRead = static_cast<DWORD>(min(static_cast<uint64_t>(nNumberOfBytesToRead), remainingBytes));
 
-                // Queue completion routine to thread pool
-                auto* completionData = new CompletionData
+                if (bytesToRead > 0)
                 {
-                    lpCompletionRoutine,
-                    ERROR_SUCCESS,
-                    bytesToRead,
-                    lpOverlapped
-                };
-
-                if (!QueueUserWorkItem(static_cast<DWORD(CALLBACK*)(PVOID)>(CompletionRoutineWrapper), completionData, WT_EXECUTEDEFAULT))
-                {
-                    DWORD error = GetLastError();
-                    delete completionData;
-                    SetLastError(error);
-                    return FALSE;
+                    memcpy(lpBuffer, data.data() + readPosition, bytesToRead);
+                    if (!lpOverlapped)
+                    {
+                        virtualFile->position = readPosition + bytesToRead;
+                    }
                 }
             }
-        }
+            else if constexpr (std::is_same_v<T, ServerData>)
+            {
+#if !X64
+                // 32-bit: request data from server
+                if (serverPipe == INVALID_HANDLE_VALUE)
+                {
+                    SetLastError(ERROR_INVALID_HANDLE);
+                    return FALSE;
+                }
 
-        return TRUE;
+                std::lock_guard<std::mutex> lock(serverMutex);
+
+                // Send read request to server
+                ServerCommand request = {};
+                request.command = ServerCommand::READ_FILE;
+                request.server_handle = storage.server_handle;
+                request.offset = readPosition;
+                request.data_size = nNumberOfBytesToRead; // Use data_size for read length
+
+                DWORD bytesWritten;
+                if (!WriteFile(serverPipe, &request, sizeof(request), &bytesWritten, NULL) || bytesWritten != sizeof(request))
+                {
+                    CloseHandle(serverPipe);
+                    serverPipe = INVALID_HANDLE_VALUE;
+                    SetLastError(ERROR_WRITE_FAULT);
+                    return FALSE;
+                }
+
+                // Read response size
+                DWORD bytesRead;
+                if (!ReadFile(serverPipe, &bytesToRead, sizeof(bytesToRead), &bytesRead, NULL) || bytesRead != sizeof(bytesToRead))
+                {
+                    CloseHandle(serverPipe);
+                    serverPipe = INVALID_HANDLE_VALUE;
+                    SetLastError(ERROR_READ_FAULT);
+                    return FALSE;
+                }
+
+                if (bytesToRead > 0)
+                {
+                    if (!ReadFile(serverPipe, lpBuffer, bytesToRead, &bytesRead, NULL) || bytesRead != bytesToRead)
+                    {
+                        CloseHandle(serverPipe);
+                        serverPipe = INVALID_HANDLE_VALUE;
+                        SetLastError(ERROR_READ_FAULT);
+                        return FALSE;
+                    }
+
+                    if (!lpOverlapped)
+                    {
+                        virtualFile->position = readPosition + bytesToRead;
+                    }
+                }
+#else
+                // This shouldn't happen in 64-bit
+                SetLastError(ERROR_NOT_SUPPORTED);
+                return FALSE;
+#endif
+            }
+
+            if (lpNumberOfBytesRead)
+            {
+                *lpNumberOfBytesRead = bytesToRead;
+            }
+
+            if (lpOverlapped)
+            {
+                lpOverlapped->InternalHigh = bytesToRead;
+                if (lpOverlapped->hEvent)
+                {
+                    ResetEvent(lpOverlapped->hEvent);
+                    SetEvent(lpOverlapped->hEvent);
+                }
+                if (lpCompletionRoutine)
+                {
+                    struct CompletionData
+                    {
+                        LPOVERLAPPED_COMPLETION_ROUTINE lpCompletionRoutine;
+                        DWORD dwErrorCode;
+                        DWORD dwNumberOfBytesTransferred;
+                        LPOVERLAPPED lpOverlapped;
+                    };
+
+                    auto CompletionRoutineWrapper = [](PVOID lpParameter) -> DWORD {
+                        auto* data = static_cast<CompletionData*>(lpParameter);
+                        data->lpCompletionRoutine(data->dwErrorCode, data->dwNumberOfBytesTransferred, data->lpOverlapped);
+                        delete data;
+                        return ERROR_SUCCESS;
+                    };
+
+                    auto* completionData = new CompletionData
+                    {
+                        lpCompletionRoutine,
+                        ERROR_SUCCESS,
+                        bytesToRead,
+                        lpOverlapped
+                    };
+
+                    if (!QueueUserWorkItem(static_cast<LPTHREAD_START_ROUTINE>(CompletionRoutineWrapper), completionData, WT_EXECUTEDEFAULT))
+                    {
+                        DWORD error = GetLastError();
+                        delete completionData;
+                        SetLastError(error);
+                        return FALSE;
+                    }
+                }
+            }
+
+            return TRUE;
+        }, virtualFile->storage);
     }
 
     BOOL WINAPI shCustomReadFile(HANDLE hFile, LPVOID lpBuffer, DWORD nNumberOfBytesToRead, LPDWORD lpNumberOfBytesRead, LPOVERLAPPED lpOverlapped)
@@ -2523,7 +2831,7 @@ namespace OverloadFromFolder
         {
             if (auto virtualFile = GetVirtualFileByHandle(hFile))
             {
-                DWORD64 fileSize = virtualFile->data.size();
+                DWORD64 fileSize = virtualFile->GetSize();
                 if (lpFileSizeHigh)
                     *lpFileSizeHigh = static_cast<DWORD>(fileSize >> 32);
                 return static_cast<DWORD>(fileSize & 0xFFFFFFFF);
@@ -2546,7 +2854,7 @@ namespace OverloadFromFolder
                     SetLastError(ERROR_INVALID_PARAMETER);
                     return FALSE;
                 }
-                lpFileSize->QuadPart = virtualFile->data.size();
+                lpFileSize->QuadPart = virtualFile->GetSize();
                 return TRUE;
             }
             return FALSE;
@@ -2561,7 +2869,7 @@ namespace OverloadFromFolder
         {
             if (auto virtualFile = GetVirtualFileByHandle(hFile))
             {
-                uint64_t fileSize = virtualFile->data.size();
+                uint64_t fileSize = virtualFile->GetSize();
                 uint64_t newPosition;
                 switch (dwMoveMethod)
                 {
@@ -2649,7 +2957,7 @@ namespace OverloadFromFolder
                 SetLastError(ERROR_INVALID_PARAMETER);
                 return FALSE;
             }
-        
+
             if (auto virtualFile = GetVirtualFileByHandle(hFile))
             {
                 ZeroMemory(lpFileInformation, sizeof(BY_HANDLE_FILE_INFORMATION));
@@ -2657,12 +2965,13 @@ namespace OverloadFromFolder
                 lpFileInformation->ftCreationTime = virtualFile->creationTime;
                 lpFileInformation->ftLastAccessTime = virtualFile->lastAccessTime;
                 lpFileInformation->ftLastWriteTime = virtualFile->lastWriteTime;
-                lpFileInformation->nFileSizeHigh = static_cast<DWORD>((static_cast<uint64_t>(virtualFile->data.size()) >> 32) & 0xFFFFFFFF);
-                lpFileInformation->nFileSizeLow = static_cast<DWORD>(virtualFile->data.size() & 0xFFFFFFFF);
+                uint64_t size = virtualFile->GetSize();
+                lpFileInformation->nFileSizeHigh = static_cast<DWORD>((size >> 32) & 0xFFFFFFFF);
+                lpFileInformation->nFileSizeLow = static_cast<DWORD>(size & 0xFFFFFFFF);
                 lpFileInformation->nNumberOfLinks = 1;
                 return TRUE;
             }
-        
+
             SetLastError(ERROR_NOT_SUPPORTED);
             return FALSE;
         }
@@ -2693,15 +3002,16 @@ namespace OverloadFromFolder
                 {
                     auto fileInfo = static_cast<PFILE_STANDARD_INFO>(lpFileInformation);
                     memset(fileInfo, 0, sizeof(FILE_STANDARD_INFO));
-                    fileInfo->AllocationSize.QuadPart = static_cast<LONGLONG>(virtualFile->data.size());
-                    fileInfo->EndOfFile.QuadPart = static_cast<LONGLONG>(virtualFile->data.size());
+                    uint64_t size = virtualFile->GetSize();
+                    fileInfo->AllocationSize.QuadPart = static_cast<LONGLONG>(size);
+                    fileInfo->EndOfFile.QuadPart = static_cast<LONGLONG>(size);
                     fileInfo->NumberOfLinks = 1;
                     fileInfo->DeletePending = FALSE;
                     fileInfo->Directory = FALSE;
                     return TRUE;
                 }
             }
-        
+
             SetLastError(ERROR_NOT_SUPPORTED);
             return FALSE;
         }
@@ -2906,10 +3216,29 @@ namespace OverloadFromFolder
                 if (existingFile->priority > priority)
                     return false; // Existing has higher priority, skip
 
-                // Append data
-                size_t oldSize = existingFile->data.size();
-                existingFile->data.resize(oldSize + size);
-                std::memcpy(existingFile->data.data() + oldSize, data, size);
+                // For append operation, we need to handle different storage types
+                std::visit([&](auto& storage) {
+                    using T = std::decay_t<decltype(storage)>;
+
+                    if constexpr (std::is_same_v<T, LocalData>)
+                    {
+                        // Append to local data
+                        size_t oldSize = storage.data.size();
+                        storage.data.resize(oldSize + size);
+                        std::memcpy(storage.data.data() + oldSize, data, size);
+                    }
+                    else if constexpr (std::is_same_v<T, ServerData>)
+                    {
+#if !X64
+                        // Send append command to server
+                        if (VirtualFile::AppendFileOnServer(storage.server_handle, data, size))
+                        {
+                            // Update local size tracking
+                            storage.size += size;
+                        }
+#endif
+                    }
+                }, existingFile->storage);
 
                 // Update priority if new is higher
                 if (priority > existingFile->priority)
@@ -2946,6 +3275,19 @@ namespace OverloadFromFolder
             if (pathIt != virtualFilesByPath.end())
             {
                 auto virtualFile = pathIt->second;
+
+                // Handle server cleanup if needed
+                std::visit([&](const auto& storage) {
+                    using T = std::decay_t<decltype(storage)>;
+
+                    if constexpr (std::is_same_v<T, ServerData>)
+                    {
+                        #if !X64
+                        VirtualFile::RemoveFileOnServer(storage.server_handle);
+                        #endif
+                    }
+                }, virtualFile->storage);
+
                 virtualFilesByPath.erase(pathIt);
 
                 // Remove all handles that reference this virtual file
@@ -2962,7 +3304,6 @@ namespace OverloadFromFolder
                 }
 
                 virtualFilesCount.fetch_sub(1, std::memory_order_release);
-
                 HookAPIForVirtualFiles();
             }
         }
@@ -4164,7 +4505,7 @@ LONG WINAPI CustomUnhandledExceptionFilter(LPEXCEPTION_POINTERS ExceptionInfo)
             if (LogException(buffer, size, (LPEXCEPTION_POINTERS)ExceptionInfo, reg, stack, trace))
             {
                 DWORD NumberOfBytesWritten = 0;
-                WriteFile(hFile, buffer, strlen(buffer), &NumberOfBytesWritten, NULL);
+                WriteFile(hFile, buffer, DWORD(strlen(buffer)), &NumberOfBytesWritten, NULL);
             }
         };
 
