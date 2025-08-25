@@ -2863,54 +2863,59 @@ namespace OverloadFromFolder
         return mhGetFileSizeEx->get_original<decltype(GetFileSizeEx)>()(hFile, lpFileSize);
     }
 
+    BOOL SetVirtualFilePointerEx(HANDLE hFile, LARGE_INTEGER liDistanceToMove, PLARGE_INTEGER lpNewFilePointer, DWORD dwMoveMethod)
+    {
+        if (auto virtualFile = GetVirtualFileByHandle(hFile))
+        {
+            uint64_t fileSize = virtualFile->GetSize();
+            uint64_t newPosition;
+            switch (dwMoveMethod)
+            {
+            case FILE_BEGIN:
+                if (liDistanceToMove.QuadPart < 0)
+                {
+                    SetLastError(ERROR_NEGATIVE_SEEK);
+                    return FALSE;
+                }
+                newPosition = liDistanceToMove.QuadPart;
+                break;
+            case FILE_CURRENT:
+                if (liDistanceToMove.QuadPart < 0 && static_cast<uint64_t>(-liDistanceToMove.QuadPart) > virtualFile->position)
+                {
+                    SetLastError(ERROR_NEGATIVE_SEEK);
+                    return FALSE;
+                }
+                newPosition = virtualFile->position + liDistanceToMove.QuadPart;
+                break;
+            case FILE_END:
+                if (liDistanceToMove.QuadPart < 0 && static_cast<uint64_t>(-liDistanceToMove.QuadPart) > fileSize)
+                {
+                    SetLastError(ERROR_NEGATIVE_SEEK);
+                    return FALSE;
+                }
+                newPosition = fileSize + liDistanceToMove.QuadPart;
+                break;
+            default:
+                SetLastError(ERROR_INVALID_PARAMETER);
+                return FALSE;
+            }
+            virtualFile->position = newPosition;
+            if (lpNewFilePointer)
+            {
+                lpNewFilePointer->QuadPart = newPosition;
+            }
+            return TRUE;
+        }
+        SetLastError(ERROR_INVALID_HANDLE);
+        return FALSE;
+    }
+
     BOOL WINAPI shCustomSetFilePointerEx(HANDLE hFile, LARGE_INTEGER liDistanceToMove, PLARGE_INTEGER lpNewFilePointer, DWORD dwMoveMethod)
     {
         auto raddr = _ReturnAddress();
         if (!isRecursive(raddr) && IsVirtualHandle(hFile))
         {
-            if (auto virtualFile = GetVirtualFileByHandle(hFile))
-            {
-                uint64_t fileSize = virtualFile->GetSize();
-                uint64_t newPosition;
-                switch (dwMoveMethod)
-                {
-                case FILE_BEGIN:
-                    if (liDistanceToMove.QuadPart < 0)
-                    {
-                        SetLastError(ERROR_NEGATIVE_SEEK);
-                        return FALSE;
-                    }
-                    newPosition = liDistanceToMove.QuadPart;
-                    break;
-                case FILE_CURRENT:
-                    if (liDistanceToMove.QuadPart < 0 && static_cast<uint64_t>(-liDistanceToMove.QuadPart) > virtualFile->position)
-                    {
-                        SetLastError(ERROR_NEGATIVE_SEEK);
-                        return FALSE;
-                    }
-                    newPosition = virtualFile->position + liDistanceToMove.QuadPart;
-                    break;
-                case FILE_END:
-                    if (liDistanceToMove.QuadPart < 0 && static_cast<uint64_t>(-liDistanceToMove.QuadPart) > fileSize)
-                    {
-                        SetLastError(ERROR_NEGATIVE_SEEK);
-                        return FALSE;
-                    }
-                    newPosition = fileSize + liDistanceToMove.QuadPart;
-                    break;
-                default:
-                    SetLastError(ERROR_INVALID_PARAMETER);
-                    return FALSE;
-                }
-                virtualFile->position = newPosition;
-                if (lpNewFilePointer)
-                {
-                    lpNewFilePointer->QuadPart = newPosition;
-                }
-                return TRUE;
-            }
-            SetLastError(ERROR_INVALID_HANDLE);
-            return FALSE;
+            SetVirtualFilePointerEx(hFile, liDistanceToMove, lpNewFilePointer, dwMoveMethod);
         }
         return mhSetFilePointerEx->get_original<decltype(SetFilePointerEx)>()(hFile, liDistanceToMove, lpNewFilePointer, dwMoveMethod);
     }
@@ -2924,7 +2929,7 @@ namespace OverloadFromFolder
             liDistanceToMove.LowPart = lDistanceToMove;
             liDistanceToMove.HighPart = lpDistanceToMoveHigh ? *lpDistanceToMoveHigh : 0;
             LARGE_INTEGER liNewPosition;
-            if (!shCustomSetFilePointerEx(hFile, liDistanceToMove, &liNewPosition, dwMoveMethod))
+            if (!SetVirtualFilePointerEx(hFile, liDistanceToMove, &liNewPosition, dwMoveMethod))
             {
                 return INVALID_SET_FILE_POINTER;
             }
