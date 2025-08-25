@@ -2900,21 +2900,31 @@ namespace OverloadFromFolder
 
             auto pathIt = virtualFilesByPath.find(filePath);
 
-            if (pathIt != virtualFilesByPath.end() && pathIt->second->priority >= priority)
+            if (pathIt != virtualFilesByPath.end())
             {
-                return false;
+                auto& existingFile = pathIt->second;
+                if (existingFile->priority > priority)
+                    return false; // Existing has higher priority, skip
+
+                // Append data
+                size_t oldSize = existingFile->data.size();
+                existingFile->data.resize(oldSize + size);
+                std::memcpy(existingFile->data.data() + oldSize, data, size);
+
+                // Update priority if new is higher
+                if (priority > existingFile->priority)
+                    existingFile->priority = priority;
+
+                return true;
             }
-
-            bool wasNew = (pathIt == virtualFilesByPath.end());
-            auto virtualFile = std::make_shared<VirtualFile>(data, size, priority);
-            virtualFilesByPath[filePath] = virtualFile;
-
-            if (wasNew)
+            else
+            {
+                auto virtualFile = std::make_shared<VirtualFile>(data, size, priority);
+                virtualFilesByPath[filePath] = virtualFile;
                 virtualFilesCount.fetch_add(1, std::memory_order_release);
-
-            HookAPIForVirtualFiles();
-
-            return true;
+                HookAPIForVirtualFiles();
+                return true;
+            }
         }
         catch (...)
         {
