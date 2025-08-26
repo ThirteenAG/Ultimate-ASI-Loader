@@ -1,5 +1,6 @@
 #include "dllmain.h"
 #include "exception.hpp"
+#include "miniz.h"
 #include <initguid.h>
 #include <filesystem>
 #include <shared_mutex>
@@ -7,6 +8,7 @@
 #include <fstream>
 #include <memory>
 #include <map>
+#include <set>
 #include <FunctionHookMinHook.hpp>
 #include <shellapi.h>
 #include <SubAuth.h>
@@ -31,21 +33,35 @@ typedef NTSTATUS(NTAPI* LdrAddRefDll_t)(ULONG, HMODULE);
 
 namespace OverloadFromFolder
 {
+    struct MultiPartArchive
+    {
+        std::vector<std::filesystem::path> parts;
+        std::vector<uint64_t> part_sizes;
+        std::vector<uint64_t> part_offsets; // Cumulative offsets
+        uint64_t total_size = 0;
+        bool is_multi_part = false;
+    };
+
     struct FileLoaderPathEntry
     {
         std::filesystem::path path;
         std::vector<std::filesystem::path> dependencies;
         int priority;
         bool isLessThanDependency = false; // true for '<', false for '>'
+        bool isFromZip = false;
+        std::vector<std::shared_ptr<MultiPartArchive>> archives;
     };
 
     std::filesystem::path gamePath;
     std::vector<FileLoaderPathEntry> sFileLoaderEntries;
     std::vector<std::filesystem::path> sActiveDirectories;
+    std::unordered_map<std::filesystem::path, std::wstring> updateTxtContents;
 
     void HookAPIForOverload();
+    void HookAPIForVirtualFiles();
+    void LoadVirtualFilesFromZip();
     BOOL SetVirtualFilePointerEx(HANDLE hFile, LARGE_INTEGER liDistanceToMove, PLARGE_INTEGER lpNewFilePointer, DWORD dwMoveMethod);
-    std::vector<std::filesystem::path> DetermineActiveDirectories(const std::vector<FileLoaderPathEntry>& entries, const std::filesystem::path& selectedPath);
+    std::vector<std::filesystem::path> DetermineActiveDirectories(const std::vector<FileLoaderPathEntry>& entries, const std::filesystem::path& selectedPath, std::vector<bool>* isFromZipVector = nullptr);
 }
 
 bool WINAPI IsUltimateASILoader()
@@ -425,7 +441,7 @@ void GetSections(T&& h, Args... args)
 {
     const std::set< std::string_view, std::less<> > s = { args... };
     size_t dwLoadOffset = (size_t)GetModuleHandle(NULL);
-    BYTE* pImageBase = reinterpret_cast<BYTE *>(dwLoadOffset);
+    BYTE* pImageBase = reinterpret_cast<BYTE*>(dwLoadOffset);
     PIMAGE_DOS_HEADER   pDosHeader = reinterpret_cast<PIMAGE_DOS_HEADER>(dwLoadOffset);
     PIMAGE_NT_HEADERS   pNtHeader = reinterpret_cast<PIMAGE_NT_HEADERS>(pImageBase + pDosHeader->e_lfanew);
     PIMAGE_SECTION_HEADER pSection = IMAGE_FIRST_SECTION(pNtHeader);
@@ -585,7 +601,7 @@ void LoadOriginalLibrary()
             d3d12.LoadOriginalLibrary(LoadLib(szLocalPath));
         else
             d3d12.LoadOriginalLibrary(LoadLib(szSystemPath));
-    } 
+    }
     else if (iequals(szSelfName, L"winmm.dll"))
     {
         szLocalPath += L"winmmHooked.dll";
@@ -652,158 +668,158 @@ void LoadOriginalLibrary()
     }
     else
 #if !X64
-    if (iequals(szSelfName, L"vorbisFile.dll"))
-    {
-        szLocalPath += L"vorbisHooked.dll";
-        if (std::filesystem::exists(szLocalPath))
+        if (iequals(szSelfName, L"vorbisFile.dll"))
         {
-            vorbisfile.LoadOriginalLibrary(LoadLib(szLocalPath), false);
-        }
-        else
-        {
-            HRSRC hResource = FindResource(hm, MAKEINTRESOURCE(IDR_VORBISF), RT_RCDATA);
-            if (hResource)
+            szLocalPath += L"vorbisHooked.dll";
+            if (std::filesystem::exists(szLocalPath))
             {
-                HGLOBAL hLoadedResource = LoadResource(hm, hResource);
-                if (hLoadedResource)
+                vorbisfile.LoadOriginalLibrary(LoadLib(szLocalPath), false);
+            }
+            else
+            {
+                HRSRC hResource = FindResource(hm, MAKEINTRESOURCE(IDR_VORBISF), RT_RCDATA);
+                if (hResource)
                 {
-                    LPVOID pLockedResource = LockResource(hLoadedResource);
-                    if (pLockedResource)
+                    HGLOBAL hLoadedResource = LoadResource(hm, hResource);
+                    if (hLoadedResource)
                     {
-                        size_t dwResourceSize = SizeofResource(hm, hResource);
-                        if (0 != dwResourceSize)
+                        LPVOID pLockedResource = LockResource(hLoadedResource);
+                        if (pLockedResource)
                         {
-                            vorbisfile.LoadOriginalLibrary(ogMemModule = MemoryLoadLibrary((const void*)pLockedResource, dwResourceSize), true);
+                            size_t dwResourceSize = SizeofResource(hm, hResource);
+                            if (0 != dwResourceSize)
+                            {
+                                vorbisfile.LoadOriginalLibrary(ogMemModule = MemoryLoadLibrary((const void*)pLockedResource, dwResourceSize), true);
 
-                            // Unprotect the module NOW (CLEO 4.1.1.30f crash fix)
-                            auto hExecutableInstance = (size_t)GetModuleHandle(NULL);
-                            IMAGE_NT_HEADERS* ntHeader = (IMAGE_NT_HEADERS*)(hExecutableInstance + ((IMAGE_DOS_HEADER*)hExecutableInstance)->e_lfanew);
-                            SIZE_T size = ntHeader->OptionalHeader.SizeOfImage;
-                            DWORD oldProtect;
-                            VirtualProtect((VOID*)hExecutableInstance, size, PAGE_EXECUTE_READWRITE, &oldProtect);
+                                // Unprotect the module NOW (CLEO 4.1.1.30f crash fix)
+                                auto hExecutableInstance = (size_t)GetModuleHandle(NULL);
+                                IMAGE_NT_HEADERS* ntHeader = (IMAGE_NT_HEADERS*)(hExecutableInstance + ((IMAGE_DOS_HEADER*)hExecutableInstance)->e_lfanew);
+                                SIZE_T size = ntHeader->OptionalHeader.SizeOfImage;
+                                DWORD oldProtect;
+                                VirtualProtect((VOID*)hExecutableInstance, size, PAGE_EXECUTE_READWRITE, &oldProtect);
+                            }
                         }
                     }
                 }
             }
         }
-    }
-    else if (iequals(szSelfName, L"ddraw.dll"))
-    {
-        szLocalPath += L"ddrawHooked.dll";
-        if (std::filesystem::exists(szLocalPath))
-            ddraw.LoadOriginalLibrary(LoadLib(szLocalPath));
-        else
-            ddraw.LoadOriginalLibrary(LoadLib(szSystemPath));
-    }
-    else if (iequals(szSelfName, L"d3d8.dll"))
-    {
-        szLocalPath += L"d3d8Hooked.dll";
-        if (std::filesystem::exists(szLocalPath))
-            d3d8.LoadOriginalLibrary(LoadLib(szLocalPath));
-        else
+        else if (iequals(szSelfName, L"ddraw.dll"))
         {
-            d3d8.LoadOriginalLibrary(LoadLib(szSystemPath));
-            if (GetPrivateProfileIntW(L"globalsets", L"used3d8to9", FALSE, iniPaths))
-                d3d8.Direct3DCreate8 = (FARPROC)Direct3DCreate8;
+            szLocalPath += L"ddrawHooked.dll";
+            if (std::filesystem::exists(szLocalPath))
+                ddraw.LoadOriginalLibrary(LoadLib(szLocalPath));
+            else
+                ddraw.LoadOriginalLibrary(LoadLib(szSystemPath));
         }
-    }
-    else if (iequals(szSelfName, L"msacm32.dll"))
-    {
-        szLocalPath += L"msacm32Hooked.dll";
-        if (std::filesystem::exists(szLocalPath))
-            msacm32.LoadOriginalLibrary(LoadLib(szLocalPath));
-        else
-            msacm32.LoadOriginalLibrary(LoadLib(szSystemPath));
-    }
-    else if (iequals(szSelfName, L"dinput.dll"))
-    {
-        szLocalPath += L"dinputHooked.dll";
-        if (std::filesystem::exists(szLocalPath))
-            dinput.LoadOriginalLibrary(LoadLib(szLocalPath));
-        else
-            dinput.LoadOriginalLibrary(LoadLib(szSystemPath));
-    }
-    else if (iequals(szSelfName, L"msvfw32.dll"))
-    {
-        szLocalPath += L"msvfw32Hooked.dll";
-        if (std::filesystem::exists(szLocalPath))
-            msvfw32.LoadOriginalLibrary(LoadLib(szLocalPath));
-        else
-            msvfw32.LoadOriginalLibrary(LoadLib(szSystemPath));
-    }
-    else if (iequals(szSelfName, L"binkw32.dll"))
-    {
-        szLocalPath += L"binkw32Hooked.dll";
-        if (std::filesystem::exists(szLocalPath))
+        else if (iequals(szSelfName, L"d3d8.dll"))
         {
-            bink2w32.LoadOriginalLibrary(LoadLib(szLocalPath), false);
-        }
-        else
-        {
-            HRSRC hResource = FindResource(hm, MAKEINTRESOURCE(IDR_BINK), RT_RCDATA);
-            if (hResource)
+            szLocalPath += L"d3d8Hooked.dll";
+            if (std::filesystem::exists(szLocalPath))
+                d3d8.LoadOriginalLibrary(LoadLib(szLocalPath));
+            else
             {
-                HGLOBAL hLoadedResource = LoadResource(hm, hResource);
-                if (hLoadedResource)
+                d3d8.LoadOriginalLibrary(LoadLib(szSystemPath));
+                if (GetPrivateProfileIntW(L"globalsets", L"used3d8to9", FALSE, iniPaths))
+                    d3d8.Direct3DCreate8 = (FARPROC)Direct3DCreate8;
+            }
+        }
+        else if (iequals(szSelfName, L"msacm32.dll"))
+        {
+            szLocalPath += L"msacm32Hooked.dll";
+            if (std::filesystem::exists(szLocalPath))
+                msacm32.LoadOriginalLibrary(LoadLib(szLocalPath));
+            else
+                msacm32.LoadOriginalLibrary(LoadLib(szSystemPath));
+        }
+        else if (iequals(szSelfName, L"dinput.dll"))
+        {
+            szLocalPath += L"dinputHooked.dll";
+            if (std::filesystem::exists(szLocalPath))
+                dinput.LoadOriginalLibrary(LoadLib(szLocalPath));
+            else
+                dinput.LoadOriginalLibrary(LoadLib(szSystemPath));
+        }
+        else if (iequals(szSelfName, L"msvfw32.dll"))
+        {
+            szLocalPath += L"msvfw32Hooked.dll";
+            if (std::filesystem::exists(szLocalPath))
+                msvfw32.LoadOriginalLibrary(LoadLib(szLocalPath));
+            else
+                msvfw32.LoadOriginalLibrary(LoadLib(szSystemPath));
+        }
+        else if (iequals(szSelfName, L"binkw32.dll"))
+        {
+            szLocalPath += L"binkw32Hooked.dll";
+            if (std::filesystem::exists(szLocalPath))
+            {
+                bink2w32.LoadOriginalLibrary(LoadLib(szLocalPath), false);
+            }
+            else
+            {
+                HRSRC hResource = FindResource(hm, MAKEINTRESOURCE(IDR_BINK), RT_RCDATA);
+                if (hResource)
                 {
-                    LPVOID pLockedResource = LockResource(hLoadedResource);
-                    if (pLockedResource)
+                    HGLOBAL hLoadedResource = LoadResource(hm, hResource);
+                    if (hLoadedResource)
                     {
-                        size_t dwResourceSize = SizeofResource(hm, hResource);
-                        if (0 != dwResourceSize)
+                        LPVOID pLockedResource = LockResource(hLoadedResource);
+                        if (pLockedResource)
                         {
-                            bink2w32.LoadOriginalLibrary(ogMemModule = MemoryLoadLibrary((const void*)pLockedResource, dwResourceSize), true);
+                            size_t dwResourceSize = SizeofResource(hm, hResource);
+                            if (0 != dwResourceSize)
+                            {
+                                bink2w32.LoadOriginalLibrary(ogMemModule = MemoryLoadLibrary((const void*)pLockedResource, dwResourceSize), true);
+                            }
                         }
                     }
                 }
             }
         }
-    }
-    else if (iequals(szSelfName, L"bink2w32.dll"))
-    {
-        szLocalPath += L"bink2w32Hooked.dll";
-        if (std::filesystem::exists(szLocalPath))
+        else if (iequals(szSelfName, L"bink2w32.dll"))
         {
-            bink2w32.LoadOriginalLibrary(LoadLib(szLocalPath), false);
-        }
-    }
-    else if (iequals(szSelfName, L"xlive.dll"))
-    {
-        // Unprotect image - make .text and .rdata section writeable
-        GetSections([](PIMAGE_SECTION_HEADER pSection, size_t dwLoadOffset, DWORD dwPhysSize)
-        {
-            DWORD oldProtect = 0;
-            DWORD newProtect = (pSection->Characteristics & IMAGE_SCN_MEM_EXECUTE) ? PAGE_EXECUTE_READWRITE : PAGE_READWRITE;
-            if (!VirtualProtect(reinterpret_cast<VOID*>(dwLoadOffset + pSection->VirtualAddress), dwPhysSize, newProtect, &oldProtect))
+            szLocalPath += L"bink2w32Hooked.dll";
+            if (std::filesystem::exists(szLocalPath))
             {
-                ExitProcess(0);
+                bink2w32.LoadOriginalLibrary(LoadLib(szLocalPath), false);
             }
-        }, ".text", ".rdata");
-    }
-    else
+        }
+        else if (iequals(szSelfName, L"xlive.dll"))
+        {
+            // Unprotect image - make .text and .rdata section writeable
+            GetSections([](PIMAGE_SECTION_HEADER pSection, size_t dwLoadOffset, DWORD dwPhysSize)
+            {
+                DWORD oldProtect = 0;
+                DWORD newProtect = (pSection->Characteristics & IMAGE_SCN_MEM_EXECUTE) ? PAGE_EXECUTE_READWRITE : PAGE_READWRITE;
+                if (!VirtualProtect(reinterpret_cast<VOID*>(dwLoadOffset + pSection->VirtualAddress), dwPhysSize, newProtect, &oldProtect))
+                {
+                    ExitProcess(0);
+                }
+            }, ".text", ".rdata");
+        }
+        else
 #else
-    if (iequals(szSelfName, L"bink2w64.dll"))
-    {
-        szLocalPath += L"bink2w64Hooked.dll";
-        if (std::filesystem::exists(szLocalPath))
+        if (iequals(szSelfName, L"bink2w64.dll"))
         {
-            bink2w64.LoadOriginalLibrary(LoadLib(szLocalPath));
+            szLocalPath += L"bink2w64Hooked.dll";
+            if (std::filesystem::exists(szLocalPath))
+            {
+                bink2w64.LoadOriginalLibrary(LoadLib(szLocalPath));
+            }
         }
-    } 
-    else if (iequals(szSelfName, L"binkw64.dll"))
-    {
-        szLocalPath += L"binkw64Hooked.dll";
-        if (std::filesystem::exists(szLocalPath))
+        else if (iequals(szSelfName, L"binkw64.dll"))
         {
-            bink2w64.LoadOriginalLibrary(LoadLib(szLocalPath));
+            szLocalPath += L"binkw64Hooked.dll";
+            if (std::filesystem::exists(szLocalPath))
+            {
+                bink2w64.LoadOriginalLibrary(LoadLib(szLocalPath));
+            }
         }
-    }
-    else
+        else
 #endif
-    {
-        MessageBox(0, TEXT("This library isn't supported."), TEXT("ASI Loader"), MB_ICONERROR);
-        ExitProcess(0);
-    }
+        {
+            MessageBox(0, TEXT("This library isn't supported."), TEXT("ASI Loader"), MB_ICONERROR);
+            ExitProcess(0);
+        }
 
 }
 
@@ -857,9 +873,9 @@ void FindFiles(WIN32_FIND_DATAW* fd)
                 auto pos = wcslen(fd->cFileName);
 
                 if (fd->cFileName[pos - 4] == '.' &&
-                        (fd->cFileName[pos - 3] == 'a' || fd->cFileName[pos - 3] == 'A') &&
-                        (fd->cFileName[pos - 2] == 's' || fd->cFileName[pos - 2] == 'S') &&
-                        (fd->cFileName[pos - 1] == 'i' || fd->cFileName[pos - 1] == 'I'))
+                    (fd->cFileName[pos - 3] == 'a' || fd->cFileName[pos - 3] == 'A') &&
+                    (fd->cFileName[pos - 2] == 's' || fd->cFileName[pos - 2] == 'S') &&
+                    (fd->cFileName[pos - 1] == 'i' || fd->cFileName[pos - 1] == 'I'))
                 {
                     auto path = dir + L'\\' + fd->cFileName;
 
@@ -934,9 +950,9 @@ void FindFiles(WIN32_FIND_DATAW* fd)
 }
 
 void FindPlugins(WIN32_FIND_DATAW fd,
-                 const wchar_t* szPath,
-                 const wchar_t* szSelfPath,
-                 const UINT nWantsToLoadRecursively)
+    const wchar_t* szPath,
+    const wchar_t* szSelfPath,
+    const UINT nWantsToLoadRecursively)
 {
     std::error_code ec;
 
@@ -947,8 +963,8 @@ void FindPlugins(WIN32_FIND_DATAW fd,
     if (nWantsToLoadRecursively)
     {
         constexpr auto perms =
-          std::filesystem::directory_options::skip_permission_denied |
-          std::filesystem::directory_options::follow_directory_symlink;
+            std::filesystem::directory_options::skip_permission_denied |
+            std::filesystem::directory_options::follow_directory_symlink;
 
         for (auto& i : std::filesystem::directory_iterator(szPath, perms, ec))
         {
@@ -980,9 +996,6 @@ void LoadPlugins()
     SetCurrentDirectoryW(szSelfPath.c_str());
 
 #if !X64
-    LoadLibraryW(L".\\modloader\\modupdater.asi");
-    LoadLibraryW(L".\\modloader\\modloader.asi");
-
     std::fstream wndmode_ini;
     wndmode_ini.open("wndmode.ini", std::ios_base::out | std::ios_base::in | std::ios_base::binary);
     if (wndmode_ini.is_open())
@@ -1155,8 +1168,18 @@ void LoadPluginsAndRestoreIAT(uintptr_t retaddr, std::wstring_view calledFrom = 
                             header = content;
                     }
                 }
+                else
+                {
+                    auto it = updateTxtContents.find(updateTxtPath);
+                    if (it != updateTxtContents.end())
+                    {
+                        if (!it->second.empty())
+                            header = it->second;
+                    }
+                }
 
-                auto activeDirs = DetermineActiveDirectories(sFileLoaderEntries, path);
+                std::vector<bool> isZip;
+                auto activeDirs = DetermineActiveDirectories(sFileLoaderEntries, path, &isZip);
                 auto pathWithRelations = std::filesystem::absolute(path, ec).wstring();
                 if (activeDirs.size() > 1)
                 {
@@ -1168,15 +1191,28 @@ void LoadPluginsAndRestoreIAT(uintptr_t retaddr, std::wstring_view calledFrom = 
                     }
                 }
 
+                {
+                    for (size_t i = 0; i < activeDirs.size(); ++i)
+                    {
+                        if (isZip[i])
+                        {
+                            header += L" [ZIP]";
+                            break;
+                        }
+                    }
+                }
+
                 std::wstring buttonText = std::wstring(L"&") + header + L"\n" + pathWithRelations;
                 buttonTexts.push_back(buttonText);
                 aButtons.push_back({ buttonId++, buttonTexts.back().c_str() });
             }
 
+            updateTxtContents.clear();
+
             // Add a "Cancel" option
             //buttonTexts.push_back(L"Cancel");
             //aButtons.push_back({ IDCANCEL, buttonTexts.back().c_str() });
-            
+
             // Configure the TaskDialog
             TASKDIALOGCONFIG tdc = { sizeof(TASKDIALOGCONFIG) };
             int nClickedBtn = 0;
@@ -1242,12 +1278,17 @@ void LoadPluginsAndRestoreIAT(uintptr_t retaddr, std::wstring_view calledFrom = 
                 CloseHandle(hDialogMutex);
             }
 
+            LoadVirtualFilesFromZip();
             HookAPIForOverload();
+            HookAPIForVirtualFiles();
         }
         else if (sFileLoaderEntries.size() == 1)
         {
             sActiveDirectories = DetermineActiveDirectories(sFileLoaderEntries, sFileLoaderEntries[0].path);
+
+            LoadVirtualFilesFromZip();
             HookAPIForOverload();
+            HookAPIForVirtualFiles();
         }
     }
 
@@ -1522,7 +1563,7 @@ HANDLE WINAPI CustomFindFirstFileExW(LPCWSTR lpFileName, FINDEX_INFO_LEVELS fInf
 DEFINE_GUID(CLSID_DirectInput, 0x25E609E0, 0xB259, 0x11CF, 0xBF, 0xC7, 0x44, 0x45, 0x53, 0x54, 0x00, 0x00);
 DEFINE_GUID(CLSID_DirectInput8, 0x25E609E4, 0xB259, 0x11CF, 0xBF, 0xC7, 0x44, 0x45, 0x53, 0x54, 0x00, 0x00);
 DEFINE_GUID(CLSID_WinInet, 0xC39EE728, 0xD419, 0x4BD4, 0xA3, 0xEF, 0xED, 0xA0, 0x59, 0xDB, 0xD9, 0x35);
-HRESULT WINAPI CustomCoCreateInstance(REFCLSID rclsid, LPUNKNOWN pUnkOuter, DWORD dwClsContext, REFIID riid, LPVOID *ppv)
+HRESULT WINAPI CustomCoCreateInstance(REFCLSID rclsid, LPUNKNOWN pUnkOuter, DWORD dwClsContext, REFIID riid, LPVOID* ppv)
 {
     HRESULT hr = REGDB_E_KEYMISSING;
     HMODULE hDll = NULL;
@@ -1537,7 +1578,7 @@ HRESULT WINAPI CustomCoCreateInstance(REFCLSID rclsid, LPUNKNOWN pUnkOuter, DWOR
     if (hDll == NULL || GetProcAddress(hDll, "IsUltimateASILoader") != NULL)
         return ::CoCreateInstance(rclsid, pUnkOuter, dwClsContext, riid, ppv);
 
-    typedef HRESULT(__stdcall *pDllGetClassObject)(IN REFCLSID rclsid, IN REFIID riid, OUT LPVOID FAR* ppv);
+    typedef HRESULT(__stdcall* pDllGetClassObject)(IN REFCLSID rclsid, IN REFIID riid, OUT LPVOID FAR* ppv);
 
     pDllGetClassObject GetClassObject = (pDllGetClassObject)::GetProcAddress(hDll, "DllGetClassObject");
     if (GetClassObject == NULL)
@@ -1546,9 +1587,9 @@ HRESULT WINAPI CustomCoCreateInstance(REFCLSID rclsid, LPUNKNOWN pUnkOuter, DWOR
         return hr;
     }
 
-    IClassFactory *pIFactory;
+    IClassFactory* pIFactory;
 
-    hr = GetClassObject(rclsid, IID_IClassFactory, (LPVOID *)&pIFactory);
+    hr = GetClassObject(rclsid, IID_IClassFactory, (LPVOID*)&pIFactory);
 
     if (!SUCCEEDED(hr))
         return hr;
@@ -1641,9 +1682,21 @@ namespace OverloadFromFolder
         }
     };
 
+    struct ZipData
+    {
+        std::shared_ptr<MultiPartArchive> archive;
+        mz_uint fileIndex;
+        uint64_t uncompressedSize;
+
+        size_t GetSize() const
+        {
+            return static_cast<size_t>(uncompressedSize);
+        }
+    };
+
     struct VirtualFile
     {
-        std::variant<LocalData, ServerData> storage;
+        std::variant<LocalData, ServerData, ZipData> storage;
         int priority;
         FILETIME creationTime;
         FILETIME lastWriteTime;
@@ -1672,6 +1725,17 @@ namespace OverloadFromFolder
 #else
             storage = LocalData{ std::vector<uint8_t>(fileData, fileData + fileSize) };
 #endif
+        }
+
+        VirtualFile(std::shared_ptr<MultiPartArchive> archive, uint32_t fileIndex, uint64_t uncompressedSize, int filePriority)
+            : priority(filePriority), position(0)
+        {
+            SYSTEMTIME st;
+            GetSystemTime(&st);
+            SystemTimeToFileTime(&st, &creationTime);
+            lastWriteTime = creationTime;
+            lastAccessTime = creationTime;
+            storage = ZipData{ archive, fileIndex, uncompressedSize };
         }
 
         size_t GetSize() const
@@ -1778,41 +1842,41 @@ namespace OverloadFromFolder
             {
                 if (!InitializeServerConnection())
                     return 0;
-                }
+            }
 
             std::lock_guard<std::mutex> lock(serverMutex);
 
-                ServerCommand request = {};
-                request.command = ServerCommand::ADD_FILE;
-                request.data_size = size;
-                request.priority = priority;
+            ServerCommand request = {};
+            request.command = ServerCommand::ADD_FILE;
+            request.data_size = size;
+            request.priority = priority;
 
-                DWORD bytesWritten = 0;
+            DWORD bytesWritten = 0;
             if (!WriteFile(serverPipe, &request, sizeof(request), &bytesWritten, NULL) || bytesWritten != sizeof(request))
-                {
-                        CloseHandle(serverPipe);
-                        serverPipe = INVALID_HANDLE_VALUE;
+            {
+                CloseHandle(serverPipe);
+                serverPipe = INVALID_HANDLE_VALUE;
                 return 0;
-                        }
+            }
 
             if (size > 0 && (!WriteFile(serverPipe, data, (DWORD)size, &bytesWritten, NULL) || bytesWritten != size))
-                {
-                            CloseHandle(serverPipe);
-                            serverPipe = INVALID_HANDLE_VALUE;
-                        return 0;
-                    }
+            {
+                CloseHandle(serverPipe);
+                serverPipe = INVALID_HANDLE_VALUE;
+                return 0;
+            }
 
             uint64_t new_handle = 0;
-                DWORD bytesRead = 0;
+            DWORD bytesRead = 0;
             if (!ReadFile(serverPipe, &new_handle, sizeof(new_handle), &bytesRead, NULL) || bytesRead != sizeof(new_handle))
-                {
-                        CloseHandle(serverPipe);
-                        serverPipe = INVALID_HANDLE_VALUE;
-                    return 0;
-                }
-
-                return new_handle;
+            {
+                CloseHandle(serverPipe);
+                serverPipe = INVALID_HANDLE_VALUE;
+                return 0;
             }
+
+            return new_handle;
+        }
 
         static bool AppendFileOnServer(uint64_t server_handle, const uint8_t* data, size_t size)
         {
@@ -2139,6 +2203,11 @@ namespace OverloadFromFolder
         bool anyExists = false;
         entries.erase(std::remove_if(entries.begin(), entries.end(), [&](const FileLoaderPathEntry& entry)
         {
+            if (entry.isFromZip)
+            {
+                anyExists = true;
+                return false;
+            }
             bool exists = FolderExists(entry.path);
             anyExists |= exists;
             return !exists;
@@ -2146,7 +2215,7 @@ namespace OverloadFromFolder
         return anyExists;
     };
 
-    std::vector<std::filesystem::path> DetermineActiveDirectories(const std::vector<FileLoaderPathEntry>& entries, const std::filesystem::path& selectedPath)
+    std::vector<std::filesystem::path> DetermineActiveDirectories(const std::vector<FileLoaderPathEntry>& entries, const std::filesystem::path& selectedPath, std::vector<bool>* isFromZipVector)
     {
         std::set<std::filesystem::path> pathsToKeep;
         std::set<std::filesystem::path> processed;
@@ -2202,14 +2271,14 @@ namespace OverloadFromFolder
         addPathAndDependencies(selectedPath);
 
         // Convert set to vector and sort by priority for proper overriding order
-        std::vector<std::pair<std::filesystem::path, int>> pathsWithPriority;
+        std::vector<std::pair<std::filesystem::path, std::pair<bool, int>>> pathsWithPriority;
         for (const auto& path : pathsToKeep)
         {
             for (const auto& entry : entries)
             {
                 if (entry.path == path)
                 {
-                    pathsWithPriority.emplace_back(path, entry.priority);
+                    pathsWithPriority.emplace_back(path, std::make_pair(entry.isFromZip, entry.priority));
                     break;
                 }
             }
@@ -2217,15 +2286,246 @@ namespace OverloadFromFolder
 
         // Sort by priority (higher priority numbers first for file overriding)
         std::sort(pathsWithPriority.begin(), pathsWithPriority.end(),
-            [](const auto& a, const auto& b) { return a.second > b.second; });
+            [](const auto& a, const auto& b) { return a.second.second > b.second.second; });
 
         std::vector<std::filesystem::path> result;
+        if (isFromZipVector)
+        {
+            isFromZipVector->clear(); // Clear to ensure correct size and content
+            isFromZipVector->reserve(pathsWithPriority.size()); // Pre-allocate for efficiency
+        }
         for (const auto& pair : pathsWithPriority)
         {
             result.push_back(pair.first);
+            if (isFromZipVector)
+            {
+                isFromZipVector->push_back(pair.second.first); // Store isFromZip
+            }
         }
 
         return result;
+    }
+
+    size_t multipart_zip_read_func(void* pOpaque, mz_uint64 file_ofs, void* pBuf, size_t n)
+    {
+        auto* archive = static_cast<MultiPartArchive*>(pOpaque);
+        if (file_ofs >= archive->total_size) return 0;
+
+        size_t bytes_read_total = 0;
+        size_t bytes_to_read = n;
+        if (file_ofs + n > archive->total_size)
+            bytes_to_read = static_cast<size_t>(archive->total_size - file_ofs);
+
+        size_t current_part_index = 0;
+        for (size_t i = 0; i < archive->parts.size() - 1; ++i)
+        {
+            if (file_ofs < archive->part_offsets[i + 1])
+            {
+                current_part_index = i;
+                break;
+            }
+        }
+        if (file_ofs >= archive->part_offsets.back())
+            current_part_index = archive->parts.size() - 1;
+
+        uint64_t offset_in_part = file_ofs - archive->part_offsets[current_part_index];
+
+        while (bytes_read_total < bytes_to_read && current_part_index < archive->parts.size())
+        {
+            std::ifstream part_stream(archive->parts[current_part_index], std::ios::binary);
+            if (!part_stream) return 0;
+
+            part_stream.seekg(offset_in_part, std::ios::beg);
+            size_t remaining_in_part = static_cast<size_t>(archive->part_sizes[current_part_index] - offset_in_part);
+            size_t can_read_now = min(bytes_to_read - bytes_read_total, remaining_in_part);
+
+            part_stream.read(static_cast<char*>(pBuf) + bytes_read_total, can_read_now);
+            size_t actual_read = size_t(part_stream.gcount());
+            bytes_read_total += actual_read;
+
+            if (actual_read < can_read_now) break;
+
+            current_part_index++;
+            offset_in_part = 0;
+        }
+
+        return bytes_read_total;
+    }
+
+    void LoadPackages()
+    {
+        std::error_code ec;
+        auto packagesPath = gamePath / "packages";
+        if (std::filesystem::exists(packagesPath, ec) && std::filesystem::is_directory(packagesPath, ec))
+        {
+            constexpr auto perms =
+                std::filesystem::directory_options::skip_permission_denied |
+                std::filesystem::directory_options::follow_directory_symlink;
+
+            std::map<std::wstring, std::vector<std::filesystem::path>> groupedArchives;
+            for (const auto& dir_entry : std::filesystem::directory_iterator(packagesPath, perms, ec))
+            {
+                if (!dir_entry.is_regular_file())
+                    continue;
+
+                std::wstring filename = dir_entry.path().filename().wstring();
+                size_t pos = filename.find(L".zip");
+                if (pos != std::wstring::npos)
+                {
+                    std::wstring baseName = filename.substr(0, pos);
+                    groupedArchives[baseName].push_back(dir_entry.path());
+                }
+            }
+
+            for (auto const& [baseName, parts] : groupedArchives)
+            {
+                auto sorted_parts = parts;
+                std::sort(sorted_parts.begin(), sorted_parts.end());
+
+                auto archive = std::make_shared<MultiPartArchive>();
+                archive->is_multi_part = sorted_parts.size() > 1;
+
+                uint64_t current_offset = 0;
+                for (const auto& part_path : sorted_parts)
+                {
+                    std::error_code ec;
+                    uint64_t part_size = std::filesystem::file_size(part_path, ec);
+                    if (ec)
+                        continue;
+                    archive->parts.push_back(part_path);
+                    archive->part_sizes.push_back(part_size);
+                    archive->part_offsets.push_back(current_offset);
+                    current_offset += part_size;
+                }
+                archive->total_size = current_offset;
+
+                if (archive->parts.empty())
+                    continue;
+
+                mz_zip_archive zip_archive = {};
+                bool reader_initialized = false;
+
+                if (archive->is_multi_part)
+                {
+                    zip_archive.m_pRead = multipart_zip_read_func;
+                    zip_archive.m_pIO_opaque = archive.get();
+                    reader_initialized = mz_zip_reader_init(&zip_archive, archive->total_size, 0);
+                }
+                else
+                {
+                    reader_initialized = mz_zip_reader_init_file(&zip_archive, archive->parts[0].string().c_str(), 0);
+                }
+
+                if (reader_initialized)
+                {
+                    std::set<std::filesystem::path> rootDirsInZip;
+
+                    for (uint32_t i = 0; i < mz_zip_reader_get_num_files(&zip_archive); i++)
+                    {
+                        mz_zip_archive_file_stat file_stat;
+                        if (mz_zip_reader_file_stat(&zip_archive, i, &file_stat))
+                        {
+                            std::filesystem::path internalPath(file_stat.m_filename);
+                            if (!mz_zip_reader_is_file_a_directory(&zip_archive, i) && internalPath.has_parent_path())
+                            {
+                                auto parent = internalPath.parent_path();
+                                if (parent.begin() != parent.end())
+                                {
+                                    rootDirsInZip.insert(*parent.begin());
+                                }
+
+                                // Check for update.txt in the zip
+                                if (internalPath.filename() == "update.txt")
+                                {
+                                    // Extract update.txt to memory
+                                    size_t fileSize;
+                                    void* fileData = mz_zip_reader_extract_to_heap(&zip_archive, i, &fileSize, 0);
+                                    if (fileData)
+                                    {
+                                        try
+                                        {
+                                            std::string fileContent(static_cast<char*>(fileData), fileSize);
+                                            std::wstring content = to_wstring(fileContent);
+
+                                            // Extract first line (up to newline or 100 chars)
+                                            size_t newlinePos = content.find(L'\n');
+                                            if (newlinePos != std::wstring::npos)
+                                                content = content.substr(0, newlinePos);
+                                            if (content.size() > 100)
+                                                content = content.substr(0, 100);
+
+                                            if (!content.empty())
+                                            {
+                                                updateTxtContents[internalPath] = content;
+                                            }
+                                        }
+                                        catch (const std::exception&)
+                                        {
+                                            // Skip if conversion fails
+                                        }
+                                        mz_free(fileData);
+                                    }
+                                }
+                            }
+                            else if (mz_zip_reader_is_file_a_directory(&zip_archive, i) && internalPath.begin() != internalPath.end())
+                            {
+                                rootDirsInZip.insert(*internalPath.begin());
+                            }
+                        }
+                    }
+
+                    auto loaderEntriesCopy = sFileLoaderEntries;
+                    FilterExistingPathEntries(loaderEntriesCopy);
+
+                    std::set<std::filesystem::path> remainingPaths;
+                    for (const auto& entry : loaderEntriesCopy)
+                        remainingPaths.insert(entry.path);
+
+                    std::vector<FileLoaderPathEntry> excludedEntries;
+                    for (const auto& entry : sFileLoaderEntries)
+                    {
+                        if (remainingPaths.find(entry.path) == remainingPaths.end())
+                        {
+                            excludedEntries.push_back(entry);
+                        }
+                    }
+
+                    for (const auto& rootDir : rootDirsInZip)
+                    {
+                        bool bExcluded = std::find_if(excludedEntries.begin(), excludedEntries.end(), [&rootDir](const FileLoaderPathEntry& e)
+                        {
+                            return e.path == rootDir;
+                        }) != excludedEntries.end();
+
+                        bool found = false;
+                        for (auto& entry : sFileLoaderEntries)
+                        {
+                            if (bExcluded && entry.path == rootDir)
+                            {
+                                entry.isFromZip = true;
+                                entry.archives.push_back(archive);
+                                found = true;
+                                break;
+                            }
+                        }
+                        if (!found)
+                        {
+                            if (bExcluded)
+                            {
+                                FileLoaderPathEntry newEntry;
+                                newEntry.path = rootDir;
+                                newEntry.priority = -1000;
+                                newEntry.isFromZip = true;
+                                newEntry.archives.push_back(archive);
+                                sFileLoaderEntries.push_back(newEntry);
+                                break;
+                            }
+                        }
+                    }
+                    mz_zip_reader_end(&zip_archive);
+                }
+            }
+        }
     }
 
     std::filesystem::path WINAPI GetOverloadedFilePath(std::filesystem::path lpFilename)
@@ -2379,8 +2679,8 @@ namespace OverloadFromFolder
         return {};
     }
 
-    #define value_orA(path1, path2) (path1.empty() ? path2 : path1.string().c_str())
-    #define value_orW(path1, path2) (path1.empty() ? path2 : path1.wstring().c_str())
+#define value_orA(path1, path2) (path1.empty() ? path2 : path1.string().c_str())
+#define value_orW(path1, path2) (path1.empty() ? path2 : path1.wstring().c_str())
 
     void FindFileCheckOverloadedPath(auto dir, auto lpFindFileData, auto filename)
     {
@@ -2449,7 +2749,7 @@ namespace OverloadFromFolder
         if (!bRecursive && HasVirtualFiles() && IsVirtualFile(lpFileName))
             return CreateVirtualHandle(lpFileName, dwAccess, dwCreation);
         auto r = GetFilePathForOverload(lpFileName, bRecursive);
-        return mhCreateFileA->get_original<decltype(CreateFileA)>()(value_orA(r, lpFileName), dwAccess, dwSharing, saAttributes, dwCreation, dwAttributes, hTemplate);
+            return mhCreateFileA->get_original<decltype(CreateFileA)>()(value_orA(r, lpFileName), dwAccess, dwSharing, saAttributes, dwCreation, dwAttributes, hTemplate);
     }
 
     HANDLE WINAPI shCustomCreateFileW(LPCWSTR lpFileName, DWORD dwAccess, DWORD dwSharing, LPSECURITY_ATTRIBUTES saAttributes, DWORD dwCreation, DWORD dwAttributes, HANDLE hTemplate)
@@ -2459,7 +2759,7 @@ namespace OverloadFromFolder
         if (!bRecursive && HasVirtualFiles() && IsVirtualFile(lpFileName))
             return CreateVirtualHandle(lpFileName, dwAccess, dwCreation);
         auto r = GetFilePathForOverload(lpFileName, bRecursive);
-        return mhCreateFileW->get_original<decltype(CreateFileW)>()(value_orW(r, lpFileName), dwAccess, dwSharing, saAttributes, dwCreation, dwAttributes, hTemplate);
+            return mhCreateFileW->get_original<decltype(CreateFileW)>()(value_orW(r, lpFileName), dwAccess, dwSharing, saAttributes, dwCreation, dwAttributes, hTemplate);
     }
 
     HANDLE WINAPI shCustomCreateFile2(LPCWSTR lpFileName, DWORD dwDesiredAccess, DWORD dwShareMode, DWORD dwCreationDisposition, LPCREATEFILE2_EXTENDED_PARAMETERS pCreateExParams)
@@ -2469,7 +2769,7 @@ namespace OverloadFromFolder
         if (!bRecursive && HasVirtualFiles() && IsVirtualFile(lpFileName))
             return CreateVirtualHandle(lpFileName, dwDesiredAccess, dwCreationDisposition);
         auto r = GetFilePathForOverload(lpFileName, bRecursive);
-        return mhCreateFile2->get_original<decltype(shCustomCreateFile2)>()(value_orW(r, lpFileName), dwDesiredAccess, dwShareMode, dwCreationDisposition, pCreateExParams);
+            return mhCreateFile2->get_original<decltype(shCustomCreateFile2)>()(value_orW(r, lpFileName), dwDesiredAccess, dwShareMode, dwCreationDisposition, pCreateExParams);
     }
 
     HANDLE WINAPI shCustomCreateFile3(LPCWSTR lpFileName, DWORD dwDesiredAccess, DWORD dwShareMode, DWORD dwCreationDisposition, /*LPCREATEFILE3_EXTENDED_PARAMETERS*/void* pCreateExParams)
@@ -2714,6 +3014,59 @@ namespace OverloadFromFolder
             return FALSE;
         }
 
+        // Promote from ZipData to a readable format on first read
+        if (std::holds_alternative<ZipData>(virtualFile->storage))
+        {
+            auto zipData = std::get<ZipData>(virtualFile->storage); // Make a copy
+            mz_zip_archive zip_archive = {};
+            bool success = false;
+
+            if (zipData.archive->is_multi_part)
+            {
+                zip_archive.m_pRead = multipart_zip_read_func;
+                zip_archive.m_pIO_opaque = zipData.archive.get();
+                success = mz_zip_reader_init(&zip_archive, zipData.archive->total_size, 0);
+            }
+            else
+            {
+                success = mz_zip_reader_init_file(&zip_archive, zipData.archive->parts[0].string().c_str(), 0);
+            }
+
+            if (!success)
+            {
+                SetLastError(ERROR_OPEN_FAILED);
+                return FALSE;
+            }
+
+            size_t uncompressed_size = 0;
+            void* p = mz_zip_reader_extract_to_heap(&zip_archive, zipData.fileIndex, &uncompressed_size, 0);
+            mz_zip_reader_end(&zip_archive);
+
+            if (!p)
+            {
+                SetLastError(ERROR_READ_FAULT);
+                return FALSE;
+            }
+
+#if !X64
+            // In 32-bit, try to offload to the 64-bit server process to save memory
+            uint64_t handle = VirtualFile::CreateFileOnServer(static_cast<const uint8_t*>(p), uncompressed_size, virtualFile->priority);
+            if (handle != 0)
+            {
+                virtualFile->storage = ServerData{ handle, uncompressed_size };
+            }
+            else
+            {
+                // Fallback to local memory if server fails
+                virtualFile->storage = LocalData{ std::vector<uint8_t>(static_cast<uint8_t*>(p), static_cast<uint8_t*>(p) + uncompressed_size) };
+            }
+#else
+            // In 64-bit, always use local memory
+            virtualFile->storage = LocalData{ std::vector<uint8_t>(static_cast<uint8_t*>(p), static_cast<uint8_t*>(p) + uncompressed_size) };
+#endif
+            mz_free(p);
+        }
+
         uint64_t readPosition;
         if (lpOverlapped)
         {
@@ -2883,6 +3236,13 @@ namespace OverloadFromFolder
                 return FALSE;
 #endif
             }
+            else if constexpr (std::is_same_v<T, ZipData>)
+            {
+                // This case should have been promoted already.
+                // If we reach here, it's an internal logic error.
+                SetLastError(ERROR_INTERNAL_ERROR);
+                return FALSE;
+            }
 
             if (lpNumberOfBytesRead)
             {
@@ -2993,14 +3353,14 @@ namespace OverloadFromFolder
     {
         if (auto virtualFile = GetVirtualFileByHandle(hFile))
         {
-            uint64_t fileSize = virtualFile->GetSize();
+            uint64_t fileSize = uint64_t(virtualFile->GetSize());
             uint64_t currentPosition = virtualFile->position;
             uint64_t newPosition;
 
             switch (dwMoveMethod)
             {
             case FILE_BEGIN:
-                if (liDistanceToMove.QuadPart < 0 || liDistanceToMove.QuadPart > fileSize)
+                if (liDistanceToMove.QuadPart < 0 || liDistanceToMove.QuadPart > int64_t(fileSize))
                 {
                     SetLastError(ERROR_NEGATIVE_SEEK);
                     return FALSE;
@@ -3359,6 +3719,65 @@ namespace OverloadFromFolder
         }
     }
 
+    void LoadVirtualFilesFromZip()
+    {
+        for (const auto& activeDir : sActiveDirectories)
+        {
+            for (const auto& entry : sFileLoaderEntries)
+            {
+                if (entry.path == activeDir && entry.isFromZip)
+                {
+                    for (const auto& archive : entry.archives)
+                    {
+                        mz_zip_archive zip_archive = {};
+                        bool reader_initialized = false;
+
+                        if (archive->is_multi_part)
+                        {
+                            zip_archive.m_pRead = multipart_zip_read_func;
+                            zip_archive.m_pIO_opaque = archive.get();
+                            reader_initialized = mz_zip_reader_init(&zip_archive, archive->total_size, 0);
+                        }
+                        else
+                        {
+                            reader_initialized = mz_zip_reader_init_file(&zip_archive, archive->parts[0].string().c_str(), 0);
+                        }
+
+                        if (reader_initialized)
+                        {
+                            for (uint32_t i = 0; i < mz_zip_reader_get_num_files(&zip_archive); i++)
+                            {
+                                mz_zip_archive_file_stat file_stat;
+                                if (mz_zip_reader_file_stat(&zip_archive, i, &file_stat) && !mz_zip_reader_is_file_a_directory(&zip_archive, i))
+                                {
+                                    std::filesystem::path internalPath(file_stat.m_filename);
+                                    if (!internalPath.has_root_path() && internalPath.begin() != internalPath.end() && *internalPath.begin() == activeDir)
+                                    {
+                                        auto virtualPath = lexicallyRelativeCaseIns(internalPath, activeDir);
+                                        auto normalizedPath = NormalizePath(virtualPath);
+                                        std::unique_lock lock(virtualFilesMutex);
+                                        auto it = virtualFilesByPath.find(normalizedPath);
+                                        int newPri = entry.priority - 1000;
+                                        if (it == virtualFilesByPath.end() || it->second->priority < newPri)
+                                        {
+                                            auto virtualFile = std::make_shared<VirtualFile>(archive, i, file_stat.m_uncomp_size, newPri);
+                                            virtualFilesByPath[normalizedPath] = virtualFile;
+                                            if (it == virtualFilesByPath.end())
+                                            {
+                                                virtualFilesCount.fetch_add(1, std::memory_order_release);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            mz_zip_reader_end(&zip_archive);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     bool WINAPI AddVirtualFileForOverload(auto virtualPath, const uint8_t* data, size_t size, int priority)
     {
         if (!virtualPath || !data || size == 0)
@@ -3380,11 +3799,11 @@ namespace OverloadFromFolder
                 auto& existingFile = pathIt->second;
                 if (existingFile->priority > priority)
                     return false; // Existing has higher priority, skip
-            
+
                 // For append operation, we need to handle different storage types
                 std::visit([&](auto& storage) {
                     using T = std::decay_t<decltype(storage)>;
-            
+
                     if constexpr (std::is_same_v<T, LocalData>)
                     {
                         // Append to local data
@@ -3394,21 +3813,25 @@ namespace OverloadFromFolder
                     }
                     else if constexpr (std::is_same_v<T, ServerData>)
                     {
-                        #if !X64
+#if !X64
                         // Send append command to server
                         if (VirtualFile::AppendFileOnServer(storage.server_handle, data, size))
                         {
                             // Update local size tracking
                             storage.size += size;
                         }
-                        #endif
+#endif
+                    }
+                    else if constexpr (std::is_same_v<T, ZipData>)
+                    {
+                        // Appending to a file in a zip is not supported.
                     }
                 }, existingFile->storage);
-            
+
                 // Update priority if new is higher
                 if (priority > existingFile->priority)
                     existingFile->priority = priority;
-            
+
                 return true;
             }
             else
@@ -3447,9 +3870,9 @@ namespace OverloadFromFolder
 
                     if constexpr (std::is_same_v<T, ServerData>)
                     {
-                        #if !X64
+#if !X64
                         VirtualFile::RemoveFileOnServer(storage.server_handle);
-                        #endif
+#endif
                     }
                 }, virtualFile->storage);
 
@@ -4097,244 +4520,244 @@ bool HookKernel32IAT(HMODULE mod, bool exe)
                                 {
                                 case ewinhttp::Private1:
                                     p[j] = _Private1;
-                                        break;
+                                    break;
                                 case ewinhttp::SvchostPushServiceGlobals:
                                     p[j] = _SvchostPushServiceGlobals;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpAddRequestHeaders:
                                     p[j] = _WinHttpAddRequestHeaders;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpAddRequestHeadersEx:
                                     p[j] = _WinHttpAddRequestHeadersEx;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpAutoProxySvcMain:
                                     p[j] = _WinHttpAutoProxySvcMain;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpCheckPlatform:
                                     p[j] = _WinHttpCheckPlatform;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpCloseHandle:
                                     p[j] = _WinHttpCloseHandle;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpConnect:
                                     p[j] = _WinHttpConnect;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpConnectionDeletePolicyEntries:
                                     p[j] = _WinHttpConnectionDeletePolicyEntries;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpConnectionDeleteProxyInfo:
                                     p[j] = _WinHttpConnectionDeleteProxyInfo;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpConnectionFreeNameList:
                                     p[j] = _WinHttpConnectionFreeNameList;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpConnectionFreeProxyInfo:
                                     p[j] = _WinHttpConnectionFreeProxyInfo;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpConnectionFreeProxyList:
                                     p[j] = _WinHttpConnectionFreeProxyList;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpConnectionGetNameList:
                                     p[j] = _WinHttpConnectionGetNameList;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpConnectionGetProxyInfo:
                                     p[j] = _WinHttpConnectionGetProxyInfo;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpConnectionGetProxyList:
                                     p[j] = _WinHttpConnectionGetProxyList;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpConnectionOnlyConvert:
                                     p[j] = _WinHttpConnectionOnlyConvert;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpConnectionOnlyReceive:
                                     p[j] = _WinHttpConnectionOnlyReceive;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpConnectionOnlySend:
                                     p[j] = _WinHttpConnectionOnlySend;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpConnectionSetPolicyEntries:
                                     p[j] = _WinHttpConnectionSetPolicyEntries;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpConnectionSetProxyInfo:
                                     p[j] = _WinHttpConnectionSetProxyInfo;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpConnectionUpdateIfIndexTable:
                                     p[j] = _WinHttpConnectionUpdateIfIndexTable;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpCrackUrl:
                                     p[j] = _WinHttpCrackUrl;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpCreateProxyResolver:
                                     p[j] = _WinHttpCreateProxyResolver;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpCreateUrl:
                                     p[j] = _WinHttpCreateUrl;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpDetectAutoProxyConfigUrl:
                                     p[j] = _WinHttpDetectAutoProxyConfigUrl;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpFreeProxyResult:
                                     p[j] = _WinHttpFreeProxyResult;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpFreeProxyResultEx:
                                     p[j] = _WinHttpFreeProxyResultEx;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpFreeProxySettings:
                                     p[j] = _WinHttpFreeProxySettings;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpFreeProxySettingsEx:
                                     p[j] = _WinHttpFreeProxySettingsEx;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpFreeQueryConnectionGroupResult:
                                     p[j] = _WinHttpFreeQueryConnectionGroupResult;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpGetDefaultProxyConfiguration:
                                     p[j] = _WinHttpGetDefaultProxyConfiguration;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpGetIEProxyConfigForCurrentUser:
                                     p[j] = _WinHttpGetIEProxyConfigForCurrentUser;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpGetProxyForUrl:
                                     p[j] = _WinHttpGetProxyForUrl;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpGetProxyForUrlEx:
                                     p[j] = _WinHttpGetProxyForUrlEx;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpGetProxyForUrlEx2:
                                     p[j] = _WinHttpGetProxyForUrlEx2;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpGetProxyForUrlHvsi:
                                     p[j] = _WinHttpGetProxyForUrlHvsi;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpGetProxyResult:
                                     p[j] = _WinHttpGetProxyResult;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpGetProxyResultEx:
                                     p[j] = _WinHttpGetProxyResultEx;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpGetProxySettingsEx:
                                     p[j] = _WinHttpGetProxySettingsEx;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpGetProxySettingsResultEx:
                                     p[j] = _WinHttpGetProxySettingsResultEx;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpGetProxySettingsVersion:
                                     p[j] = _WinHttpGetProxySettingsVersion;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpGetTunnelSocket:
                                     p[j] = _WinHttpGetTunnelSocket;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpOpen:
                                     p[j] = _WinHttpOpen;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpOpenRequest:
                                     p[j] = _WinHttpOpenRequest;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpPacJsWorkerMain:
                                     p[j] = _WinHttpPacJsWorkerMain;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpProbeConnectivity:
                                     p[j] = _WinHttpProbeConnectivity;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpQueryAuthSchemes:
                                     p[j] = _WinHttpQueryAuthSchemes;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpQueryConnectionGroup:
                                     p[j] = _WinHttpQueryConnectionGroup;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpQueryDataAvailable:
                                     p[j] = _WinHttpQueryDataAvailable;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpQueryHeaders:
                                     p[j] = _WinHttpQueryHeaders;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpQueryHeadersEx:
                                     p[j] = _WinHttpQueryHeadersEx;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpQueryOption:
                                     p[j] = _WinHttpQueryOption;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpReadData:
                                     p[j] = _WinHttpReadData;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpReadDataEx:
                                     p[j] = _WinHttpReadDataEx;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpReadProxySettings:
                                     p[j] = _WinHttpReadProxySettings;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpReadProxySettingsHvsi:
                                     p[j] = _WinHttpReadProxySettingsHvsi;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpReceiveResponse:
                                     p[j] = _WinHttpReceiveResponse;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpRegisterProxyChangeNotification:
                                     p[j] = _WinHttpRegisterProxyChangeNotification;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpResetAutoProxy:
                                     p[j] = _WinHttpResetAutoProxy;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpSaveProxyCredentials:
                                     p[j] = _WinHttpSaveProxyCredentials;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpSendRequest:
                                     p[j] = _WinHttpSendRequest;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpSetCredentials:
                                     p[j] = _WinHttpSetCredentials;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpSetDefaultProxyConfiguration:
                                     p[j] = _WinHttpSetDefaultProxyConfiguration;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpSetOption:
                                     p[j] = _WinHttpSetOption;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpSetProxySettingsPerUser:
                                     p[j] = _WinHttpSetProxySettingsPerUser;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpSetSecureLegacyServersAppCompat:
                                     p[j] = _WinHttpSetSecureLegacyServersAppCompat;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpSetStatusCallback:
                                     p[j] = _WinHttpSetStatusCallback;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpSetTimeouts:
                                     p[j] = _WinHttpSetTimeouts;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpTimeFromSystemTime:
                                     p[j] = _WinHttpTimeFromSystemTime;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpTimeToSystemTime:
                                     p[j] = _WinHttpTimeToSystemTime;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpUnregisterProxyChangeNotification:
                                     p[j] = _WinHttpUnregisterProxyChangeNotification;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpWebSocketClose:
                                     p[j] = _WinHttpWebSocketClose;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpWebSocketCompleteUpgrade:
                                     p[j] = _WinHttpWebSocketCompleteUpgrade;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpWebSocketQueryCloseStatus:
                                     p[j] = _WinHttpWebSocketQueryCloseStatus;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpWebSocketReceive:
                                     p[j] = _WinHttpWebSocketReceive;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpWebSocketSend:
                                     p[j] = _WinHttpWebSocketSend;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpWebSocketShutdown:
                                     p[j] = _WinHttpWebSocketShutdown;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpWriteData:
                                     p[j] = _WinHttpWriteData;
-                                        break;
+                                    break;
                                 case ewinhttp::WinHttpWriteProxySettings:
                                     p[j] = _WinHttpWriteProxySettings;
-                                        break;
+                                    break;
                                 default:
                                     break;
                                 }
@@ -4343,7 +4766,7 @@ bool HookKernel32IAT(HMODULE mod, bool exe)
                             {
                                 DWORD Protect;
                                 VirtualProtect(&p[j], 4, PAGE_EXECUTE_READWRITE, &Protect);
-                            
+
                                 const enum exinput1_1
                                 {
                                     DllMain = 1,
@@ -4353,7 +4776,7 @@ bool HookKernel32IAT(HMODULE mod, bool exe)
                                     XInputGetState = 5,
                                     XInputSetState = 6,
                                 };
-                            
+
                                 switch (IMAGE_ORDINAL(thunk->u1.Ordinal))
                                 {
                                 case exinput1_1::DllMain:
@@ -4726,11 +5149,11 @@ void Init()
         {
             SetUnhandledExceptionFilter(CustomUnhandledExceptionFilter);
             // Now stub out CustomUnhandledExceptionFilter so NO ONE ELSE can set it!
-            #if !X64
+#if !X64
             uint32_t ret = 0x900004C2; //ret4
-            #else
+#else
             uint32_t ret = 0x909090C3; //ret
-            #endif
+#endif
             DWORD protect[2];
             VirtualProtect(&SetUnhandledExceptionFilter, sizeof(ret), PAGE_EXECUTE_READWRITE, &protect[0]);
             memcpy(&SetUnhandledExceptionFilter, &ret, sizeof(ret));
@@ -4742,6 +5165,7 @@ void Init()
         using namespace OverloadFromFolder;
         gamePath = std::filesystem::path(GetExeModulePath());
         sFileLoaderEntries = ParseMultiplePathsWithPriority(sFileLoaderPathIniString);
+        LoadPackages();
         if (!FilterExistingPathEntries(sFileLoaderEntries))
         {
             // No valid paths exist - clear everything

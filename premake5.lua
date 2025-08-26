@@ -66,6 +66,8 @@ project "Ultimate-ASI-Loader-Win32"
    files { "external/injector/minhook/include/*.h", "external/injector/minhook/src/**.h", "external/injector/minhook/src/**.c" }
    includedirs { "external/injector/utility" }
    files { "external/injector/utility/FunctionHookMinHook.hpp", "external/injector/utility/FunctionHookMinHook.cpp" }
+   includedirs { "external/miniz" }
+   files { "external/miniz/miniz.c", "external/miniz/miniz.h" }
 
    files { "source/dllmain.h", "source/dllmain.cpp" }
    files { "source/x86.def" }
@@ -227,6 +229,8 @@ project "Ultimate-ASI-Loader-x64"
    files { "external/injector/minhook/include/*.h", "external/injector/minhook/src/**.h", "external/injector/minhook/src/**.c" }
    includedirs { "external/injector/utility" }
    files { "external/injector/utility/FunctionHookMinHook.hpp", "external/injector/utility/FunctionHookMinHook.cpp" }
+   includedirs { "external/miniz" }
+   files { "external/miniz/miniz.c", "external/miniz/miniz.h" }
 
    files { "source/dllmain.h", "source/dllmain.cpp" }
    files { "source/x64.def" }

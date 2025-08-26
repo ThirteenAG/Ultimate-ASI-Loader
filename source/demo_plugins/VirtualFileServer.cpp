@@ -169,6 +169,15 @@ void HandleClient(HANDLE hPipe)
 
 int main()
 {
+    HANDLE hMutex = CreateMutexW(NULL, TRUE, L"Global\\Ultimate-ASI-Loader-VirtualFileClientMutex");
+    if (!hMutex || GetLastError() != ERROR_ALREADY_EXISTS)
+    {
+        // Mutex does not exist, exit
+        std::wcerr << L"Server: Client mutex not found. Exiting." << std::endl;
+        if (hMutex) CloseHandle(hMutex);
+        return 1;
+    }
+
     const wchar_t* pipeName = L"\\\\.\\pipe\\Ultimate-ASI-Loader-VirtualFileServer";
     std::wcout << L"Server: Starting virtual file server..." << std::endl;
 
