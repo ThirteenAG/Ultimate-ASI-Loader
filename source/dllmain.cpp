@@ -2369,11 +2369,20 @@ namespace OverloadFromFolder
                     continue;
 
                 std::wstring filename = dir_entry.path().filename().wstring();
-                size_t pos = filename.find(L".zip");
+                std::wstring lowercaseFilename = filename;
+                std::transform(lowercaseFilename.begin(), lowercaseFilename.end(), lowercaseFilename.begin(), [](wchar_t c) { return ::towlower(c); });
+                size_t pos = lowercaseFilename.find(L".zip");
                 if (pos != std::wstring::npos)
                 {
-                    std::wstring baseName = filename.substr(0, pos);
-                    groupedArchives[baseName].push_back(dir_entry.path());
+                    std::wstring extension = dir_entry.path().extension().wstring();
+                    if (!extension.empty() && extension[0] == L'.')
+                        extension = extension.substr(1);
+
+                    if (lowercaseFilename.ends_with(L".zip") || (lowercaseFilename.ends_with(L".zip." + extension) && std::all_of(extension.cbegin(), extension.cend(), [](wchar_t c) { return ::iswdigit(c); })))
+                    {
+                        std::wstring baseName = filename.substr(0, pos);
+                        groupedArchives[baseName].push_back(dir_entry.path());
+                    }
                 }
             }
 
