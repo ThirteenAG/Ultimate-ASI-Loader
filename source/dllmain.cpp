@@ -2749,7 +2749,7 @@ namespace OverloadFromFolder
         if (!bRecursive && HasVirtualFiles() && IsVirtualFile(lpFileName))
             return CreateVirtualHandle(lpFileName, dwAccess, dwCreation);
         auto r = GetFilePathForOverload(lpFileName, bRecursive);
-            return mhCreateFileA->get_original<decltype(CreateFileA)>()(value_orA(r, lpFileName), dwAccess, dwSharing, saAttributes, dwCreation, dwAttributes, hTemplate);
+        return mhCreateFileA->get_original<decltype(CreateFileA)>()(value_orA(r, lpFileName), dwAccess, dwSharing, saAttributes, dwCreation, dwAttributes, hTemplate);
     }
 
     HANDLE WINAPI shCustomCreateFileW(LPCWSTR lpFileName, DWORD dwAccess, DWORD dwSharing, LPSECURITY_ATTRIBUTES saAttributes, DWORD dwCreation, DWORD dwAttributes, HANDLE hTemplate)
@@ -2759,7 +2759,7 @@ namespace OverloadFromFolder
         if (!bRecursive && HasVirtualFiles() && IsVirtualFile(lpFileName))
             return CreateVirtualHandle(lpFileName, dwAccess, dwCreation);
         auto r = GetFilePathForOverload(lpFileName, bRecursive);
-            return mhCreateFileW->get_original<decltype(CreateFileW)>()(value_orW(r, lpFileName), dwAccess, dwSharing, saAttributes, dwCreation, dwAttributes, hTemplate);
+        return mhCreateFileW->get_original<decltype(CreateFileW)>()(value_orW(r, lpFileName), dwAccess, dwSharing, saAttributes, dwCreation, dwAttributes, hTemplate);
     }
 
     HANDLE WINAPI shCustomCreateFile2(LPCWSTR lpFileName, DWORD dwDesiredAccess, DWORD dwShareMode, DWORD dwCreationDisposition, LPCREATEFILE2_EXTENDED_PARAMETERS pCreateExParams)
@@ -2769,7 +2769,7 @@ namespace OverloadFromFolder
         if (!bRecursive && HasVirtualFiles() && IsVirtualFile(lpFileName))
             return CreateVirtualHandle(lpFileName, dwDesiredAccess, dwCreationDisposition);
         auto r = GetFilePathForOverload(lpFileName, bRecursive);
-            return mhCreateFile2->get_original<decltype(shCustomCreateFile2)>()(value_orW(r, lpFileName), dwDesiredAccess, dwShareMode, dwCreationDisposition, pCreateExParams);
+        return mhCreateFile2->get_original<decltype(shCustomCreateFile2)>()(value_orW(r, lpFileName), dwDesiredAccess, dwShareMode, dwCreationDisposition, pCreateExParams);
     }
 
     HANDLE WINAPI shCustomCreateFile3(LPCWSTR lpFileName, DWORD dwDesiredAccess, DWORD dwShareMode, DWORD dwCreationDisposition, /*LPCREATEFILE3_EXTENDED_PARAMETERS*/void* pCreateExParams)
