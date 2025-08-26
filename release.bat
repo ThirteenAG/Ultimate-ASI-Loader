@@ -8,7 +8,7 @@ type nul >"bin\place both files in RESIDENT EVIL 7 biohazard Demo folder"
 7za a -tzip ".\bin\MessageBox-x64.zip" ".\bin\x64\Release\scripts\MessageBox_x64.asi"
 7za a -tzip ".\bin\MonoLoader-Win32.zip" ".\bin\Win32\Release\scripts\MonoLoader.asi" ".\source\demo_plugins\plugins\"
 7za a -tzip ".\bin\MonoLoader-x64.zip" ".\bin\x64\Release\scripts\MonoLoader_x64.asi" ".\source\demo_plugins\plugins\"
-7za a -tzip ".\bin\VirtualFileServer-x64.zip" ".\bin\x64\Release\VirtualFileServer.exe" ".\source\demo_plugins\plugins\"
+7za a -tzip ".\bin\VirtualFileServer-x64.zip" ".\bin\x64\Release\VirtualFileServer.exe"
 EXIT
 
 7-Zip Extra
