@@ -61,7 +61,10 @@ namespace OverloadFromFolder
     void HookAPIForVirtualFiles();
     void LoadVirtualFilesFromZip();
     BOOL SetVirtualFilePointerEx(HANDLE hFile, LARGE_INTEGER liDistanceToMove, PLARGE_INTEGER lpNewFilePointer, DWORD dwMoveMethod);
+    bool FilterExistingPathEntries(std::vector<FileLoaderPathEntry>& entries);
+    std::vector<FileLoaderPathEntry> ParseMultiplePathsWithPriority(const std::wstring& pathsString);
     std::vector<std::filesystem::path> DetermineActiveDirectories(const std::vector<FileLoaderPathEntry>& entries, const std::filesystem::path& selectedPath, std::vector<bool>* isFromZipVector = nullptr);
+    void LoadPackages();
 }
 
 bool WINAPI IsUltimateASILoader()
@@ -1173,6 +1176,17 @@ void LoadPluginsAndRestoreIAT(uintptr_t retaddr, std::wstring_view calledFrom = 
 
     {
         using namespace OverloadFromFolder;
+
+        auto sFileLoaderPathIniString = GetPrivateProfileStringW(TEXT("fileloader"), TEXT("overloadfromfolder"), TEXT("update"), iniPaths);
+        sFileLoaderEntries = ParseMultiplePathsWithPriority(sFileLoaderPathIniString);
+        LoadPackages();
+        if (!FilterExistingPathEntries(sFileLoaderEntries))
+        {
+            // No valid paths exist - clear everything
+            sFileLoaderEntries.clear();
+            sActiveDirectories.clear();
+        }
+
         if (sFileLoaderEntries.size() > 1)
         {
             std::vector<std::filesystem::path> pathsForDialog;
@@ -2246,7 +2260,8 @@ namespace OverloadFromFolder
         return entries;
     }
 
-    auto FilterExistingPathEntries = [](std::vector<FileLoaderPathEntry>& entries) -> bool {
+    bool FilterExistingPathEntries(std::vector<FileLoaderPathEntry>& entries)
+    {
         bool anyExists = false;
         entries.erase(std::remove_if(entries.begin(), entries.end(), [&](const FileLoaderPathEntry& entry)
         {
@@ -3606,48 +3621,39 @@ namespace OverloadFromFolder
             return;
         }
 
-        mhLoadLibraryExA = std::make_unique<FunctionHookMinHook>((uintptr_t)LoadLibraryExA, (uintptr_t)shCustomLoadLibraryExA);
-        mhLoadLibraryExW = std::make_unique<FunctionHookMinHook>((uintptr_t)LoadLibraryExW, (uintptr_t)shCustomLoadLibraryExW);
-        mhCreateFileA = std::make_unique<FunctionHookMinHook>((uintptr_t)CreateFileA, (uintptr_t)shCustomCreateFileA);
-        mhCreateFileW = std::make_unique<FunctionHookMinHook>((uintptr_t)CreateFileW, (uintptr_t)shCustomCreateFileW);
-        if (auto pKernel32 = GetModuleHandle(TEXT("kernel32.dll")))
+        std::vector<std::tuple<std::wstring, std::unique_ptr<FunctionHookMinHook>&, std::string, uintptr_t>> hookFunctions =
         {
-            if (auto pCreateFile2 = (uintptr_t)GetProcAddress(pKernel32, "CreateFile2"))
-                mhCreateFile2 = std::make_unique<FunctionHookMinHook>(pCreateFile2, (uintptr_t)shCustomCreateFile2);
-            if (auto pCreateFile3 = (uintptr_t)GetProcAddress(pKernel32, "CreateFile3"))
-                mhCreateFile3 = std::make_unique<FunctionHookMinHook>(pCreateFile3, (uintptr_t)shCustomCreateFile3);
-        }
-        mhGetFileAttributesA = std::make_unique<FunctionHookMinHook>((uintptr_t)GetFileAttributesA, (uintptr_t)shCustomGetFileAttributesA);
-        mhGetFileAttributesW = std::make_unique<FunctionHookMinHook>((uintptr_t)GetFileAttributesW, (uintptr_t)shCustomGetFileAttributesW);
-        mhGetFileAttributesExA = std::make_unique<FunctionHookMinHook>((uintptr_t)GetFileAttributesExA, (uintptr_t)shCustomGetFileAttributesExA);
-        mhGetFileAttributesExW = std::make_unique<FunctionHookMinHook>((uintptr_t)GetFileAttributesExW, (uintptr_t)shCustomGetFileAttributesExW);
-        mhFindFirstFileA = std::make_unique<FunctionHookMinHook>((uintptr_t)FindFirstFileA, (uintptr_t)shCustomFindFirstFileA);
-        mhFindNextFileA = std::make_unique<FunctionHookMinHook>((uintptr_t)FindNextFileA, (uintptr_t)shCustomFindNextFileA);
-        mhFindFirstFileW = std::make_unique<FunctionHookMinHook>((uintptr_t)FindFirstFileW, (uintptr_t)shCustomFindFirstFileW);
-        mhFindNextFileW = std::make_unique<FunctionHookMinHook>((uintptr_t)FindNextFileW, (uintptr_t)shCustomFindNextFileW);
-        mhFindFirstFileExA = std::make_unique<FunctionHookMinHook>((uintptr_t)FindFirstFileExA, (uintptr_t)shCustomFindFirstFileExA);
-        mhFindFirstFileExW = std::make_unique<FunctionHookMinHook>((uintptr_t)FindFirstFileExW, (uintptr_t)shCustomFindFirstFileExW);
-        mhFindClose = std::make_unique<FunctionHookMinHook>((uintptr_t)FindClose, (uintptr_t)shCustomFindClose);
+            { L"KernelBase.dll", mhLoadLibraryExA,       "LoadLibraryExA",       (uintptr_t)shCustomLoadLibraryExA       },
+            { L"KernelBase.dll", mhLoadLibraryExW,       "LoadLibraryExW",       (uintptr_t)shCustomLoadLibraryExW       },
+            { L"KernelBase.dll", mhCreateFileA,          "CreateFileA",          (uintptr_t)shCustomCreateFileA          },
+            { L"KernelBase.dll", mhCreateFileW,          "CreateFileW",          (uintptr_t)shCustomCreateFileW          },
+            { L"KernelBase.dll", mhCreateFile2,          "CreateFile2",          (uintptr_t)shCustomCreateFile2          },
+            { L"KernelBase.dll", mhCreateFile3,          "CreateFile3",          (uintptr_t)shCustomCreateFile3          },
+            { L"KernelBase.dll", mhGetFileAttributesA,   "GetFileAttributesA",   (uintptr_t)shCustomGetFileAttributesA   },
+            { L"KernelBase.dll", mhGetFileAttributesW,   "GetFileAttributesW",   (uintptr_t)shCustomGetFileAttributesW   },
+            { L"KernelBase.dll", mhGetFileAttributesExA, "GetFileAttributesExA", (uintptr_t)shCustomGetFileAttributesExA },
+            { L"KernelBase.dll", mhGetFileAttributesExW, "GetFileAttributesExW", (uintptr_t)shCustomGetFileAttributesExW },
+            { L"KernelBase.dll", mhFindFirstFileA,       "FindFirstFileA",       (uintptr_t)shCustomFindFirstFileA       },
+            { L"KernelBase.dll", mhFindNextFileA,        "FindNextFileA",        (uintptr_t)shCustomFindNextFileA        },
+            { L"KernelBase.dll", mhFindFirstFileW,       "FindFirstFileW",       (uintptr_t)shCustomFindFirstFileW       },
+            { L"KernelBase.dll", mhFindNextFileW,        "FindNextFileW",        (uintptr_t)shCustomFindNextFileW        },
+            { L"KernelBase.dll", mhFindFirstFileExA,     "FindFirstFileExA",     (uintptr_t)shCustomFindFirstFileExA     },
+            { L"KernelBase.dll", mhFindFirstFileExW,     "FindFirstFileExW",     (uintptr_t)shCustomFindFirstFileExW     },
+            { L"KernelBase.dll", mhFindClose,            "FindClose",            (uintptr_t)shCustomFindClose            },
+        };
 
-        mhLoadLibraryExA->create();
-        mhLoadLibraryExW->create();
-        mhCreateFileA->create();
-        mhCreateFileW->create();
-        if (mhCreateFile2)
-            mhCreateFile2->create();
-        if (mhCreateFile3)
-            mhCreateFile3->create();
-        mhGetFileAttributesA->create();
-        mhGetFileAttributesW->create();
-        mhGetFileAttributesExA->create();
-        mhGetFileAttributesExW->create();
-        mhFindFirstFileA->create();
-        mhFindNextFileA->create();
-        mhFindFirstFileW->create();
-        mhFindNextFileW->create();
-        mhFindFirstFileExA->create();
-        mhFindFirstFileExW->create();
-        mhFindClose->create();
+        for (auto& [dllName, hookVar, funcName, customHook] : hookFunctions)
+        {
+            if (auto pDll = GetModuleHandleW(dllName.c_str()))
+            {
+                if (auto pFunc = (uintptr_t)GetProcAddress(pDll, funcName.c_str()))
+                {
+                    hookVar = std::make_unique<FunctionHookMinHook>(pFunc, customHook);
+                    if (hookVar)
+                        hookVar->create();
+                }
+            }
+        }
 
         // increase the ref count in case this dll is unloaded before the game exit
         auto hNtdll = GetModuleHandleW(L"ntdll.dll");
@@ -3666,111 +3672,66 @@ namespace OverloadFromFolder
         static bool virtualFileHooksActive = false;
         bool shouldHaveHooks = HasVirtualFiles();
 
+        // true = depends on sActiveDirectories.empty()
+        std::vector<std::tuple<std::wstring, std::unique_ptr<FunctionHookMinHook>&, std::string, uintptr_t, bool>> hookFunctions =
+        {
+            { L"KernelBase.dll", mhCreateFileA,                  "CreateFileA",                  (uintptr_t)shCustomCreateFileA,                  true  },
+            { L"KernelBase.dll", mhCreateFileW,                  "CreateFileW",                  (uintptr_t)shCustomCreateFileW,                  true  },
+            { L"KernelBase.dll", mhCreateFile2,                  "CreateFile2",                  (uintptr_t)shCustomCreateFile2,                  true  },
+            { L"KernelBase.dll", mhCreateFile3,                  "CreateFile3",                  (uintptr_t)shCustomCreateFile3,                  true  },
+            { L"KernelBase.dll", mhGetFileAttributesA,           "GetFileAttributesA",           (uintptr_t)shCustomGetFileAttributesA,           true  },
+            { L"KernelBase.dll", mhGetFileAttributesW,           "GetFileAttributesW",           (uintptr_t)shCustomGetFileAttributesW,           true  },
+            { L"KernelBase.dll", mhGetFileAttributesExA,         "GetFileAttributesExA",         (uintptr_t)shCustomGetFileAttributesExA,         true  },
+            { L"KernelBase.dll", mhGetFileAttributesExW,         "GetFileAttributesExW",         (uintptr_t)shCustomGetFileAttributesExW,         true  },
+            { L"KernelBase.dll", mhReadFile,                     "ReadFile",                     (uintptr_t)shCustomReadFile,                     false },
+            { L"KernelBase.dll", mhReadFileEx,                   "ReadFileEx",                   (uintptr_t)shCustomReadFileEx,                   false },
+            { L"KernelBase.dll", mhGetFileSize,                  "GetFileSize",                  (uintptr_t)shCustomGetFileSize,                  false },
+            { L"KernelBase.dll", mhGetFileSizeEx,                "GetFileSizeEx",                (uintptr_t)shCustomGetFileSizeEx,                false },
+            { L"KernelBase.dll", mhSetFilePointer,               "SetFilePointer",               (uintptr_t)shCustomSetFilePointer,               false },
+            { L"KernelBase.dll", mhSetFilePointerEx,             "SetFilePointerEx",             (uintptr_t)shCustomSetFilePointerEx,             false },
+            { L"KernelBase.dll", mhCloseHandle,                  "CloseHandle",                  (uintptr_t)shCustomCloseHandle,                  false },
+            { L"KernelBase.dll", mhGetFileInformationByHandle,   "GetFileInformationByHandle",   (uintptr_t)shCustomGetFileInformationByHandle,   false },
+            { L"KernelBase.dll", mhGetFileInformationByHandleEx, "GetFileInformationByHandleEx", (uintptr_t)shCustomGetFileInformationByHandleEx, false },
+            { L"KernelBase.dll", mhGetFileType,                  "GetFileType",                  (uintptr_t)shCustomGetFileType,                  false },
+        };
+
         if (shouldHaveHooks && !virtualFileHooksActive)
         {
-            if (sActiveDirectories.empty())
+            for (auto& [dllName, hookVar, funcName, customHook, isDirDependent] : hookFunctions)
             {
-                if (!mhCreateFileA)
-                    mhCreateFileA = std::make_unique<FunctionHookMinHook>((uintptr_t)CreateFileA, (uintptr_t)shCustomCreateFileA);
-                if (!mhCreateFileW)
-                    mhCreateFileW = std::make_unique<FunctionHookMinHook>((uintptr_t)CreateFileW, (uintptr_t)shCustomCreateFileW);
-
-                if (auto pKernel32 = GetModuleHandle(TEXT("kernel32.dll")))
+                if (auto pDll = GetModuleHandleW(dllName.c_str()))
                 {
-                    if (auto pCreateFile2 = (uintptr_t)GetProcAddress(pKernel32, "CreateFile2"))
-                        if (!mhCreateFile2)
-                            mhCreateFile2 = std::make_unique<FunctionHookMinHook>(pCreateFile2, (uintptr_t)shCustomCreateFile2);
-                    if (auto pCreateFile3 = (uintptr_t)GetProcAddress(pKernel32, "CreateFile3"))
-                        if (!mhCreateFile3)
-                            mhCreateFile3 = std::make_unique<FunctionHookMinHook>(pCreateFile3, (uintptr_t)shCustomCreateFile3);
+                    if (!hookVar)
+                    {
+                        if (auto pFunc = (uintptr_t)GetProcAddress(pDll, funcName.c_str()))
+                        {
+                            hookVar = std::make_unique<FunctionHookMinHook>(pFunc, customHook);
+                            if (hookVar && (!isDirDependent || sActiveDirectories.empty()))
+                            {
+                                hookVar->create();
+                            }
+                        }
+                    }
+                    else if (sActiveDirectories.empty() && isDirDependent)
+                    {
+                        if (hookVar)
+                        {
+                            hookVar->create();
+                        }
+                    }
                 }
-
-                if (!mhGetFileAttributesA)
-                    mhGetFileAttributesA = std::make_unique<FunctionHookMinHook>((uintptr_t)GetFileAttributesA, (uintptr_t)shCustomGetFileAttributesA);
-                if (!mhGetFileAttributesW)
-                    mhGetFileAttributesW = std::make_unique<FunctionHookMinHook>((uintptr_t)GetFileAttributesW, (uintptr_t)shCustomGetFileAttributesW);
-                if (!mhGetFileAttributesExA)
-                    mhGetFileAttributesExA = std::make_unique<FunctionHookMinHook>((uintptr_t)GetFileAttributesExA, (uintptr_t)shCustomGetFileAttributesExA);
-                if (!mhGetFileAttributesExW)
-                    mhGetFileAttributesExW = std::make_unique<FunctionHookMinHook>((uintptr_t)GetFileAttributesExW, (uintptr_t)shCustomGetFileAttributesExW);
             }
-
-            mhReadFile = std::make_unique<FunctionHookMinHook>((uintptr_t)ReadFile, (uintptr_t)shCustomReadFile);
-            mhReadFileEx = std::make_unique<FunctionHookMinHook>((uintptr_t)ReadFileEx, (uintptr_t)shCustomReadFileEx);
-            mhGetFileSize = std::make_unique<FunctionHookMinHook>((uintptr_t)GetFileSize, (uintptr_t)shCustomGetFileSize);
-            mhGetFileSizeEx = std::make_unique<FunctionHookMinHook>((uintptr_t)GetFileSizeEx, (uintptr_t)shCustomGetFileSizeEx);
-            mhSetFilePointer = std::make_unique<FunctionHookMinHook>((uintptr_t)SetFilePointer, (uintptr_t)shCustomSetFilePointer);
-            mhSetFilePointerEx = std::make_unique<FunctionHookMinHook>((uintptr_t)SetFilePointerEx, (uintptr_t)shCustomSetFilePointerEx);
-            mhCloseHandle = std::make_unique<FunctionHookMinHook>((uintptr_t)CloseHandle, (uintptr_t)shCustomCloseHandle);
-            mhGetFileInformationByHandle = std::make_unique<FunctionHookMinHook>((uintptr_t)GetFileInformationByHandle, (uintptr_t)shCustomGetFileInformationByHandle);
-            mhGetFileInformationByHandleEx = std::make_unique<FunctionHookMinHook>((uintptr_t)GetFileInformationByHandleEx, (uintptr_t)shCustomGetFileInformationByHandleEx);
-            mhGetFileType = std::make_unique<FunctionHookMinHook>((uintptr_t)GetFileType, (uintptr_t)shCustomGetFileType);
-
-            if (sActiveDirectories.empty())
-            {
-                if (mhCreateFileA)
-                    mhCreateFileA->create();
-                if (mhCreateFileW)
-                    mhCreateFileW->create();
-                if (mhCreateFile2)
-                    mhCreateFile2->create();
-                if (mhCreateFile3)
-                    mhCreateFile3->create();
-                if (mhGetFileAttributesA)
-                    mhGetFileAttributesA->create();
-                if (mhGetFileAttributesW)
-                    mhGetFileAttributesW->create();
-                if (mhGetFileAttributesExA)
-                    mhGetFileAttributesExA->create();
-                if (mhGetFileAttributesExW)
-                    mhGetFileAttributesExW->create();
-            }
-
-            mhReadFile->create();
-            mhReadFileEx->create();
-            mhGetFileSize->create();
-            mhGetFileSizeEx->create();
-            mhSetFilePointer->create();
-            mhSetFilePointerEx->create();
-            mhCloseHandle->create();
-            mhGetFileInformationByHandle->create();
-            mhGetFileInformationByHandleEx->create();
-            mhGetFileType->create();
-
             virtualFileHooksActive = true;
         }
         else if (!shouldHaveHooks && virtualFileHooksActive)
         {
-            if (sActiveDirectories.empty())
+            for (auto& [dllName, hookVar, funcName, customHook, isDirDependent] : hookFunctions)
             {
-                if (mhCreateFileA)
-                    mhCreateFileA.reset();
-                if (mhCreateFileW)
-                    mhCreateFileW.reset();
-                if (mhCreateFile2)
-                    mhCreateFile2.reset();
-                if (mhCreateFile3)
-                    mhCreateFile3.reset();
-                if (mhGetFileAttributesA)
-                    mhGetFileAttributesA.reset();
-                if (mhGetFileAttributesW)
-                    mhGetFileAttributesW.reset();
-                if (mhGetFileAttributesExA)
-                    mhGetFileAttributesExA.reset();
-                if (mhGetFileAttributesExW)
-                    mhGetFileAttributesExW.reset();
+                if (hookVar && (!isDirDependent || sActiveDirectories.empty()))
+                {
+                    hookVar.reset();
+                }
             }
-
-            mhReadFile.reset();
-            mhReadFileEx.reset();
-            mhGetFileSize.reset();
-            mhGetFileSizeEx.reset();
-            mhSetFilePointer.reset();
-            mhSetFilePointerEx.reset();
-            mhCloseHandle.reset();
-            mhGetFileInformationByHandle.reset();
-            mhGetFileInformationByHandleEx.reset();
-            mhGetFileType.reset();
             virtualFileHooksActive = false;
         }
     }
@@ -5182,6 +5143,7 @@ LONG WINAPI CustomUnhandledExceptionFilter(LPEXCEPTION_POINTERS ExceptionInfo)
 
 void Init()
 {
+    OverloadFromFolder::gamePath = std::filesystem::path(GetExeModulePath());
     std::wstring modulePath = GetModuleFileNameW(hm);
     std::wstring moduleName = modulePath.substr(modulePath.find_last_of(L"/\\") + 1);
     moduleName.resize(moduleName.find_last_of(L'.'));
@@ -5197,7 +5159,6 @@ void Init()
     sLoadFromAPI = GetPrivateProfileStringW(TEXT("globalsets"), TEXT("loadfromapi"), L"", iniPaths);
     auto nFindModule = GetPrivateProfileIntW(TEXT("globalsets"), TEXT("findmodule"), FALSE, iniPaths);
     auto nDisableCrashDumps = GetPrivateProfileIntW(TEXT("globalsets"), TEXT("disablecrashdumps"), FALSE, iniPaths);
-    auto sFileLoaderPathIniString = GetPrivateProfileStringW(TEXT("fileloader"), TEXT("overloadfromfolder"), TEXT("update"), iniPaths);
 
     if (!nDisableCrashDumps)
     {
@@ -5214,19 +5175,6 @@ void Init()
             VirtualProtect(&SetUnhandledExceptionFilter, sizeof(ret), PAGE_EXECUTE_READWRITE, &protect[0]);
             memcpy(&SetUnhandledExceptionFilter, &ret, sizeof(ret));
             VirtualProtect(&SetUnhandledExceptionFilter, sizeof(ret), protect[0], &protect[1]);
-        }
-    }
-
-    {
-        using namespace OverloadFromFolder;
-        gamePath = std::filesystem::path(GetExeModulePath());
-        sFileLoaderEntries = ParseMultiplePathsWithPriority(sFileLoaderPathIniString);
-        LoadPackages();
-        if (!FilterExistingPathEntries(sFileLoaderEntries))
-        {
-            // No valid paths exist - clear everything
-            sFileLoaderEntries.clear();
-            sActiveDirectories.clear();
         }
     }
 
