@@ -289,3 +289,13 @@ __pycache__/
 *.btm.cs
 *.odx.cs
 *.xsd.cs
+
+# Tests
+tests/**/*.exe
+tests/**/*.dll
+tests/**/*.asi
+tests/**/*.txt
+!tests/**/*[Ss]ample*.exe
+!tests/**/**.zip
+!tests/**/*[Dd]3[Dd][Xx]9_43.dll
+!tests/**/x64

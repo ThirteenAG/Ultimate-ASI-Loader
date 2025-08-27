@@ -165,6 +165,26 @@ project "MonoLoader"
       defines { "NDEBUG" }
       optimize "On"
       staticruntime "On"
+
+project "Test_Win32"
+   kind "SharedLib"
+   language "C++"
+   targetdir "bin/Win32/%{cfg.buildcfg}"
+   targetextension ".asi"
+   
+   files { "tests/tests.cpp" }
+   files { "source/resources/Versioninfo.rc" }
+
+   characterset ("UNICODE")
+   
+   filter "configurations:Debug"
+      defines { "DEBUG" }
+      symbols "On"
+
+   filter "configurations:Release"
+      defines { "NDEBUG" }
+      optimize "On"
+      staticruntime "On"
       
 -- x64
 workspace "Ultimate-ASI-Loader-x64"
@@ -301,6 +321,26 @@ project "MonoLoader_x64"
    files { "external/injector/safetyhook/include/**.hpp", "external/injector/safetyhook/src/**.cpp" }
    includedirs { "external/injector/zydis" }
    files { "external/injector/zydis/**.h", "external/injector/zydis/**.c" }
+
+   characterset ("UNICODE")
+   
+   filter "configurations:Debug"
+      defines { "DEBUG" }
+      symbols "On"
+
+   filter "configurations:Release"
+      defines { "NDEBUG" }
+      optimize "On"
+      staticruntime "On"
+
+project "Test_x64"
+   kind "SharedLib"
+   language "C++"
+   targetdir "bin/x64/%{cfg.buildcfg}"
+   targetextension ".asi"
+   
+   files { "tests/tests.cpp" }
+   files { "source/resources/Versioninfo.rc" }
 
    characterset ("UNICODE")
    

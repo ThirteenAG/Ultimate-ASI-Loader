@@ -60,6 +60,9 @@ namespace OverloadFromFolder
     void HookAPIForOverload();
     void HookAPIForVirtualFiles();
     void LoadVirtualFilesFromZip();
+#if !X64
+    bool InitializeServerConnection();
+#endif
     BOOL SetVirtualFilePointerEx(HANDLE hFile, LARGE_INTEGER liDistanceToMove, PLARGE_INTEGER lpNewFilePointer, DWORD dwMoveMethod);
     bool FilterExistingPathEntries(std::vector<FileLoaderPathEntry>& entries);
     std::vector<FileLoaderPathEntry> ParseMultiplePathsWithPriority(const std::wstring& pathsString);
@@ -1340,6 +1343,9 @@ void LoadPluginsAndRestoreIAT(uintptr_t retaddr, std::wstring_view calledFrom = 
             }
 
             LoadVirtualFilesFromZip();
+#if !X64
+            InitializeServerConnection();
+#endif
             HookAPIForOverload();
             HookAPIForVirtualFiles();
         }
@@ -1348,6 +1354,9 @@ void LoadPluginsAndRestoreIAT(uintptr_t retaddr, std::wstring_view calledFrom = 
             sActiveDirectories = DetermineActiveDirectories(sFileLoaderEntries, sFileLoaderEntries[0].path);
 
             LoadVirtualFilesFromZip();
+#if !X64
+            InitializeServerConnection();
+#endif
             HookAPIForOverload();
             HookAPIForVirtualFiles();
         }
@@ -1808,101 +1817,11 @@ namespace OverloadFromFolder
 
     public:
 #if !X64
-        static bool InitializeServerConnection()
-        {
-            static std::once_flag flag;
-            bool result = false;
-
-            std::call_once(flag, [&]() {
-                std::lock_guard<std::mutex> lock(serverMutex);
-                HANDLE hMutex = CreateMutexW(NULL, TRUE, L"Global\\Ultimate-ASI-Loader-VirtualFileClientMutex");
-                if (GetLastError() == ERROR_ALREADY_EXISTS)
-                {
-                    CloseHandle(hMutex);
-                    return;
-                }
-
-                auto CreateProcessInJob = [](HANDLE hJob, LPCTSTR lpApplicationName, LPTSTR lpCommandLine, LPSECURITY_ATTRIBUTES lpProcessAttributes,
-                    LPSECURITY_ATTRIBUTES lpThreadAttributes, BOOL bInheritHandles, DWORD dwCreationFlags, LPVOID lpEnvironment,
-                    LPCTSTR lpCurrentDirectory, LPSTARTUPINFO lpStartupInfo, LPPROCESS_INFORMATION ppi) -> BOOL {
-                    BOOL fRc = CreateProcess(lpApplicationName, lpCommandLine, lpProcessAttributes,
-                        lpThreadAttributes, bInheritHandles, dwCreationFlags | CREATE_SUSPENDED, lpEnvironment, lpCurrentDirectory,
-                        lpStartupInfo, ppi);
-                    if (fRc)
-                    {
-                        fRc = AssignProcessToJobObject(hJob, ppi->hProcess);
-                        if (fRc && !(dwCreationFlags & CREATE_SUSPENDED))
-                        {
-                            fRc = ResumeThread(ppi->hThread) != (DWORD)-1;
-                        }
-                        if (!fRc)
-                        {
-                            TerminateProcess(ppi->hProcess, 0);
-                            CloseHandle(ppi->hProcess);
-                            CloseHandle(ppi->hThread);
-                            ppi->hProcess = ppi->hThread = nullptr;
-                        }
-                    }
-                    return fRc;
-                };
-
-                std::error_code ec;
-                auto processPath = std::filesystem::path(GetModulePath(hm)).replace_extension(L".exe");
-                auto workingDir = std::filesystem::path(processPath).remove_filename();
-                if (std::filesystem::exists(processPath, ec))
-                {
-                    HANDLE hJob = CreateJobObject(nullptr, nullptr);
-                    JOBOBJECT_EXTENDED_LIMIT_INFORMATION info = { };
-                    info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
-                    SetInformationJobObject(hJob, JobObjectExtendedLimitInformation, &info, sizeof(info));
-
-                    STARTUPINFOW si = { sizeof(si) };
-                    PROCESS_INFORMATION pi;
-                    if (CreateProcessInJob(hJob, processPath.c_str(), NULL, nullptr, nullptr, FALSE, CREATE_NO_WINDOW,
-                        nullptr, workingDir.c_str(), &si, &pi))
-                    {
-                        CloseHandle(pi.hProcess);
-                        CloseHandle(pi.hThread);
-
-                        // Retry loop for pipe creation
-                        constexpr DWORD max_attempts = 10;
-                        DWORD retry_delay_ms = 100;
-                        for (DWORD attempt = 0; attempt < max_attempts; ++attempt)
-                        {
-                            serverPipe = CreateFileW(L"\\\\.\\pipe\\Ultimate-ASI-Loader-VirtualFileServer", GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0, NULL);
-                            if (serverPipe != INVALID_HANDLE_VALUE)
-                            {
-                                DWORD pid = GetCurrentProcessId();
-                                DWORD bytes;
-                                if (WriteFile(serverPipe, &pid, sizeof(pid), &bytes, NULL) && bytes == sizeof(pid))
-                                {
-                                    result = true;
-                                    break;
-                                }
-                                CloseHandle(serverPipe);
-                                serverPipe = INVALID_HANDLE_VALUE;
-                            }
-                            Sleep(retry_delay_ms);
-                            retry_delay_ms += 50;
-                        }
-                    }
-                    else
-                    {
-                        CloseHandle(hJob);
-                    }
-                }
-                CloseHandle(hMutex);
-            });
-
-            return result;
-        }
-
         static uint64_t CreateFileOnServer(const uint8_t* data, size_t size, int priority)
         {
             if (serverPipe == INVALID_HANDLE_VALUE)
             {
-                if (!InitializeServerConnection())
-                    return 0;
+                return 0;
             }
 
             std::lock_guard<std::mutex> lock(serverMutex);
@@ -2857,7 +2776,7 @@ namespace OverloadFromFolder
     {
         auto raddr = _ReturnAddress();
         auto bRecursive = isRecursive(raddr);
-        if (HasVirtualFiles() && IsVirtualFile(lpFileName))
+        if (!bRecursive && HasVirtualFiles() && IsVirtualFile(lpFileName))
         {
             if (GetVirtualFileByPath(lpFileName))
             {
@@ -2874,7 +2793,7 @@ namespace OverloadFromFolder
     {
         auto raddr = _ReturnAddress();
         auto bRecursive = isRecursive(raddr);
-        if (HasVirtualFiles() && IsVirtualFile(lpFileName))
+        if (!bRecursive && HasVirtualFiles() && IsVirtualFile(lpFileName))
         {
             if (GetVirtualFileByPath(lpFileName))
             {
@@ -2891,7 +2810,7 @@ namespace OverloadFromFolder
     {
         auto raddr = _ReturnAddress();
         auto bRecursive = isRecursive(raddr);
-        if (HasVirtualFiles() && IsVirtualFile(lpFileName))
+        if (!bRecursive && HasVirtualFiles() && IsVirtualFile(lpFileName))
         {
             if (auto virtualFile = GetVirtualFileByPath(lpFileName))
             {
@@ -2920,7 +2839,7 @@ namespace OverloadFromFolder
     {
         auto raddr = _ReturnAddress();
         auto bRecursive = isRecursive(raddr);
-        if (HasVirtualFiles() && IsVirtualFile(lpFileName))
+        if (!bRecursive && HasVirtualFiles() && IsVirtualFile(lpFileName))
         {
             if (auto virtualFile = GetVirtualFileByPath(lpFileName))
             {
@@ -3735,6 +3654,97 @@ namespace OverloadFromFolder
             virtualFileHooksActive = false;
         }
     }
+
+#if !X64
+    bool InitializeServerConnection()
+    {
+        static std::once_flag flag;
+        bool result = false;
+
+        std::call_once(flag, [&]() {
+            std::lock_guard<std::mutex> lock(serverMutex);
+            HANDLE hMutex = CreateMutexW(NULL, TRUE, L"Global\\Ultimate-ASI-Loader-VirtualFileClientMutex");
+            if (GetLastError() == ERROR_ALREADY_EXISTS)
+            {
+                CloseHandle(hMutex);
+                return;
+            }
+
+            auto CreateProcessInJob = [](HANDLE hJob, LPCTSTR lpApplicationName, LPTSTR lpCommandLine, LPSECURITY_ATTRIBUTES lpProcessAttributes,
+                LPSECURITY_ATTRIBUTES lpThreadAttributes, BOOL bInheritHandles, DWORD dwCreationFlags, LPVOID lpEnvironment,
+                LPCTSTR lpCurrentDirectory, LPSTARTUPINFO lpStartupInfo, LPPROCESS_INFORMATION ppi) -> BOOL {
+                BOOL fRc = CreateProcess(lpApplicationName, lpCommandLine, lpProcessAttributes,
+                    lpThreadAttributes, bInheritHandles, dwCreationFlags | CREATE_SUSPENDED, lpEnvironment, lpCurrentDirectory,
+                    lpStartupInfo, ppi);
+                if (fRc)
+                {
+                    fRc = AssignProcessToJobObject(hJob, ppi->hProcess);
+                    if (fRc && !(dwCreationFlags & CREATE_SUSPENDED))
+                    {
+                        fRc = ResumeThread(ppi->hThread) != (DWORD)-1;
+                    }
+                    if (!fRc)
+                    {
+                        TerminateProcess(ppi->hProcess, 0);
+                        CloseHandle(ppi->hProcess);
+                        CloseHandle(ppi->hThread);
+                        ppi->hProcess = ppi->hThread = nullptr;
+                    }
+                }
+                return fRc;
+            };
+
+            std::error_code ec;
+            auto processPath = std::filesystem::path(GetModulePath(hm)).replace_extension(L".exe");
+            auto workingDir = std::filesystem::path(processPath).remove_filename();
+            if (std::filesystem::exists(processPath, ec))
+            {
+                HANDLE hJob = CreateJobObject(nullptr, nullptr);
+                JOBOBJECT_EXTENDED_LIMIT_INFORMATION info = { };
+                info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+                SetInformationJobObject(hJob, JobObjectExtendedLimitInformation, &info, sizeof(info));
+
+                STARTUPINFOW si = { sizeof(si) };
+                PROCESS_INFORMATION pi;
+                if (CreateProcessInJob(hJob, processPath.c_str(), NULL, nullptr, nullptr, FALSE, CREATE_NO_WINDOW,
+                    nullptr, workingDir.c_str(), &si, &pi))
+                {
+                    CloseHandle(pi.hProcess);
+                    CloseHandle(pi.hThread);
+
+                    // Retry loop for pipe creation
+                    constexpr DWORD max_attempts = 10;
+                    DWORD retry_delay_ms = 100;
+                    for (DWORD attempt = 0; attempt < max_attempts; ++attempt)
+                    {
+                        serverPipe = CreateFileW(L"\\\\.\\pipe\\Ultimate-ASI-Loader-VirtualFileServer", GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0, NULL);
+                        if (serverPipe != INVALID_HANDLE_VALUE)
+                        {
+                            DWORD pid = GetCurrentProcessId();
+                            DWORD bytes;
+                            if (WriteFile(serverPipe, &pid, sizeof(pid), &bytes, NULL) && bytes == sizeof(pid))
+                            {
+                                result = true;
+                                break;
+                            }
+                            CloseHandle(serverPipe);
+                            serverPipe = INVALID_HANDLE_VALUE;
+                        }
+                        Sleep(retry_delay_ms);
+                        retry_delay_ms += 50;
+                    }
+                }
+                else
+                {
+                    CloseHandle(hJob);
+                }
+            }
+            CloseHandle(hMutex);
+        });
+
+        return result;
+    }
+#endif
 
     void LoadVirtualFilesFromZip()
     {

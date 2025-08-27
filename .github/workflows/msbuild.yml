@@ -75,6 +75,12 @@ jobs:
         ./release.bat
         ./release.ps1
 
+    - name: Test
+      shell: cmd
+      run: |
+        cd tests
+        test.bat
+
     - name: Upload artifact (Win32)
       uses: actions/upload-artifact@v4
       with:
