@@ -1050,9 +1050,56 @@ void LoadPlugins()
     auto nWantsToLoadPlugins = GetPrivateProfileIntW(L"globalsets", L"loadplugins", TRUE, iniPaths);
     auto nWantsToLoadFromScriptsOnly = GetPrivateProfileIntW(L"globalsets", L"loadfromscriptsonly", FALSE, iniPaths);
     auto nWantsToLoadRecursively = GetPrivateProfileIntW(L"globalsets", L"loadrecursively", TRUE, iniPaths);
+    auto sLoadExtraPlugins = GetPrivateProfileStringW(TEXT("globalsets"), TEXT("loadextraplugins"), TEXT("modloader\\modloader.asi"), iniPaths);
 
     if (nWantsToLoadPlugins)
     {
+        auto sExtraPlugins = [](const std::wstring& pathsString) -> std::vector<std::wstring>
+        {
+            std::vector<std::wstring> entries;
+            std::wstring::size_type start = 0;
+
+            auto trim = [](std::wstring str) {
+                auto first = str.find_first_not_of(L" \t\r\n");
+                if (first == std::wstring::npos) return std::wstring();
+                auto last = str.find_last_not_of(L" \t\r\n");
+                return str.substr(first, last - first + 1);
+            };
+
+            auto removeQuotes = [](std::wstring str) {
+                return (str.size() >= 2 && str.front() == L'"' && str.back() == L'"')
+                    ? str.substr(1, str.size() - 2) : str;
+            };
+
+            while (start < pathsString.length())
+            {
+                auto end = pathsString.find(L'|', start);
+                if (end == std::wstring::npos) end = pathsString.length();
+
+                std::wstring cleanPath = removeQuotes(trim(pathsString.substr(start, end - start)));
+                if (!cleanPath.empty() &&
+                    std::find(entries.begin(), entries.end(), cleanPath) == entries.end())
+                {
+                    entries.push_back(cleanPath);
+                }
+
+                start = end + 1;
+                while (start < pathsString.length() && ::iswspace(pathsString[start])) start++;
+            }
+
+            return entries;
+        }(sLoadExtraPlugins);
+
+        if (!sExtraPlugins.empty())
+        {
+            for (const auto& it : sExtraPlugins)
+            {
+                SetCurrentDirectoryW(szSelfPath.c_str());
+                LoadLib(it);
+                SetCurrentDirectoryW(oldDir.c_str());
+            }
+        }
+
         WIN32_FIND_DATAW fd{};
         if (!nWantsToLoadFromScriptsOnly)
         {
