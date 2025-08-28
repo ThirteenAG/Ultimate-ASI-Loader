@@ -9,6 +9,10 @@ AddVirtualFileForOverloadA = AddVirtualFileForOverloadA
 RemoveVirtualFileFromOverloadA = RemoveVirtualFileFromOverloadA
 AddVirtualFileForOverloadW = AddVirtualFileForOverloadW
 RemoveVirtualFileFromOverloadW = RemoveVirtualFileFromOverloadW
+AddVirtualPathForOverloadA = AddVirtualPathForOverloadA
+RemoveVirtualPathFromOverloadA = RemoveVirtualPathFromOverloadA
+AddVirtualPathForOverloadW = AddVirtualPathForOverloadW
+RemoveVirtualPathFromOverloadW = RemoveVirtualPathFromOverloadW
 GetMemoryModule = GetMemoryModule
 
 LIBRARY "dinput8"

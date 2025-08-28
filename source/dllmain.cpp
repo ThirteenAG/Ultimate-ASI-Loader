@@ -9,6 +9,7 @@
 #include <memory>
 #include <map>
 #include <set>
+#include <unordered_set>
 #include <FunctionHookMinHook.hpp>
 #include <shellapi.h>
 #include <SubAuth.h>
@@ -1903,6 +1904,11 @@ namespace OverloadFromFolder
 #endif
     };
 
+    static std::atomic<size_t> virtualPathsCount{ 0 };
+    static std::shared_mutex virtualPathMutex;
+    static std::unordered_map<std::wstring, std::pair<std::filesystem::path, int>> virtualPathMappings;
+    thread_local std::unordered_set<std::wstring> recursionGuard;
+
     static std::atomic<size_t> virtualFilesCount{ 0 };
     static std::shared_mutex virtualFilesMutex;
     static std::unordered_map<std::wstring, std::shared_ptr<VirtualFile>> virtualFilesByPath;
@@ -1918,6 +1924,11 @@ namespace OverloadFromFolder
             relativePath = normalized.wstring();
         std::transform(relativePath.begin(), relativePath.end(), relativePath.begin(), ::towlower);
         return relativePath;
+    }
+
+    inline bool HasVirtualPaths()
+    {
+        return virtualPathsCount.load(std::memory_order_acquire) > 0;
     }
 
     inline bool HasVirtualFiles()
@@ -2522,13 +2533,36 @@ namespace OverloadFromFolder
     {
         try
         {
+            if (HasVirtualPaths())
+            {
+                auto normalized = NormalizePath(lpFilename);
+                if (recursionGuard.count(normalized))
+                {
+                    return {};
+                }
+                recursionGuard.insert(normalized);
+
+                std::shared_lock lock(virtualPathMutex);
+                auto it = virtualPathMappings.find(normalized);
+                if (it != virtualPathMappings.end())
+                {
+                    std::filesystem::path vpath(it->second.first);
+                    auto recursive = GetOverloadedFilePath(vpath);
+                    recursionGuard.erase(normalized);
+                    if (!recursive.empty())
+                        return recursive;
+                    return vpath;
+                }
+                recursionGuard.erase(normalized);
+            }
+
             std::error_code ec;
 
             static auto starts_with = [](const std::filesystem::path& path, const std::filesystem::path& base) -> bool
             {
                 std::wstring str1(path.wstring()); std::wstring str2(base.wstring());
-                std::transform(str1.begin(), str1.end(), str1.begin(), ::tolower);
-                std::transform(str2.begin(), str2.end(), str2.begin(), ::tolower);
+                std::transform(str1.begin(), str1.end(), str1.begin(), ::towlower);
+                std::transform(str2.begin(), str2.end(), str2.begin(), ::towlower);
                 return str1.starts_with(str2);
             };
 
@@ -2661,6 +2695,21 @@ namespace OverloadFromFolder
     {
         try
         {
+            if (HasVirtualPaths())
+            {
+                std::shared_lock lock(virtualPathMutex);
+                auto normalized = NormalizePath(path);
+                auto it = virtualPathMappings.find(normalized);
+                if (it != virtualPathMappings.end())
+                {
+                    std::filesystem::path vpath(it->second.first);
+                    auto recursive = GetOverloadedFilePath(vpath);
+                    if (!recursive.empty()) 
+                        return recursive;
+                    return vpath;
+                }
+            }
+
             if (!sActiveDirectories.empty())
                 return GetOverloadedFilePath(path);
         }
@@ -3520,7 +3569,11 @@ namespace OverloadFromFolder
 
     void HookAPIForOverload()
     {
-        if (sActiveDirectories.empty())
+        static bool apiOverloadHooksActive = false;
+        if (apiOverloadHooksActive)
+            return;
+
+        if (sActiveDirectories.empty() && !HasVirtualPaths())
             return;
 
         constexpr auto mutexName = L"Ultimate-ASI-Loader-OverloadFromFolder";
@@ -3565,11 +3618,14 @@ namespace OverloadFromFolder
         {
             if (auto pDll = GetModuleHandleW(dllName.c_str()))
             {
-                if (auto pFunc = (uintptr_t)GetProcAddress(pDll, funcName.c_str()))
+                if (!hookVar)
                 {
-                    hookVar = std::make_unique<FunctionHookMinHook>(pFunc, customHook);
-                    if (hookVar)
-                        hookVar->create();
+                    if (auto pFunc = (uintptr_t)GetProcAddress(pDll, funcName.c_str()))
+                    {
+                        hookVar = std::make_unique<FunctionHookMinHook>(pFunc, customHook);
+                        if (hookVar)
+                            hookVar->create();
+                    }
                 }
             }
         }
@@ -3584,6 +3640,8 @@ namespace OverloadFromFolder
                 pLdrAddRefDll(0, (HMODULE)&__ImageBase);
             }
         }
+
+        apiOverloadHooksActive = true;
     }
 
     void HookAPIForVirtualFiles()
@@ -3591,67 +3649,79 @@ namespace OverloadFromFolder
         static bool virtualFileHooksActive = false;
         bool shouldHaveHooks = HasVirtualFiles();
 
-        // true = depends on sActiveDirectories.empty()
-        std::vector<std::tuple<std::wstring, std::unique_ptr<FunctionHookMinHook>&, std::string, uintptr_t, bool>> hookFunctions =
+        if (!virtualFileHooksActive && shouldHaveHooks)
         {
-            { L"KernelBase.dll", mhCreateFileA,                  "CreateFileA",                  (uintptr_t)shCustomCreateFileA,                  true  },
-            { L"KernelBase.dll", mhCreateFileW,                  "CreateFileW",                  (uintptr_t)shCustomCreateFileW,                  true  },
-            { L"KernelBase.dll", mhCreateFile2,                  "CreateFile2",                  (uintptr_t)shCustomCreateFile2,                  true  },
-            { L"KernelBase.dll", mhCreateFile3,                  "CreateFile3",                  (uintptr_t)shCustomCreateFile3,                  true  },
-            { L"KernelBase.dll", mhGetFileAttributesA,           "GetFileAttributesA",           (uintptr_t)shCustomGetFileAttributesA,           true  },
-            { L"KernelBase.dll", mhGetFileAttributesW,           "GetFileAttributesW",           (uintptr_t)shCustomGetFileAttributesW,           true  },
-            { L"KernelBase.dll", mhGetFileAttributesExA,         "GetFileAttributesExA",         (uintptr_t)shCustomGetFileAttributesExA,         true  },
-            { L"KernelBase.dll", mhGetFileAttributesExW,         "GetFileAttributesExW",         (uintptr_t)shCustomGetFileAttributesExW,         true  },
-            { L"KernelBase.dll", mhReadFile,                     "ReadFile",                     (uintptr_t)shCustomReadFile,                     false },
-            { L"KernelBase.dll", mhReadFileEx,                   "ReadFileEx",                   (uintptr_t)shCustomReadFileEx,                   false },
-            { L"KernelBase.dll", mhGetFileSize,                  "GetFileSize",                  (uintptr_t)shCustomGetFileSize,                  false },
-            { L"KernelBase.dll", mhGetFileSizeEx,                "GetFileSizeEx",                (uintptr_t)shCustomGetFileSizeEx,                false },
-            { L"KernelBase.dll", mhSetFilePointer,               "SetFilePointer",               (uintptr_t)shCustomSetFilePointer,               false },
-            { L"KernelBase.dll", mhSetFilePointerEx,             "SetFilePointerEx",             (uintptr_t)shCustomSetFilePointerEx,             false },
-            { L"KernelBase.dll", mhCloseHandle,                  "CloseHandle",                  (uintptr_t)shCustomCloseHandle,                  false },
-            { L"KernelBase.dll", mhGetFileInformationByHandle,   "GetFileInformationByHandle",   (uintptr_t)shCustomGetFileInformationByHandle,   false },
-            { L"KernelBase.dll", mhGetFileInformationByHandleEx, "GetFileInformationByHandleEx", (uintptr_t)shCustomGetFileInformationByHandleEx, false },
-            { L"KernelBase.dll", mhGetFileType,                  "GetFileType",                  (uintptr_t)shCustomGetFileType,                  false },
-        };
+            constexpr auto mutexName = L"Ultimate-ASI-Loader-VirtualFiles";
 
-        if (shouldHaveHooks && !virtualFileHooksActive)
-        {
-            for (auto& [dllName, hookVar, funcName, customHook, isDirDependent] : hookFunctions)
+            auto hVirtualFilesMutex = OpenMutexW(MUTEX_ALL_ACCESS, FALSE, mutexName);
+            if (hVirtualFilesMutex)
             {
-                if (auto pDll = GetModuleHandleW(dllName.c_str()))
+                CloseHandle(hVirtualFilesMutex);
+                hVirtualFilesMutex = nullptr;
+                return;
+            }
+
+            hVirtualFilesMutex = CreateMutexW(nullptr, TRUE, mutexName);
+            if (!hVirtualFilesMutex || GetLastError() == ERROR_ALREADY_EXISTS)
+            {
+                if (hVirtualFilesMutex) CloseHandle(hVirtualFilesMutex);
+                hVirtualFilesMutex = nullptr;
+                return;
+            }
+
+            std::vector<std::tuple<std::wstring, std::unique_ptr<FunctionHookMinHook>&, std::string, uintptr_t>> hookFunctions =
+            {
+                { L"KernelBase.dll", mhCreateFileA,                  "CreateFileA",                  (uintptr_t)shCustomCreateFileA,                  },
+                { L"KernelBase.dll", mhCreateFileW,                  "CreateFileW",                  (uintptr_t)shCustomCreateFileW,                  },
+                { L"KernelBase.dll", mhCreateFile2,                  "CreateFile2",                  (uintptr_t)shCustomCreateFile2,                  },
+                { L"KernelBase.dll", mhCreateFile3,                  "CreateFile3",                  (uintptr_t)shCustomCreateFile3,                  },
+                { L"KernelBase.dll", mhGetFileAttributesA,           "GetFileAttributesA",           (uintptr_t)shCustomGetFileAttributesA,           },
+                { L"KernelBase.dll", mhGetFileAttributesW,           "GetFileAttributesW",           (uintptr_t)shCustomGetFileAttributesW,           },
+                { L"KernelBase.dll", mhGetFileAttributesExA,         "GetFileAttributesExA",         (uintptr_t)shCustomGetFileAttributesExA,         },
+                { L"KernelBase.dll", mhGetFileAttributesExW,         "GetFileAttributesExW",         (uintptr_t)shCustomGetFileAttributesExW,         },
+                { L"KernelBase.dll", mhReadFile,                     "ReadFile",                     (uintptr_t)shCustomReadFile,                     },
+                { L"KernelBase.dll", mhReadFileEx,                   "ReadFileEx",                   (uintptr_t)shCustomReadFileEx,                   },
+                { L"KernelBase.dll", mhGetFileSize,                  "GetFileSize",                  (uintptr_t)shCustomGetFileSize,                  },
+                { L"KernelBase.dll", mhGetFileSizeEx,                "GetFileSizeEx",                (uintptr_t)shCustomGetFileSizeEx,                },
+                { L"KernelBase.dll", mhSetFilePointer,               "SetFilePointer",               (uintptr_t)shCustomSetFilePointer,               },
+                { L"KernelBase.dll", mhSetFilePointerEx,             "SetFilePointerEx",             (uintptr_t)shCustomSetFilePointerEx,             },
+                { L"KernelBase.dll", mhCloseHandle,                  "CloseHandle",                  (uintptr_t)shCustomCloseHandle,                  },
+                { L"KernelBase.dll", mhGetFileInformationByHandle,   "GetFileInformationByHandle",   (uintptr_t)shCustomGetFileInformationByHandle,   },
+                { L"KernelBase.dll", mhGetFileInformationByHandleEx, "GetFileInformationByHandleEx", (uintptr_t)shCustomGetFileInformationByHandleEx, },
+                { L"KernelBase.dll", mhGetFileType,                  "GetFileType",                  (uintptr_t)shCustomGetFileType,                  },
+            };
+
+            if (shouldHaveHooks && !virtualFileHooksActive)
+            {
+                for (auto& [dllName, hookVar, funcName, customHook] : hookFunctions)
                 {
-                    if (!hookVar)
+                    if (auto pDll = GetModuleHandleW(dllName.c_str()))
                     {
-                        if (auto pFunc = (uintptr_t)GetProcAddress(pDll, funcName.c_str()))
+                        if (!hookVar)
                         {
-                            hookVar = std::make_unique<FunctionHookMinHook>(pFunc, customHook);
-                            if (hookVar && (!isDirDependent || sActiveDirectories.empty()))
+                            if (auto pFunc = (uintptr_t)GetProcAddress(pDll, funcName.c_str()))
                             {
-                                hookVar->create();
+                                hookVar = std::make_unique<FunctionHookMinHook>(pFunc, customHook);
+                                if (hookVar)
+                                    hookVar->create();
                             }
                         }
                     }
-                    else if (sActiveDirectories.empty() && isDirDependent)
+                }
+
+                // increase the ref count in case this dll is unloaded before the game exit
+                auto hNtdll = GetModuleHandleW(L"ntdll.dll");
+                if (hNtdll)
+                {
+                    auto pLdrAddRefDll = (LdrAddRefDll_t)GetProcAddress(hNtdll, "LdrAddRefDll");
+                    if (pLdrAddRefDll)
                     {
-                        if (hookVar)
-                        {
-                            hookVar->create();
-                        }
+                        pLdrAddRefDll(0, (HMODULE)&__ImageBase);
                     }
                 }
+
+                virtualFileHooksActive = true;
             }
-            virtualFileHooksActive = true;
-        }
-        else if (!shouldHaveHooks && virtualFileHooksActive)
-        {
-            for (auto& [dllName, hookVar, funcName, customHook, isDirDependent] : hookFunctions)
-            {
-                if (hookVar && (!isDirDependent || sActiveDirectories.empty()))
-                {
-                    hookVar.reset();
-                }
-            }
-            virtualFileHooksActive = false;
         }
     }
 
@@ -3805,6 +3875,109 @@ namespace OverloadFromFolder
         }
     }
 
+    bool WINAPI AddVirtualPathForOverload(auto originalPath, auto virtualPath, int priority)
+    {
+        if (!originalPath || !virtualPath)
+            return false;
+
+        auto key = NormalizePath(originalPath);
+        if (key.empty())
+            return false;
+
+        // Lock both mutexes to check and modify containers
+        std::scoped_lock lock(virtualPathMutex, virtualFilesMutex);
+
+        // Check virtual files and remove if lower priority
+        auto fileIt = virtualFilesByPath.find(key);
+        if (fileIt != virtualFilesByPath.end() && fileIt->second->priority < priority)
+        {
+            auto virtualFile = fileIt->second;
+            // Handle server cleanup if needed
+            std::visit([&](const auto& storage) {
+                using T = std::decay_t<decltype(storage)>;
+                if constexpr (std::is_same_v<T, ServerData>)
+                {
+#if !X64
+                    VirtualFile::RemoveFileOnServer(storage.server_handle);
+#endif
+                }
+            }, virtualFile->storage);
+
+            // Remove associated handles
+            for (auto handleIt = virtualFilesByHandle.begin(); handleIt != virtualFilesByHandle.end();)
+            {
+                if (handleIt->second == virtualFile)
+                {
+                    handleIt = virtualFilesByHandle.erase(handleIt);
+                }
+                else
+                {
+                    ++handleIt;
+                }
+            }
+
+            virtualFilesByPath.erase(fileIt);
+            virtualFilesCount.fetch_sub(1, std::memory_order_release);
+        }
+
+        // Check existing virtual path
+        auto pathIt = virtualPathMappings.find(key);
+        bool isNew = (pathIt == virtualPathMappings.end());
+
+        if (!isNew && priority <= pathIt->second.second)
+            return false; // Existing path has higher or equal priority
+
+        virtualPathMappings[key] = { virtualPath, priority };
+
+        if (isNew)
+        {
+            virtualPathsCount.fetch_add(1, std::memory_order_release);
+        }
+
+        if (sActiveDirectories.empty() && virtualPathsCount.load(std::memory_order_acquire) == 1)
+        {
+            HookAPIForOverload();
+        }
+
+        return true;
+    }
+
+    void WINAPI RemoveVirtualPathFromOverload(auto originalPath)
+    {
+        if (!originalPath)
+            return;
+
+        auto key = NormalizePath(originalPath);
+        if (key.empty())
+            return;
+
+        std::unique_lock lock(virtualPathMutex);
+        if (virtualPathMappings.erase(key))
+        {
+            virtualPathsCount.fetch_sub(1, std::memory_order_release);
+        }
+    }
+
+    bool WINAPI AddVirtualPathForOverloadA(const char* originalPath, const char* virtualPath, int priority)
+    {
+        return AddVirtualPathForOverload(originalPath, virtualPath, priority);
+    }
+
+    void WINAPI RemoveVirtualPathFromOverloadA(const char* originalPath)
+    {
+        return RemoveVirtualPathFromOverload(originalPath);
+    }
+
+    bool WINAPI AddVirtualPathForOverloadW(const wchar_t* originalPath, const wchar_t* virtualPath, int priority)
+    {
+        return AddVirtualPathForOverload(originalPath, virtualPath, priority);
+    }
+
+    void WINAPI RemoveVirtualPathFromOverloadW(const wchar_t* originalPath)
+    {
+        return RemoveVirtualPathFromOverload(originalPath);
+    }
+
     bool WINAPI AddVirtualFileForOverload(auto virtualPath, const uint8_t* data, size_t size, int priority)
     {
         if (!virtualPath || !data || size == 0)
@@ -3813,17 +3986,25 @@ namespace OverloadFromFolder
         try
         {
             auto filePath = NormalizePath(virtualPath);
-
             if (filePath.empty())
                 return false;
 
-            std::unique_lock lock(virtualFilesMutex);
+            // Lock both mutexes to check and modify containers
+            std::scoped_lock lock(virtualPathMutex, virtualFilesMutex);
 
-            auto pathIt = virtualFilesByPath.find(filePath);
-
-            if (pathIt != virtualFilesByPath.end())
+            // Check virtual paths and remove if lower priority
+            auto pathIt = virtualPathMappings.find(filePath);
+            if (pathIt != virtualPathMappings.end() && pathIt->second.second < priority)
             {
-                auto& existingFile = pathIt->second;
+                virtualPathMappings.erase(pathIt);
+                virtualPathsCount.fetch_sub(1, std::memory_order_release);
+            }
+
+            // Check existing virtual file
+            auto fileIt = virtualFilesByPath.find(filePath);
+            if (fileIt != virtualFilesByPath.end())
+            {
+                auto& existingFile = fileIt->second;
                 if (existingFile->priority > priority)
                     return false; // Existing has higher priority, skip
 
@@ -3919,7 +4100,6 @@ namespace OverloadFromFolder
                 }
 
                 virtualFilesCount.fetch_sub(1, std::memory_order_release);
-                HookAPIForVirtualFiles();
             }
         }
         catch (...)
