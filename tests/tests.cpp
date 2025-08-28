@@ -46,7 +46,7 @@ void Init()
         outfile.close();
     }
 
-    // OverloadFromFolder (folder)
+    // Overload (folder)
     {
         std::ifstream ifs;
         ifs.open(L"input.bin", std::ifstream::in);
@@ -57,7 +57,7 @@ void Init()
         outfile.close();
     }
 
-    // OverloadFromFolder (virtual file)
+    // Overload (virtual file)
     {
         bool (WINAPI* GetOverloadPathW)(wchar_t* out, size_t out_size) = nullptr;
         bool (WINAPI* AddVirtualFileForOverloadW)(const wchar_t* virtualPath, const uint8_t* data, size_t size, int priority) = nullptr;
@@ -81,9 +81,11 @@ void Init()
         std::ofstream outfile(line, std::ios::out | std::ios::binary);
         outfile.flush();
         outfile.close();
+
+        AddVirtualFileForOverloadW(L"input3.bin", &hexData[14], 14, 1000);
     }
 
-    // OverloadFromFolder (zip file)
+    // Overload (zip file)
     {
         std::ifstream ifs;
         ifs.open(L"input3.bin", std::ifstream::in);
@@ -92,6 +94,37 @@ void Init()
         std::ofstream outfile(line, std::ios::out | std::ios::binary);
         outfile.flush();
         outfile.close();
+    }
+
+    // Overload (virtual path)
+    {
+        bool (WINAPI* GetOverloadPathW)(wchar_t* out, size_t out_size) = nullptr;
+        bool (WINAPI* AddVirtualPathForOverloadW)(const wchar_t* originalPath, const wchar_t* virtualPath, int priority) = nullptr;
+        void (WINAPI* RemoveVirtualPathFromOverloadW)(const wchar_t* originalPath) = nullptr;
+
+        GetOverloadPathW = (decltype(GetOverloadPathW))GetProcAddress(hUAL, "GetOverloadPathW");
+        AddVirtualPathForOverloadW = (decltype(AddVirtualPathForOverloadW))GetProcAddress(hUAL, "AddVirtualPathForOverloadW");
+        RemoveVirtualPathFromOverloadW = (decltype(RemoveVirtualPathFromOverloadW))GetProcAddress(hUAL, "RemoveVirtualPathFromOverloadW");
+
+        AddVirtualPathForOverloadW(L"input3.bin", L"storage/input3.bin", 1001); // higher priority than input3.bin above to work
+        AddVirtualPathForOverloadW(L"input4.bin", L"storage/input4.bin", 1001);
+        RemoveVirtualPathFromOverloadW(L"input4.bin");
+
+        std::ifstream ifs;
+        ifs.open(L"input3.bin", std::ifstream::in);
+        std::string line;
+        std::getline(ifs, line);
+
+        if (line == "virtual_path_test_passed.txt")
+        {
+            std::ifstream ifs2;
+            ifs2.open(L"input4.bin", std::ifstream::in);
+            std::string line2;
+            std::getline(ifs2, line2);
+            std::ofstream outfile2(line2, std::ios::out | std::ios::binary);
+            outfile2.flush();
+            outfile2.close();
+        }
     }
 
     ExitProcess(0);

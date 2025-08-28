@@ -10,8 +10,8 @@ cd /d "%~dp0" || (
 REM Define directories and executables
 set "BASE_DIR=%CD%"
 
-set "DIRECTORIES=ASILoading OverloadFromFolder OverloadFromFolderVirtualFile OverloadFromFolderZipFile"
-set "TEST_FILES=ASILoading:dynamic:dynamic OverloadFromFolder:update_test_passed.txt:update_test_passed.txt OverloadFromFolderVirtualFile:virtual_file_test_passed.txt:virtual_file_test_passed.txt OverloadFromFolderZipFile:zip_file_test_passed.txt:zip_file_test_passed.txt"
+set "DIRECTORIES=ASILoading OverloadFromFolder OverloadFromFolderVirtualFile OverloadFromFolderZipFile OverloadFromFolderVirtualPath"
+set "TEST_FILES=ASILoading:dynamic:dynamic OverloadFromFolder:update_test_passed.txt:update_test_passed.txt OverloadFromFolderVirtualFile:virtual_file_test_passed.txt:virtual_file_test_passed.txt OverloadFromFolderZipFile:zip_file_test_passed.txt:zip_file_test_passed.txt OverloadFromFolderVirtualPath:virtual_path_test_passed.txt:virtual_path_test_passed.txt"
 set "X86_SAMPLES=DInput8Sample.exe D3D9Sample.exe D3D10Sample.exe D3D11Sample.exe D3D12Sample.exe"
 set "X64_SAMPLES=DInput8Sample64.exe D3D9Sample64.exe D3D10Sample64.exe D3D11Sample64.exe D3D12Sample64.exe"
 set "X86_DLLS=dinput8.dll d3d9.dll d3d10.dll d3d11.dll d3d12.dll"
