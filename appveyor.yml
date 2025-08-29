@@ -1,4 +1,4 @@
-version: 6.{build}.0
+version: 9.{build}.0
 skip_tags: true
 image: Visual Studio 2022
 configuration: Release
@@ -13,7 +13,15 @@ build:
 before_package:
 - cmd: msbuild.exe build/Ultimate-ASI-Loader-x64.sln /t:Build /p:Configuration=Release;Platform=x64
 after_build:
-- cmd: release.bat
+- cmd: >-
+    release.bat
+
+
+    cd tests
+
+    test.bat
+
+    cd ..
 artifacts:
 - path: bin\Ultimate-ASI-Loader.zip
   name: Ultimate-ASI-Loader.zip
