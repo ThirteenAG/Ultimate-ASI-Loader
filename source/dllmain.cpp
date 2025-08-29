@@ -1916,14 +1916,33 @@ namespace OverloadFromFolder
 
     std::wstring NormalizePath(const std::filesystem::path& path)
     {
-        std::wstring relativePath = {};
-        auto normalized = std::filesystem::path(path).make_preferred();
-        if (normalized.is_absolute())
-            relativePath = lexicallyRelativeCaseIns(normalized, gamePath).make_preferred().wstring();
-        else
-            relativePath = normalized.wstring();
-        std::transform(relativePath.begin(), relativePath.end(), relativePath.begin(), ::towlower);
-        return relativePath;
+        static auto starts_with = [](const std::filesystem::path& path, const std::filesystem::path& base) -> bool
+        {
+            std::wstring str1(path.wstring()); std::wstring str2(base.wstring());
+            std::transform(str1.begin(), str1.end(), str1.begin(), ::towlower);
+            std::transform(str2.begin(), str2.end(), str2.begin(), ::towlower);
+            return str1.starts_with(str2);
+        };
+
+        std::error_code ec;
+        auto filePath = path;
+        auto absolutePath = std::filesystem::absolute(filePath.make_preferred(), ec);
+        auto relativePath = lexicallyRelativeCaseIns(absolutePath, gamePath);
+
+        if (starts_with(relativePath, ".."))
+        {
+            std::filesystem::path rp;
+            for (auto& p : relativePath)
+            {
+                if (p != "..")
+                    rp = rp / p;
+            }
+            relativePath = rp;
+        }
+
+        auto relativePathStr = relativePath.wstring();
+        std::transform(relativePathStr.begin(), relativePathStr.end(), relativePathStr.begin(), ::towlower);
+        return relativePathStr;
     }
 
     inline bool HasVirtualPaths()
@@ -2567,7 +2586,7 @@ namespace OverloadFromFolder
             };
 
             auto filePath = lpFilename;
-            auto absolutePath = std::filesystem::absolute(filePath, ec);
+            auto absolutePath = std::filesystem::absolute(filePath.make_preferred(), ec);
             auto relativePath = lexicallyRelativeCaseIns(absolutePath, gamePath);
             auto commonPath = gamePath;
 
@@ -2718,8 +2737,8 @@ namespace OverloadFromFolder
         return {};
     }
 
-#define value_orA(path1, path2) (path1.empty() ? path2 : path1.string().c_str())
-#define value_orW(path1, path2) (path1.empty() ? path2 : path1.wstring().c_str())
+    #define value_orA(path1, path2) (path1.empty() ? path2 : path1.string().c_str())
+    #define value_orW(path1, path2) (path1.empty() ? path2 : path1.wstring().c_str())
 
     void FindFileCheckOverloadedPath(auto dir, auto lpFindFileData, auto filename)
     {
@@ -3927,7 +3946,11 @@ namespace OverloadFromFolder
         if (!isNew && priority <= pathIt->second.second)
             return false; // Existing path has higher or equal priority
 
-        virtualPathMappings[key] = { virtualPath, priority };
+        auto vpath = std::filesystem::path(virtualPath);
+        if (vpath.is_relative())
+            vpath = gamePath / vpath;
+
+        virtualPathMappings[key] = { vpath, priority };
 
         if (isNew)
         {
