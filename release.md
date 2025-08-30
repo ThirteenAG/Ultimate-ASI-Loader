@@ -1,4 +1,4 @@
-This is a DLL file which adds ASI plugin loading functionality to any game, which uses any of the following libraries:
+This is a DLL file that adds ASI plugin loading functionality to any game that uses any of the following libraries:
 
 |                                                          Win32                                                            |                                                       Win64                                                           |
 | :-----------------------------------------------------------------------------------------------------------------------: | :-------------------------------------------------------------------------------------------------------------------: |
@@ -30,13 +30,14 @@ This is a DLL file which adds ASI plugin loading functionality to any game, whic
 | [xinput9_1_0.dll](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/Win32-latest/xinput9_1_0-Win32.zip) | [xinput9_1_0.dll](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/x64-latest/xinput9_1_0-x64.zip) |
 | [xinputuap.dll](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/Win32-latest/xinputuap-Win32.zip)     |  [xinputuap.dll](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/x64-latest/xinputuap-x64.zip)    |
 
-It is possible(and sometimes necessary) to load the original dll by renaming it to `<dllname>Hooked.dll`, e.g. `d3d12Hooked.dll`.
-With **binkw32.dll** and **vorbisFile.dll** it is optional and you can simply replace the dll. Always make a backup before replacing any files.
+It is possible (and sometimes necessary) to load the original DLL by renaming it to `<dllname>Hooked.dll`, e.g. `d3d12Hooked.dll`.
+With **binkw32.dll** and **vorbisFile.dll**, it is optional, and you can simply replace the DLL. Always make a backup before replacing any files.
+
 
 ## INSTALLATION
 
-To install it, you just need to place DLL into the game directory. Usually, it works as dinput8.dll, but if it's not, there is a possibility to rename it(see the list of supported names above).
+To install it, you just need to place the DLL into the game directory. Usually, it works as dinput8.dll, but if that doesn't work, you can rename it (see the list of supported names above).
 
 ## USAGE
 
-Put ASI files in the game root directory, 'scripts', 'plugins', or 'update' folder.
+Put ASI files in the game's root directory or in the `scripts`, `plugins`, or `update` folder.
