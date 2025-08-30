@@ -30,7 +30,6 @@ for %%A in (Win32 x64) do (
 
     for %%D in (%DIRECTORIES%) do (
         set "D=%%D"
-        REM echo Processing !D! in !ARCH!
         if not exist "%%D\!ARCH!\" (
             echo Error: Directory %%D\!ARCH! does not exist
             dir "%%D" 2>nul
@@ -46,49 +45,70 @@ for %%A in (Win32 x64) do (
             exit /b 1
         )
         set "CURRENT_DIR=%CD%"
-        REM echo Current directory: !CURRENT_DIR!
-        REM cd
-        REM dir *.exe 2>nul
 
-        REM Clean up existing .txt files
+        REM Clean up existing .txt files and specific DLLs (exclude D3DX9_43.dll)
         del /s *.txt >nul 2>&1
+        for %%L in (!DLLS!) do (
+            del /s "%%L" >nul 2>&1
+        )
 
-        REM Set executables
-        set "EXECS=!SAMPLES!"
+        REM Copy Test_*.asi file
+        copy "..\..\..\bin\!ARCH!\Release\Test_!ARCH!.asi" "Test_!ARCH!.asi" >nul
+        if not exist "Test_!ARCH!.asi" (
+            echo Error: Test_!ARCH!.asi not found in !CURRENT_DIR!
+            popd
+            cd /d "%BASE_DIR%"
+            exit /b 1
+        )
 
-        REM Copy required files
+        REM Check if dinput8.dll exists
         if not exist "..\..\..\bin\!ARCH!\Release\dinput8.dll" (
             echo Error: dinput8.dll not found in ..\..\..\bin\!ARCH!\Release
             popd
             cd /d "%BASE_DIR%"
             exit /b 1
         )
-        if not "!D!"=="ASILoading" (
-            if not exist "..\..\..\bin\x64\Release\VirtualFileServer.exe" (
-                echo Error: VirtualFileServer.exe not found in ..\..\..\bin\x64\Release
-                popd
-                cd /d "%BASE_DIR%"
-                exit /b 1
-            )
-        )
-        for %%L in (!DLLS!) do (
-            copy "..\..\..\bin\!ARCH!\Release\dinput8.dll" "%%L" >nul
-            if not "!D!"=="ASILoading" (
-                copy "..\..\..\bin\x64\Release\VirtualFileServer.exe" "%%~nL.exe" >nul
-            )
-        )
-        copy "..\..\..\bin\!ARCH!\Release\Test_!ARCH!.asi" "Test_!ARCH!.asi" >nul
 
-        REM Run tests for each executable
-        for %%E in (!EXECS!) do (
+        REM Counter to align executables with DLLs
+        set "INDEX=0"
+        for %%E in (!SAMPLES!) do (
             set "E=%%E"
-            REM echo Testing !E! in !D! (!ARCH!)
             if not exist "!E!" (
                 echo Error: Executable !E! not found in !CURRENT_DIR!
-                REM dir *.exe 2>nul
                 popd
                 cd /d "%BASE_DIR%"
                 exit /b 1
+            )
+
+            REM Get the corresponding DLL name by index
+            set "CURRENT_DLL="
+            set "DLL_INDEX=0"
+            for %%L in (!DLLS!) do (
+                if !DLL_INDEX! equ !INDEX! (
+                    set "CURRENT_DLL=%%L"
+                )
+                set /a DLL_INDEX+=1
+            )
+
+            if not defined CURRENT_DLL (
+                echo Error: No DLL defined for !E! in !ARCH!
+                popd
+                cd /d "%BASE_DIR%"
+                exit /b 1
+            )
+
+            REM Copy dinput8.dll as the expected DLL name
+            copy "..\..\..\bin\!ARCH!\Release\dinput8.dll" "!CURRENT_DLL!" >nul
+
+            REM Copy VirtualFileServer.exe if not ASILoading
+            if not "!D!"=="ASILoading" (
+                if not exist "..\..\..\bin\x64\Release\VirtualFileServer.exe" (
+                    echo Error: VirtualFileServer.exe not found in ..\..\..\bin\x64\Release
+                    popd
+                    cd /d "%BASE_DIR%"
+                    exit /b 1
+                )
+                copy "..\..\..\bin\x64\Release\VirtualFileServer.exe" "!CURRENT_DLL:~0,-4!.exe" >nul
             )
 
             REM Get the expected test file for this directory
@@ -115,23 +135,36 @@ for %%A in (Win32 x64) do (
                 exit /b 1
             )
 
-            REM echo Running !E!, expecting test file: !TEST_FILE!
-            REM echo.
+            REM Run the executable
             start /W /B "" "!E!"
 
             if exist "!TEST_FILE!" (
                 echo !ARCH! !D! Test for !E! PASSED
                 del "!TEST_FILE!"
-                REM Ensure the process is terminated
                 taskkill /IM "!E!" /F >nul 2>&1
-                REM echo.
             ) else (
-                REM Process not running and no file, fail immediately
                 echo !ARCH! !D! Test for !E! FAILED
+                for %%L in (!DLLS!) do (
+                    del /s "%%L" >nul 2>&1
+                )
+                if not "!D!"=="ASILoading" (
+                    del "!CURRENT_DLL:~0,-4!.exe" >nul 2>&1
+                )
                 popd
                 cd /d "%BASE_DIR%"
                 exit /b 1
             )
+
+            REM Clean up specific DLL and VirtualFileServer.exe (if copied), preserve D3DX9_43.dll
+            for %%L in (!DLLS!) do (
+                del /s "%%L" >nul 2>&1
+            )
+            if not "!D!"=="ASILoading" (
+                del "!CURRENT_DLL:~0,-4!.exe" >nul 2>&1
+            )
+
+            REM Increment index for next executable-DLL pair
+            set /a INDEX+=1
         )
 
         popd
