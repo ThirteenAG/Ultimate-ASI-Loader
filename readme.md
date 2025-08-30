@@ -9,7 +9,7 @@
 
 ## DESCRIPTION
 
-This is a DLL file that adds ASI plugin loading functionality to any game, which uses any of the following libraries:
+This is a DLL file that adds ASI plugin loading functionality to any game that uses any of the following libraries:
 
 |                                                          Win32                                                            |                                                       Win64                                                           |
 | :-----------------------------------------------------------------------------------------------------------------------: | :-------------------------------------------------------------------------------------------------------------------: |
@@ -41,23 +41,23 @@ This is a DLL file that adds ASI plugin loading functionality to any game, which
 | [xinput9_1_0.dll](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/Win32-latest/xinput9_1_0-Win32.zip) | [xinput9_1_0.dll](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/x64-latest/xinput9_1_0-x64.zip) |
 | [xinputuap.dll](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/Win32-latest/xinputuap-Win32.zip)     |  [xinputuap.dll](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/x64-latest/xinputuap-x64.zip)    |
 
-It is possible(and sometimes necessary) to load the original dll by renaming it to `<dllname>Hooked.dll`, e.g. `d3d12Hooked.dll`.
-With **binkw32.dll** and **vorbisFile.dll** it is optional and you can simply replace the dll. Always make a backup before replacing any files.
+It is possible (and sometimes necessary) to load the original DLL by renaming it to `<dllname>Hooked.dll`, e.g. `d3d12Hooked.dll`.
+With **binkw32.dll** and **vorbisFile.dll**, it is optional, and you can simply replace the DLL. Always make a backup before replacing any files.
 
 
 ## INSTALLATION
 
-To install it, you just need to place DLL into the game directory. Usually, it works as dinput8.dll, but if it's not, there is a possibility to rename it(see the list of supported names above).
+To install it, you just need to place the DLL into the game directory. Usually, it works as dinput8.dll, but if that doesn't work, you can rename it (see the list of supported names above).
 
 ## USAGE
 
-Put ASI files in the game root directory, 'scripts', 'plugins', or 'update' folder.
-If a configuration is necessary, the global.ini file can be placed in the 'scripts' or 'plugins' folder. It can be used alongside the chosen dll and if so, it is also possible to use the dll name for ini file, e.g. version.dll/version.ini.
+Put ASI files in the game's root directory or in the `scripts`, `plugins`, or `update` folder.
+If configuration is necessary, the global.ini file can be placed in the 'scripts' or 'plugins' folder. It can be used alongside the chosen DLL, and if so, it is also possible to use the DLL name for the ini file (e.g., version.dll/version.ini).
 [See an example of global.ini here](https://github.com/ThirteenAG/Ultimate-ASI-Loader/blob/master/data/scripts/global.ini).
 
 ## UPDATE FOLDER (Overload From Folder)
 
-It is possible to install mods that replace files via the `update` folder, allowing you to avoid actual file replacement.
+It is possible to install mods that replace files via the `update` folder, allowing you to avoid replacing original game files.
 
 For example, if a mod replaces the file located at:
 
@@ -87,16 +87,16 @@ Should be adjusted to:
 
 Starting with version 7.9.0, you can use this functionality for total conversions:
 
-![re5dx9_update](https://github.com/user-attachments/assets/7ec4c006-2205-444f-9a7a-8d3c8f5b62fb)
+![re5dx9_update](https://github.com/user-attachments/assets/a4baaa7b-d0bc-44ce-ab5e-d5fa8cc3ae43)
 
-Two or more folders must be specified and exist for the selector dialog to appear. Define them inside global.ini under `[FileLoader]` section at `OverloadFromFolder` key. Use `|` symbol as a separator. If only one folder is specified and exists, it will be used to overload files, but the selector will not appear. Without ini file, `update` folder is always used if it exists. Example:
+Two or more folders must be specified, and exist, for the selector dialog to appear. Define them inside global.ini under `[FileLoader]` section using the `OverloadFromFolder` key. Use the `|` symbol as a separator. If only one folder is specified and exists, it will be used to overload files, but the selector will not appear. Without an ini file, the `update` folder is always used if it exists. Example:
 
 ```ini
 [FileLoader]
 OverloadFromFolder=update | nightmare
 ```
 
-To create a custom header, create `update.txt` inside update/total conversion folder and insert the custom name there.
+To create a custom header, create `update.txt` inside `update` or total conversion folder and insert the custom name there.
 
 `Resident Evil 5\nightmare\update.txt:`
 
@@ -104,7 +104,7 @@ To create a custom header, create `update.txt` inside update/total conversion fo
 Resident Evil 5 - Nightmare (Story mode mod)
 ```
 
-To get the current update path, use the `GetOverloadPathA` or `GetOverloadPathW` exports from the ASI plugin.
+To get the current update path, use the ASI Loader's `GetOverloadPathA` or `GetOverloadPathW` exports from the ASI plugin.
 
 ```cpp
 bool (WINAPI* GetOverloadPathW)(wchar_t* out, size_t out_size) = nullptr;
@@ -128,48 +128,48 @@ if (!GetOverloadPathW || !GetOverloadPathW(s.data(), s.size()))
 auto updatePath = std::filesystem::path(s.data());
 ```
 
-## ADDITIONAL WINDOWED MODE FEATURE (x86 builds only)
+## ADDITIONAL WINDOWED MODE FEATURE (x86 builds only, legacy feature)
 
-32-bit version of ASI loader has built-in wndmode.dll, which can be loaded if you create empty wndmode.ini in the folder with asi loader's dll. It will be automatically filled with example configuration at the first run of the game. Settings are not universal and should be changed in every specific case, but usually, it works as is.
+The 32-bit version of the ASI loader has a built-in wndmode.dll, which can be loaded if you create an empty wndmode.ini in the folder with the ASI loader's DLL. It will be automatically filled with example configuration at the first run of the game. Settings are not universal and should be changed for each specific game, but usually, it works as is.
 
 ## D3D8TO9
 
-Some mods, like [SkyGfx](https://github.com/aap/skygfx_vc) require [d3d8to9](https://github.com/crosire/d3d8to9). It is also a part of the ASI loader, so to use it, create [global.ini](https://github.com/ThirteenAG/Ultimate-ASI-Loader/edit/master/readme.md#usage) with the following content:
+Some mods, like [SkyGfx](https://github.com/aap/skygfx_vc), require [d3d8to9](https://github.com/crosire/d3d8to9). It is also a part of the ASI loader, so to use it, create [global.ini](https://github.com/ThirteenAG/Ultimate-ASI-Loader/edit/master/readme.md#usage) with the following content:
 
 ```ini
 [GlobalSets]
 UseD3D8to9=1
 ```
-Asi loader must be named `d3d8.dll` in order for this feature to take effect.
+The ASI Loader must be named `d3d8.dll` in order for this feature to take effect.
 
 [See an example of global.ini here](https://github.com/ThirteenAG/Ultimate-ASI-Loader/blob/master/data/scripts/global.ini#L8).
 
 ## CrashDumps
 
-ASI loader is now capable of generating crash minidumps and crash logs. To use this feature, create a folder named `CrashDumps` in the folder with asi loader's dll. You can disable that via the `DisableCrashDumps=1` ini option.
+The ASI loader is now capable of generating crash minidumps and crash logs. To use this feature, create a folder named `CrashDumps` in the folder with the ASI loader's DLL. You can disable it via the `DisableCrashDumps=1` ini option.
 
 ## Using with UWP games
 
-1. Enable Developer Mode (Windows Settings -> Update and Security -> For Developers -> Developer Mode)  
+1. Enable Developer Mode (Windows Settings -> Update and Security -> For Developers -> Developer Mode)
    ![image](https://user-images.githubusercontent.com/4904157/136562544-6d249514-203e-40c2-808f-34786b043ec5.png)
-2. Install a UWP game, for example, GTA San Andreas.  
+2. Install a UWP game, for example, GTA San Andreas.
    ![image](https://user-images.githubusercontent.com/4904157/136558440-553ef1f6-cf69-413b-903b-fd4203d6cc1f.png)
 3. Launch a UWP game through the start menu.
-4. Open [UWPInjector.exe](https://github.com/Wunkolo/UWPDumper) from the UWPDumper download.  
+4. Open [UWPInjector.exe](https://github.com/Wunkolo/UWPDumper) from the UWPDumper download.
    ![image](https://user-images.githubusercontent.com/4904157/136558563-6e39dd67-778e-4159-bb3b-83c499017223.png)
 5. Enter the Process ID that is displayed from the injector and then hit enter.
-6. Wait until the game is dumped.  
+6. Wait until the game is dumped.
    ![image](https://user-images.githubusercontent.com/4904157/136558813-8b7c271c-2475-40b9-a432-f9640f328a43.png)
 7. Go to the directory : `C:\Users\[YOUR USERNAME]\AppData\Local\Packages\[YOUR UWP GAME NAME]\TempState\DUMP`
 8. Copy these files into a new folder somewhere else of your choosing.
-9. Uninstall a UWP game by clicking on the start menu, right-clicking on its icon, and uninstall.  
+9. Uninstall a UWP game by clicking on the start menu, right-clicking on its icon, and uninstall.
    ![image](https://user-images.githubusercontent.com/4904157/136559019-bdd6d278-d2ae-4acf-b119-9933baab7d96.png)
 10. Go to your directory with your new dumped files (the ones you copied over) and shift + right-click in the directory and "Open Powershell window here".
-11. In that folder, rename **AppxBlockMap.xml** and **AppxSignature.xml** to anything else.
+11. In that folder, rename **AppxBlockMap.xml** and **AppxSignature.xml** to anything else (to bypass UWP restrictions).
 12. Run the following command: `Add-AppxPackage -Register AppxManifest.xml`
-13. Place Ultimate ASI Loader DLL into the game directory. You need to find out which name works for a specific game, in the case of GTA SA I've used **d3d11.dll**, so I put **dinput8.dll** from the x86 archive and renamed it to **d3d11.dll**.
-14. Create a **scripts** or **plugins** folder within the root directory and place your plugins in it.  
-Rough code example of radio for all vehicles plugin [here](https://gist.github.com/ThirteenAG/868a964b46b82ce5cebbd4a0823c69e4). Compiled binary here - [GTASAUWP.RadioForAllVehicles.zip](https://github.com/ThirteenAG/Ultimate-ASI-Loader/files/7311505/GTASAUWP.RadioForAllVehicles.zip)  
+13. Place the Ultimate ASI Loader DLL into the game directory. You need to find out which name works for a specific game, in the case of GTA SA I've used **d3d11.dll**, so I put **dinput8.dll** from the x86 archive and renamed it to **d3d11.dll**.
+14. Create a scripts or plugins folder within the root directory and place your plugins in it.
+Rough code example of radio for all vehicles plugin [here](https://gist.github.com/ThirteenAG/868a964b46b82ce5cebbd4a0823c69e4). Compiled binary here - [GTASAUWP.RadioForAllVehicles.zip](https://github.com/ThirteenAG/Ultimate-ASI-Loader/files/7311505/GTASAUWP.RadioForAllVehicles.zip)
 15. Click on the start menu and launch the game!  
-16. See your mods in action.  
+16. See your mods in action.
 ![ApplicationFrameHost_2021-10-08_15-57-14](https://user-images.githubusercontent.com/4904157/136561208-e989119e-1ef4-42c2-8b20-c1f81f4e0931.png)
