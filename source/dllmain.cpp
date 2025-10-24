@@ -1199,8 +1199,8 @@ void LoadPluginsAndRestoreIAT(uintptr_t retaddr, std::wstring_view calledFrom = 
                 pathsForDialog.push_back(entry.path);
             }
 
-            constexpr auto dialogMutexName = L"Global\\UltimateASILoader-FolderSelectDialog-Mutex";
-            auto hDialogMutex = CreateMutexW(NULL, TRUE, dialogMutexName);
+            std::wstring dialogMutexName = L"Global\\UltimateASILoader-FolderSelectDialog-Mutex" + std::to_wstring(GetCurrentProcessId());
+            auto hDialogMutex = CreateMutexW(NULL, TRUE, dialogMutexName.c_str());
 
             if (hDialogMutex && GetLastError() == ERROR_ALREADY_EXISTS)
             {
@@ -3596,16 +3596,16 @@ namespace OverloadFromFolder
         if (sActiveDirectories.empty() && !HasVirtualPaths())
             return;
 
-        constexpr auto mutexName = L"Ultimate-ASI-Loader-OverloadFromFolder";
+        std::wstring mutexName = L"Ultimate-ASI-Loader-OverloadFromFolder" + std::to_wstring(GetCurrentProcessId());
 
-        auto hMutex = OpenMutexW(MUTEX_ALL_ACCESS, FALSE, mutexName);
+        auto hMutex = OpenMutexW(MUTEX_ALL_ACCESS, FALSE, mutexName.c_str());
         if (hMutex)
         {
             CloseHandle(hMutex);
             return;
         }
 
-        hMutex = CreateMutexW(nullptr, TRUE, mutexName);
+        hMutex = CreateMutexW(nullptr, TRUE, mutexName.c_str());
         if (!hMutex || GetLastError() == ERROR_ALREADY_EXISTS)
         {
             if (hMutex)
@@ -3671,9 +3671,9 @@ namespace OverloadFromFolder
 
         if (!virtualFileHooksActive && shouldHaveHooks)
         {
-            constexpr auto mutexName = L"Ultimate-ASI-Loader-VirtualFiles";
+            std::wstring mutexName = L"Ultimate-ASI-Loader-VirtualFiles" + std::to_wstring(GetCurrentProcessId());
 
-            auto hVirtualFilesMutex = OpenMutexW(MUTEX_ALL_ACCESS, FALSE, mutexName);
+            auto hVirtualFilesMutex = OpenMutexW(MUTEX_ALL_ACCESS, FALSE, mutexName.c_str());
             if (hVirtualFilesMutex)
             {
                 CloseHandle(hVirtualFilesMutex);
@@ -3681,7 +3681,7 @@ namespace OverloadFromFolder
                 return;
             }
 
-            hVirtualFilesMutex = CreateMutexW(nullptr, TRUE, mutexName);
+            hVirtualFilesMutex = CreateMutexW(nullptr, TRUE, mutexName.c_str());
             if (!hVirtualFilesMutex || GetLastError() == ERROR_ALREADY_EXISTS)
             {
                 if (hVirtualFilesMutex) CloseHandle(hVirtualFilesMutex);
@@ -3753,7 +3753,8 @@ namespace OverloadFromFolder
 
         std::call_once(flag, [&]() {
             std::lock_guard<std::mutex> lock(serverMutex);
-            HANDLE hMutex = CreateMutexW(NULL, TRUE, L"Global\\Ultimate-ASI-Loader-VirtualFileClientMutex");
+            std::wstring mutexName = L"Global\\Ultimate-ASI-Loader-VirtualFileClientMutex" + std::to_wstring(GetCurrentProcessId());
+            HANDLE hMutex = CreateMutexW(NULL, TRUE, mutexName.c_str());
             if (GetLastError() == ERROR_ALREADY_EXISTS)
             {
                 CloseHandle(hMutex);
