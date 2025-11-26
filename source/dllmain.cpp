@@ -5065,6 +5065,7 @@ void PatchOrdinals(HMODULE mod)
     }
 }
 
+HANDLE g_hHookIATMutex = nullptr;
 bool HookIAT()
 {
     std::wstring mutexName = L"Ultimate-ASI-Loader-HookIAT" + std::to_wstring(GetCurrentProcessId());
@@ -5083,6 +5084,8 @@ bool HookIAT()
             CloseHandle(hMutex);
         return false;
     }
+
+    g_hHookIATMutex = hMutex;
 
     ModuleList modules;
     modules.Enumerate(ModuleList::SearchLocation::All);
@@ -5107,9 +5110,6 @@ bool HookIAT()
             }
         }
     }
-
-    if (hMutex)
-        CloseHandle(hMutex);
 
     return !moduleIATs.empty();
 }
@@ -5289,6 +5289,12 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID /*lpReserved*/)
         {
             for (auto& [name, data] : modData.ole32Functions)
                 data.Restore();
+        }
+
+        if (g_hHookIATMutex)
+        {
+            CloseHandle(g_hHookIATMutex);
+            g_hHookIATMutex = nullptr;
         }
     }
     return TRUE;
