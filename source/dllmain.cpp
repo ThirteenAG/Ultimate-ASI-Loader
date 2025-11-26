@@ -61,9 +61,9 @@ namespace OverloadFromFolder
     void HookAPIForOverload();
     void HookAPIForVirtualFiles();
     void LoadVirtualFilesFromZip();
-#if !X64
+    #if !X64
     bool InitializeServerConnection();
-#endif
+    #endif
     BOOL SetVirtualFilePointerEx(HANDLE hFile, LARGE_INTEGER liDistanceToMove, PLARGE_INTEGER lpNewFilePointer, DWORD dwMoveMethod);
     bool FilterExistingPathEntries(std::vector<FileLoaderPathEntry>& entries);
     std::vector<FileLoaderPathEntry> ParseMultiplePathsWithPriority(const std::wstring& pathsString);
@@ -164,102 +164,102 @@ HRESULT CALLBACK TaskDialogCallbackProc(HWND hwnd, UINT uNotification, WPARAM wP
 
     switch (uNotification)
     {
-    case TDN_CREATED:
-    {
-        g_mainDialogHwnd = hwnd;
-        g_userInteracted = false;
-        g_remainingSeconds = countdownSeconds;
-        g_lastMousePos = { -1, -1 };
-
-        hTaskbarIcon = GetApplicationIcon();
-        if (hTaskbarIcon)
-            SendMessage(hwnd, WM_SETICON, ICON_BIG, (LPARAM)hTaskbarIcon);
-
-        // Initialize progress bar
-        SendMessage(hwnd, TDM_SET_PROGRESS_BAR_RANGE, 0, MAKELPARAM(0, countdownSeconds));
-        SendMessage(hwnd, TDM_SET_PROGRESS_BAR_POS, countdownSeconds, 0);
-
-        // Set timer for countdown (1000ms = 1 second)
-        g_timerID = SetTimer(g_mainDialogHwnd, g_timerID, 1000, NULL);
-
-        // Set up a low-level mouse hook to detect any mouse movement.
-        g_hMouseHook = SetWindowsHookEx(WH_MOUSE_LL, LowLevelMouseProc, GetModuleHandle(NULL), 0);
-
-        // Create a hook to capture other messages for this thread
-        SetWindowsHookEx(WH_GETMESSAGE, [](int nCode, WPARAM wParam, LPARAM lParam) -> LRESULT
+        case TDN_CREATED:
         {
-            if (nCode >= 0 && wParam == PM_REMOVE)
+            g_mainDialogHwnd = hwnd;
+            g_userInteracted = false;
+            g_remainingSeconds = countdownSeconds;
+            g_lastMousePos = { -1, -1 };
+
+            hTaskbarIcon = GetApplicationIcon();
+            if (hTaskbarIcon)
+                SendMessage(hwnd, WM_SETICON, ICON_BIG, (LPARAM)hTaskbarIcon);
+
+            // Initialize progress bar
+            SendMessage(hwnd, TDM_SET_PROGRESS_BAR_RANGE, 0, MAKELPARAM(0, countdownSeconds));
+            SendMessage(hwnd, TDM_SET_PROGRESS_BAR_POS, countdownSeconds, 0);
+
+            // Set timer for countdown (1000ms = 1 second)
+            g_timerID = SetTimer(g_mainDialogHwnd, g_timerID, 1000, NULL);
+
+            // Set up a low-level mouse hook to detect any mouse movement.
+            g_hMouseHook = SetWindowsHookEx(WH_MOUSE_LL, LowLevelMouseProc, GetModuleHandle(NULL), 0);
+
+            // Create a hook to capture other messages for this thread
+            SetWindowsHookEx(WH_GETMESSAGE, [](int nCode, WPARAM wParam, LPARAM lParam) -> LRESULT
             {
-                MSG* msg = (MSG*)lParam;
-                switch (msg->message)
+                if (nCode >= 0 && wParam == PM_REMOVE)
                 {
-                case WM_KEYDOWN:
-                case WM_LBUTTONDOWN:
-                case WM_RBUTTONDOWN:
-                case WM_MBUTTONDOWN:
-                    if (!g_userInteracted)
+                    MSG* msg = (MSG*)lParam;
+                    switch (msg->message)
                     {
-                        g_userInteracted = true;
-                        KillTimer(g_mainDialogHwnd, g_timerID);
-                        SendMessage(g_mainDialogHwnd, TDM_SET_ELEMENT_TEXT, TDE_FOOTER, (LPARAM)szFooter);
-                        SendMessage(g_mainDialogHwnd, TDM_SET_PROGRESS_BAR_POS, 0, 0);
-                        if (g_hMouseHook)
-                        {
-                            UnhookWindowsHookEx(g_hMouseHook);
-                            g_hMouseHook = NULL;
-                        }
+                        case WM_KEYDOWN:
+                        case WM_LBUTTONDOWN:
+                        case WM_RBUTTONDOWN:
+                        case WM_MBUTTONDOWN:
+                            if (!g_userInteracted)
+                            {
+                                g_userInteracted = true;
+                                KillTimer(g_mainDialogHwnd, g_timerID);
+                                SendMessage(g_mainDialogHwnd, TDM_SET_ELEMENT_TEXT, TDE_FOOTER, (LPARAM)szFooter);
+                                SendMessage(g_mainDialogHwnd, TDM_SET_PROGRESS_BAR_POS, 0, 0);
+                                if (g_hMouseHook)
+                                {
+                                    UnhookWindowsHookEx(g_hMouseHook);
+                                    g_hMouseHook = NULL;
+                                }
+                            }
+                            break;
                     }
-                    break;
+                }
+                return CallNextHookEx(NULL, nCode, wParam, lParam);
+            }, NULL, GetCurrentThreadId());
+        }
+        break;
+        case TDN_DESTROYED:
+            if (g_hMouseHook)
+            {
+                UnhookWindowsHookEx(g_hMouseHook);
+                g_hMouseHook = NULL;
+
+                if (hTaskbarIcon)
+                    DestroyIcon(hTaskbarIcon);
+            }
+            break;
+        case TDN_TIMER:
+            if (g_remainingSeconds > 0 && !g_userInteracted)
+            {
+                g_remainingSeconds--;
+                SendMessage(hwnd, TDM_SET_PROGRESS_BAR_POS, g_remainingSeconds, 0);
+
+                std::wstring progressText = L"Auto-closing in " + std::to_wstring(g_remainingSeconds) + L" seconds...";
+                SendMessage(hwnd, TDM_SET_ELEMENT_TEXT, TDE_FOOTER, (LPARAM)progressText.c_str());
+
+                if (g_remainingSeconds == 0)
+                {
+                    KillTimer(hwnd, g_timerID);
+                    SendMessage(hwnd, TDM_CLICK_BUTTON, DEFAULT_BUTTON, 0);
                 }
             }
-            return CallNextHookEx(NULL, nCode, wParam, lParam);
-        }, NULL, GetCurrentThreadId());
-    }
-    break;
-    case TDN_DESTROYED:
-        if (g_hMouseHook)
-        {
-            UnhookWindowsHookEx(g_hMouseHook);
-            g_hMouseHook = NULL;
-
-            if (hTaskbarIcon)
-                DestroyIcon(hTaskbarIcon);
-        }
-        break;
-    case TDN_TIMER:
-        if (g_remainingSeconds > 0 && !g_userInteracted)
-        {
-            g_remainingSeconds--;
-            SendMessage(hwnd, TDM_SET_PROGRESS_BAR_POS, g_remainingSeconds, 0);
-
-            std::wstring progressText = L"Auto-closing in " + std::to_wstring(g_remainingSeconds) + L" seconds...";
-            SendMessage(hwnd, TDM_SET_ELEMENT_TEXT, TDE_FOOTER, (LPARAM)progressText.c_str());
-
-            if (g_remainingSeconds == 0)
+            break;
+        case TDN_BUTTON_CLICKED:
+            if (!g_userInteracted)
             {
+                g_userInteracted = true;
                 KillTimer(hwnd, g_timerID);
-                SendMessage(hwnd, TDM_CLICK_BUTTON, DEFAULT_BUTTON, 0);
+                SendMessage(hwnd, TDM_SET_PROGRESS_BAR_POS, 0, 0);
             }
-        }
-        break;
-    case TDN_BUTTON_CLICKED:
-        if (!g_userInteracted)
-        {
-            g_userInteracted = true;
-            KillTimer(hwnd, g_timerID);
-            SendMessage(hwnd, TDM_SET_PROGRESS_BAR_POS, 0, 0);
-        }
-        break;
-    case TDN_HYPERLINK_CLICKED:
-        ShellExecuteW(hwnd, L"open", (LPCWSTR)lParam, NULL, NULL, SW_SHOW);
-        if (!g_userInteracted)
-        {
-            g_userInteracted = true;
-            KillTimer(hwnd, g_timerID);
-            SendMessage(hwnd, TDM_SET_ELEMENT_TEXT, TDE_FOOTER, (LPARAM)szFooter);
-            SendMessage(hwnd, TDM_SET_PROGRESS_BAR_POS, 0, 0);
-        }
-        break;
+            break;
+        case TDN_HYPERLINK_CLICKED:
+            ShellExecuteW(hwnd, L"open", (LPCWSTR)lParam, NULL, NULL, SW_SHOW);
+            if (!g_userInteracted)
+            {
+                g_userInteracted = true;
+                KillTimer(hwnd, g_timerID);
+                SendMessage(hwnd, TDM_SET_ELEMENT_TEXT, TDE_FOOTER, (LPARAM)szFooter);
+                SendMessage(hwnd, TDM_SET_PROGRESS_BAR_POS, 0, 0);
+            }
+            break;
     }
 
     return S_OK;
@@ -292,34 +292,43 @@ std::filesystem::path lexicallyRelativeCaseIns(const std::filesystem::path& path
         std::filesystem::path::const_iterator _last;
     };
 
-    if (!iequals(path.root_name().wstring(), base.root_name().wstring()) || path.is_absolute() != base.is_absolute() || (!path.has_root_directory() && base.has_root_directory())) {
+    if (!iequals(path.root_name().wstring(), base.root_name().wstring()) || path.is_absolute() != base.is_absolute() || (!path.has_root_directory() && base.has_root_directory()))
+    {
         return std::filesystem::path();
     }
     std::filesystem::path::const_iterator a = path.begin(), b = base.begin();
-    while (a != path.end() && b != base.end() && iequals(a->wstring(), b->wstring())) {
+    while (a != path.end() && b != base.end() && iequals(a->wstring(), b->wstring()))
+    {
         ++a;
         ++b;
     }
-    if (a == path.end() && b == base.end()) {
+    if (a == path.end() && b == base.end())
+    {
         return std::filesystem::path(".");
     }
     int count = 0;
-    for (const auto& element : input_iterator_range(b, base.end())) {
-        if (element != "." && element != "" && element != "..") {
+    for (const auto& element : input_iterator_range(b, base.end()))
+    {
+        if (element != "." && element != "" && element != "..")
+        {
             ++count;
         }
-        else if (element == "..") {
+        else if (element == "..")
+        {
             --count;
         }
     }
-    if (count < 0) {
+    if (count < 0)
+    {
         return std::filesystem::path();
     }
     std::filesystem::path result;
-    for (int i = 0; i < count; ++i) {
+    for (int i = 0; i < count; ++i)
+    {
         result /= "..";
     }
-    for (const auto& element : input_iterator_range(a, path.end())) {
+    for (const auto& element : input_iterator_range(a, path.end()))
+    {
         result /= element;
     }
     return result;
@@ -334,8 +343,7 @@ bool FolderExists(auto szPath)
             return std::filesystem::is_directory(path);
         else
             return std::filesystem::is_directory(std::filesystem::path(GetModuleFileNameW(NULL)).parent_path() / path);
-    }
-    catch (...)
+    } catch (...)
     {
     }
 
@@ -463,70 +471,36 @@ void GetSections(T&& h, Args... args)
     }
 }
 
-enum Kernel32ExportsNames
+struct FunctionData
 {
-    eGetStartupInfoA,
-    eGetStartupInfoW,
-    eGetModuleHandleA,
-    eGetModuleHandleW,
-    eGetProcAddress,
-    eGetShortPathNameA,
-    eFindFirstFileA,
-    eFindNextFileA,
-    eFindFirstFileW,
-    eFindNextFileW,
-    eFindFirstFileExA,
-    eFindFirstFileExW,
-    eLoadLibraryExA,
-    eLoadLibraryExW,
-    eLoadLibraryA,
-    eLoadLibraryW,
-    eFreeLibrary,
-    eCreateEventA,
-    eCreateEventW,
-    eGetSystemInfo,
-    eInterlockedCompareExchange,
-    eSleep,
-    eGetSystemTimeAsFileTime,
-    eGetCurrentProcessId,
-    eGetCommandLineA,
-    eGetCommandLineW,
-    eAcquireSRWLockExclusive,
-    eCreateFileA,
-    eCreateFileW,
-    eGetFileAttributesA,
-    eGetFileAttributesW,
-    eGetFileAttributesExA,
-    eGetFileAttributesExW,
+    uintptr_t IATPtr;
+    uintptr_t ProcAddress;
 
-    Kernel32ExportsNamesCount
+    void Restore() const
+    {
+        if (!IATPtr)
+            return;
+        auto ptr = (size_t*)IATPtr;
+        MEMORY_BASIC_INFORMATION mbi;
+        if (VirtualQuery(ptr, &mbi, sizeof(mbi)) == 0 || mbi.State != MEM_COMMIT || !(mbi.Protect & (PAGE_READWRITE | PAGE_EXECUTE_READWRITE | PAGE_WRITECOPY | PAGE_EXECUTE_WRITECOPY)))
+            return;
+        DWORD dwProtect[2];
+        if (!VirtualProtect(ptr, sizeof(size_t), PAGE_EXECUTE_READWRITE, &dwProtect[0]))
+            return;
+        *ptr = ProcAddress;
+        VirtualProtect(ptr, sizeof(size_t), dwProtect[0], &dwProtect[1]);
+    }
 };
 
-enum Kernel32ExportsData
+struct ModuleIATData
 {
-    IATPtr,
-    ProcAddress,
-
-    Kernel32ExportsDataCount
+    HMODULE module = NULL;
+    std::unordered_map<std::string, FunctionData> kernel32Functions;
+    std::unordered_map<std::string, FunctionData> ole32Functions;
+    std::unordered_map<std::string, FunctionData> vccorlibFunctions;
 };
 
-enum OLE32ExportsNames
-{
-    eCoCreateInstance,
-
-    OLE32ExportsNamesCount
-};
-
-enum vccorlibExportsNames
-{
-    eGetCmdArguments,
-
-    vccorlibExportsNamesCount
-};
-
-size_t Kernel32Data[Kernel32ExportsNamesCount][Kernel32ExportsDataCount];
-size_t OLE32Data[OLE32ExportsNamesCount][Kernel32ExportsDataCount];
-size_t vccorlibData[vccorlibExportsNamesCount][Kernel32ExportsDataCount];
+std::vector<ModuleIATData> moduleIATs;
 
 #if !X64
 #define IDR_VORBISF    101
@@ -674,7 +648,7 @@ void LoadOriginalLibrary()
             xinput.LoadOriginalLibrary(LoadLib(szSystemPath));
     }
     else
-#if !X64
+        #if !X64
         if (iequals(szSelfName, L"vorbisFile.dll"))
         {
             szLocalPath += L"vorbisHooked.dll";
@@ -804,7 +778,7 @@ void LoadOriginalLibrary()
             }, ".text", ".rdata");
         }
         else
-#else
+            #else
         if (iequals(szSelfName, L"bink2w64.dll"))
         {
             szLocalPath += L"bink2w64Hooked.dll";
@@ -822,7 +796,7 @@ void LoadOriginalLibrary()
             }
         }
         else
-#endif
+            #endif
         {
             MessageBox(0, TEXT("This library isn't supported."), TEXT("ASI Loader"), MB_ICONERROR);
             ExitProcess(0);
@@ -950,8 +924,7 @@ void FindFiles(WIN32_FIND_DATAW* fd)
                     }
                 }
             }
-        }
-        while (FindNextFileW(asiFile, fd));
+        } while (FindNextFileW(asiFile, fd));
         FindClose(asiFile);
     }
 }
@@ -1002,7 +975,7 @@ void LoadPlugins()
     auto szSelfPath = GetModuleFileNameW(hm).substr(0, GetModuleFileNameW(hm).find_last_of(L"/\\") + 1);
     SetCurrentDirectoryW(szSelfPath.c_str());
 
-#if !X64
+    #if !X64
     std::fstream wndmode_ini;
     wndmode_ini.open("wndmode.ini", std::ios_base::out | std::ios_base::in | std::ios_base::binary);
     if (wndmode_ini.is_open())
@@ -1052,7 +1025,7 @@ void LoadPlugins()
             }
         }
     }
-#endif
+    #endif
 
     auto nWantsToLoadPlugins = GetPrivateProfileIntW(L"globalsets", L"loadplugins", TRUE, iniPaths);
     auto nWantsToLoadFromScriptsOnly = GetPrivateProfileIntW(L"globalsets", L"loadfromscriptsonly", FALSE, iniPaths);
@@ -1066,14 +1039,16 @@ void LoadPlugins()
             std::vector<std::wstring> entries;
             std::wstring::size_type start = 0;
 
-            auto trim = [](std::wstring str) {
+            auto trim = [](std::wstring str)
+            {
                 auto first = str.find_first_not_of(L" \t\r\n");
                 if (first == std::wstring::npos) return std::wstring();
                 auto last = str.find_last_not_of(L" \t\r\n");
                 return str.substr(first, last - first + 1);
             };
 
-            auto removeQuotes = [](std::wstring str) {
+            auto removeQuotes = [](std::wstring str)
+            {
                 return (str.size() >= 2 && str.front() == L'"' && str.back() == L'"')
                     ? str.substr(1, str.size() - 2) : str;
             };
@@ -1139,9 +1114,9 @@ void LoadEverything()
     if (_InterlockedCompareExchange(&LoadedPluginsYet, 1, 0) != 0) return;
 
     LoadOriginalLibrary();
-#if !X64
+    #if !X64
     Direct3D8DisableMaximizedWindowedModeShim();
-#endif
+    #endif
     LoadPlugins();
 }
 
@@ -1166,16 +1141,12 @@ void LoadPluginsAndRestoreIAT(uintptr_t retaddr, std::wstring_view calledFrom = 
 
     if (_InterlockedCompareExchange(&RestoredOnce, 1, 0) != 0) return;
 
-    for (size_t i = 0; i < Kernel32ExportsNamesCount; i++)
+    for (auto& modData : moduleIATs)
     {
-        if (Kernel32Data[i][IATPtr] && Kernel32Data[i][ProcAddress])
-        {
-            auto ptr = (size_t*)Kernel32Data[i][IATPtr];
-            DWORD dwProtect[2];
-            VirtualProtect(ptr, sizeof(size_t), PAGE_EXECUTE_READWRITE, &dwProtect[0]);
-            *ptr = Kernel32Data[i][ProcAddress];
-            VirtualProtect(ptr, sizeof(size_t), dwProtect[0], &dwProtect[1]);
-        }
+        for (auto& [name, data] : modData.kernel32Functions)
+            data.Restore();
+        for (auto& [name, data] : modData.vccorlibFunctions)
+            data.Restore();
     }
 
     {
@@ -1344,9 +1315,9 @@ void LoadPluginsAndRestoreIAT(uintptr_t retaddr, std::wstring_view calledFrom = 
             }
 
             LoadVirtualFilesFromZip();
-#if !X64
+            #if !X64
             InitializeServerConnection();
-#endif
+            #endif
             HookAPIForOverload();
             HookAPIForVirtualFiles();
         }
@@ -1355,9 +1326,9 @@ void LoadPluginsAndRestoreIAT(uintptr_t retaddr, std::wstring_view calledFrom = 
             sActiveDirectories = DetermineActiveDirectories(sFileLoaderEntries, sFileLoaderEntries[0].path);
 
             LoadVirtualFilesFromZip();
-#if !X64
+            #if !X64
             InitializeServerConnection();
-#endif
+            #endif
             HookAPIForOverload();
             HookAPIForVirtualFiles();
         }
@@ -1631,6 +1602,7 @@ HANDLE WINAPI CustomFindFirstFileExW(LPCWSTR lpFileName, FINDEX_INFO_LEVELS fInf
     return FindFirstFileExW(lpFileName, fInfoLevelId, lpFindFileData, fSearchOp, lpSearchFilter, dwAdditionalFlags);
 }
 
+DEFINE_GUID(CLSID_DirectSound, 0x47d4d946, 0x62e8, 0x11cf, 0x93, 0xbc, 0x44, 0x45, 0x53, 0x54, 0x00, 0x00);
 DEFINE_GUID(CLSID_DirectInput, 0x25E609E0, 0xB259, 0x11CF, 0xBF, 0xC7, 0x44, 0x45, 0x53, 0x54, 0x00, 0x00);
 DEFINE_GUID(CLSID_DirectInput8, 0x25E609E4, 0xB259, 0x11CF, 0xBF, 0xC7, 0x44, 0x45, 0x53, 0x54, 0x00, 0x00);
 DEFINE_GUID(CLSID_WinInet, 0xC39EE728, 0xD419, 0x4BD4, 0xA3, 0xEF, 0xED, 0xA0, 0x59, 0xDB, 0xD9, 0x35);
@@ -1639,7 +1611,9 @@ HRESULT WINAPI CustomCoCreateInstance(REFCLSID rclsid, LPUNKNOWN pUnkOuter, DWOR
     HRESULT hr = REGDB_E_KEYMISSING;
     HMODULE hDll = NULL;
 
-    if (rclsid == CLSID_DirectInput8)
+    if (rclsid == CLSID_DirectSound)
+        hDll = ::LoadLibrary(L"dsound.dll");
+    else if (rclsid == CLSID_DirectInput8)
         hDll = ::LoadLibrary(L"dinput8.dll");
     else if (rclsid == CLSID_DirectInput)
         hDll = ::LoadLibrary(L"dinput.dll");
@@ -1673,7 +1647,22 @@ HRESULT WINAPI CustomCoCreateInstance(REFCLSID rclsid, LPUNKNOWN pUnkOuter, DWOR
 
 LPWSTR WINAPI CustomGetCmdArguments(int* argc)
 {
-    auto fnGetCmdArguments = reinterpret_cast<decltype(&CustomGetCmdArguments)>(vccorlibData[eGetCmdArguments][ProcAddress]);
+    HMODULE mod = NULL;
+    GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, (LPCTSTR)_ReturnAddress(), &mod);
+    uintptr_t original = 0;
+    for (auto& m : moduleIATs)
+    {
+        if (m.module == mod)
+        {
+            auto it = m.vccorlibFunctions.find("?GetCmdArguments@Details@Platform@@YAPEAPEA_WPEAH@Z");
+            if (it != m.vccorlibFunctions.end())
+            {
+                original = it->second.ProcAddress;
+                break;
+            }
+        }
+    }
+    auto fnGetCmdArguments = reinterpret_cast<decltype(&CustomGetCmdArguments)>(original);
     LoadPluginsAndRestoreIAT((uintptr_t)_ReturnAddress(), L"GetCmdArguments");
     return fnGetCmdArguments(argc);
 }
@@ -1783,7 +1772,7 @@ namespace OverloadFromFolder
             lastWriteTime = creationTime;
             lastAccessTime = creationTime;
 
-#if !X64
+            #if !X64
             uint64_t handle = CreateFileOnServer(fileData, fileSize, filePriority);
             if (handle != 0)
             {
@@ -1793,9 +1782,9 @@ namespace OverloadFromFolder
             {
                 storage = LocalData{ std::vector<uint8_t>(fileData, fileData + fileSize) };
             }
-#else
+            #else
             storage = LocalData{ std::vector<uint8_t>(fileData, fileData + fileSize) };
-#endif
+            #endif
         }
 
         VirtualFile(std::shared_ptr<MultiPartArchive> archive, uint32_t fileIndex, uint64_t uncompressedSize, int filePriority)
@@ -1811,13 +1800,14 @@ namespace OverloadFromFolder
 
         size_t GetSize() const
         {
-            return std::visit([](const auto& data) -> size_t {
+            return std::visit([](const auto& data) -> size_t
+            {
                 return data.GetSize();
             }, storage);
         }
 
     public:
-#if !X64
+        #if !X64
         static uint64_t CreateFileOnServer(const uint8_t* data, size_t size, int priority)
         {
             if (serverPipe == INVALID_HANDLE_VALUE)
@@ -1901,7 +1891,7 @@ namespace OverloadFromFolder
             DWORD bytesWritten = 0;
             WriteFile(serverPipe, &request, sizeof(request), &bytesWritten, NULL);
         }
-#endif
+        #endif
     };
 
     static std::atomic<size_t> virtualPathsCount{ 0 };
@@ -2035,7 +2025,8 @@ namespace OverloadFromFolder
         std::map<std::wstring, size_t> pathIndices;
         std::wstring::size_type start = 0;
 
-        auto trim = [](const std::wstring& str) -> std::wstring {
+        auto trim = [](const std::wstring& str) -> std::wstring
+        {
             const auto first = str.find_first_not_of(L" \t\r\n");
             if (first == std::wstring::npos)
                 return L"";
@@ -2043,13 +2034,15 @@ namespace OverloadFromFolder
             return str.substr(first, last - first + 1);
         };
 
-        auto removeQuotes = [](const std::wstring& str) -> std::wstring {
+        auto removeQuotes = [](const std::wstring& str) -> std::wstring
+        {
             if (str.size() >= 2 && str.front() == L'"' && str.back() == L'"')
                 return str.substr(1, str.size() - 2);
             return str;
         };
 
-        auto findLastOfBefore = [](const std::wstring& str, const std::wstring& chars, std::wstring::size_type pos) -> std::wstring::size_type {
+        auto findLastOfBefore = [](const std::wstring& str, const std::wstring& chars, std::wstring::size_type pos) -> std::wstring::size_type
+        {
             if (pos == 0) return std::wstring::npos;
             for (std::wstring::size_type i = pos - 1; i != std::wstring::npos; --i)
             {
@@ -2233,7 +2226,8 @@ namespace OverloadFromFolder
         std::set<std::filesystem::path> processed;
 
         // Lambda to recursively find all dependencies
-        std::function<void(const std::filesystem::path&)> addPathAndDependencies = [&](const std::filesystem::path& currentPath) {
+        std::function<void(const std::filesystem::path&)> addPathAndDependencies = [&](const std::filesystem::path& currentPath)
+        {
             if (processed.count(currentPath) > 0)
                 return; // Already processed
             processed.insert(currentPath);
@@ -2479,8 +2473,7 @@ namespace OverloadFromFolder
                                             {
                                                 updateTxtContents[internalPath] = content;
                                             }
-                                        }
-                                        catch (const std::exception&)
+                                        } catch (const std::exception&)
                                         {
                                             // Skip if conversion fails
                                         }
@@ -2623,8 +2616,7 @@ namespace OverloadFromFolder
                         return newPath;
                 }
             }
-        }
-        catch (...) {}
+        } catch (...) {}
 
         return {};
     }
@@ -2647,8 +2639,7 @@ namespace OverloadFromFolder
                     return true;
                 }
             }
-        }
-        catch (...) {}
+        } catch (...) {}
         return false;
     }
 
@@ -2670,8 +2661,7 @@ namespace OverloadFromFolder
                     return true;
                 }
             }
-        }
-        catch (...) {}
+        } catch (...) {}
         return false;
     }
 
@@ -2688,8 +2678,7 @@ namespace OverloadFromFolder
                     return true;
                 }
             }
-        }
-        catch (...) {}
+        } catch (...) {}
         return false;
     }
 
@@ -2706,8 +2695,7 @@ namespace OverloadFromFolder
                     return true;
                 }
             }
-        }
-        catch (...) {}
+        } catch (...) {}
         return false;
     }
 
@@ -2724,7 +2712,7 @@ namespace OverloadFromFolder
                 {
                     std::filesystem::path vpath(it->second.first);
                     auto recursive = GetOverloadedFilePath(vpath);
-                    if (!recursive.empty()) 
+                    if (!recursive.empty())
                         return recursive;
                     return vpath;
                 }
@@ -2732,8 +2720,7 @@ namespace OverloadFromFolder
 
             if (!sActiveDirectories.empty())
                 return GetOverloadedFilePath(path);
-        }
-        catch (...) {}
+        } catch (...) {}
 
         return {};
     }
@@ -3107,7 +3094,7 @@ namespace OverloadFromFolder
                 return FALSE;
             }
 
-#if !X64
+            #if !X64
             // In 32-bit, try to offload to the 64-bit server process to save memory
             uint64_t handle = VirtualFile::CreateFileOnServer(static_cast<const uint8_t*>(p), uncompressed_size, virtualFile->priority);
             if (handle != 0)
@@ -3119,10 +3106,10 @@ namespace OverloadFromFolder
                 // Fallback to local memory if server fails
                 virtualFile->storage = LocalData{ std::vector<uint8_t>(static_cast<uint8_t*>(p), static_cast<uint8_t*>(p) + uncompressed_size) };
             }
-#else
+            #else
             // In 64-bit, always use local memory
             virtualFile->storage = LocalData{ std::vector<uint8_t>(static_cast<uint8_t*>(p), static_cast<uint8_t*>(p) + uncompressed_size) };
-#endif
+            #endif
             mz_free(p);
         }
 
@@ -3157,7 +3144,8 @@ namespace OverloadFromFolder
         DWORD bytesRead = 0;
 
         // Handle different storage types
-        return std::visit([&](const auto& storage) -> BOOL {
+        return std::visit([&](const auto& storage) -> BOOL
+        {
             using T = std::decay_t<decltype(storage)>;
 
             if constexpr (std::is_same_v<T, LocalData>)
@@ -3206,7 +3194,7 @@ namespace OverloadFromFolder
             }
             else if constexpr (std::is_same_v<T, ServerData>)
             {
-#if !X64
+                #if !X64
                 // 32-bit: request data from server
                 if (serverPipe == INVALID_HANDLE_VALUE)
                 {
@@ -3290,10 +3278,10 @@ namespace OverloadFromFolder
                     SetLastError(ERROR_HANDLE_EOF);
                     return TRUE;
                 }
-#else
+                #else
                 SetLastError(ERROR_NOT_SUPPORTED);
                 return FALSE;
-#endif
+                #endif
             }
             else if constexpr (std::is_same_v<T, ZipData>)
             {
@@ -3325,7 +3313,8 @@ namespace OverloadFromFolder
                         LPOVERLAPPED lpOverlapped;
                     };
 
-                    auto CompletionRoutineWrapper = [](PVOID lpParameter) -> DWORD {
+                    auto CompletionRoutineWrapper = [](PVOID lpParameter) -> DWORD
+                    {
                         auto* data = static_cast<CompletionData*>(lpParameter);
                         data->lpCompletionRoutine(data->dwErrorCode, data->dwNumberOfBytesTransferred, data->lpOverlapped);
                         delete data;
@@ -3418,41 +3407,41 @@ namespace OverloadFromFolder
 
             switch (dwMoveMethod)
             {
-            case FILE_BEGIN:
-                if (liDistanceToMove.QuadPart < 0 || liDistanceToMove.QuadPart > int64_t(fileSize))
+                case FILE_BEGIN:
+                    if (liDistanceToMove.QuadPart < 0 || liDistanceToMove.QuadPart > int64_t(fileSize))
+                    {
+                        SetLastError(ERROR_NEGATIVE_SEEK);
+                        return FALSE;
+                    }
+                    newPosition = liDistanceToMove.QuadPart;
+                    break;
+                case FILE_CURRENT:
                 {
-                    SetLastError(ERROR_NEGATIVE_SEEK);
-                    return FALSE;
+                    int64_t offset = liDistanceToMove.QuadPart;
+                    newPosition = currentPosition + offset;
+                    if (offset < 0 && static_cast<uint64_t>(-offset) > currentPosition)
+                    {
+                        SetLastError(ERROR_NEGATIVE_SEEK);
+                        return FALSE;
+                    }
+                    if (newPosition > fileSize)
+                    {
+                        SetLastError(ERROR_SEEK_ON_DEVICE);
+                        return FALSE;
+                    }
                 }
-                newPosition = liDistanceToMove.QuadPart;
                 break;
-            case FILE_CURRENT:
-            {
-                int64_t offset = liDistanceToMove.QuadPart;
-                newPosition = currentPosition + offset;
-                if (offset < 0 && static_cast<uint64_t>(-offset) > currentPosition)
-                {
-                    SetLastError(ERROR_NEGATIVE_SEEK);
+                case FILE_END:
+                    if (liDistanceToMove.QuadPart > 0 || static_cast<uint64_t>(-liDistanceToMove.QuadPart) > fileSize)
+                    {
+                        SetLastError(ERROR_NEGATIVE_SEEK);
+                        return FALSE;
+                    }
+                    newPosition = fileSize + liDistanceToMove.QuadPart;
+                    break;
+                default:
+                    SetLastError(ERROR_INVALID_PARAMETER);
                     return FALSE;
-                }
-                if (newPosition > fileSize)
-                {
-                    SetLastError(ERROR_SEEK_ON_DEVICE);
-                    return FALSE;
-                }
-            }
-            break;
-            case FILE_END:
-                if (liDistanceToMove.QuadPart > 0 || static_cast<uint64_t>(-liDistanceToMove.QuadPart) > fileSize)
-                {
-                    SetLastError(ERROR_NEGATIVE_SEEK);
-                    return FALSE;
-                }
-                newPosition = fileSize + liDistanceToMove.QuadPart;
-                break;
-            default:
-                SetLastError(ERROR_INVALID_PARAMETER);
-                return FALSE;
             }
             virtualFile->position = newPosition;
             if (lpNewFilePointer)
@@ -3745,13 +3734,14 @@ namespace OverloadFromFolder
         }
     }
 
-#if !X64
+    #if !X64
     bool InitializeServerConnection()
     {
         static std::once_flag flag;
         bool result = false;
 
-        std::call_once(flag, [&]() {
+        std::call_once(flag, [&]()
+        {
             std::lock_guard<std::mutex> lock(serverMutex);
             std::wstring mutexName = L"Global\\Ultimate-ASI-Loader-VirtualFileClientMutex" + std::to_wstring(GetCurrentProcessId());
             HANDLE hMutex = CreateMutexW(NULL, TRUE, mutexName.c_str());
@@ -3763,7 +3753,8 @@ namespace OverloadFromFolder
 
             auto CreateProcessInJob = [](HANDLE hJob, LPCTSTR lpApplicationName, LPTSTR lpCommandLine, LPSECURITY_ATTRIBUTES lpProcessAttributes,
                 LPSECURITY_ATTRIBUTES lpThreadAttributes, BOOL bInheritHandles, DWORD dwCreationFlags, LPVOID lpEnvironment,
-                LPCTSTR lpCurrentDirectory, LPSTARTUPINFO lpStartupInfo, LPPROCESS_INFORMATION ppi) -> BOOL {
+                LPCTSTR lpCurrentDirectory, LPSTARTUPINFO lpStartupInfo, LPPROCESS_INFORMATION ppi) -> BOOL
+            {
                 BOOL fRc = CreateProcess(lpApplicationName, lpCommandLine, lpProcessAttributes,
                     lpThreadAttributes, bInheritHandles, dwCreationFlags | CREATE_SUSPENDED, lpEnvironment, lpCurrentDirectory,
                     lpStartupInfo, ppi);
@@ -3835,7 +3826,7 @@ namespace OverloadFromFolder
 
         return result;
     }
-#endif
+    #endif
 
     void LoadVirtualFilesFromZip()
     {
@@ -3914,13 +3905,14 @@ namespace OverloadFromFolder
         {
             auto virtualFile = fileIt->second;
             // Handle server cleanup if needed
-            std::visit([&](const auto& storage) {
+            std::visit([&](const auto& storage)
+            {
                 using T = std::decay_t<decltype(storage)>;
                 if constexpr (std::is_same_v<T, ServerData>)
                 {
-#if !X64
+                    #if !X64
                     VirtualFile::RemoveFileOnServer(storage.server_handle);
-#endif
+                    #endif
                 }
             }, virtualFile->storage);
 
@@ -4034,7 +4026,8 @@ namespace OverloadFromFolder
                     return false; // Existing has higher priority, skip
 
                 // For append operation, we need to handle different storage types
-                std::visit([&](auto& storage) {
+                std::visit([&](auto& storage)
+                {
                     using T = std::decay_t<decltype(storage)>;
 
                     if constexpr (std::is_same_v<T, LocalData>)
@@ -4046,14 +4039,14 @@ namespace OverloadFromFolder
                     }
                     else if constexpr (std::is_same_v<T, ServerData>)
                     {
-#if !X64
+                        #if !X64
                         // Send append command to server
                         if (VirtualFile::AppendFileOnServer(storage.server_handle, data, size))
                         {
                             // Update local size tracking
                             storage.size += size;
                         }
-#endif
+                        #endif
                     }
                     else if constexpr (std::is_same_v<T, ZipData>)
                     {
@@ -4075,8 +4068,7 @@ namespace OverloadFromFolder
                 HookAPIForVirtualFiles();
                 return true;
             }
-        }
-        catch (...)
+        } catch (...)
         {
             return false;
         }
@@ -4098,14 +4090,15 @@ namespace OverloadFromFolder
                 auto virtualFile = pathIt->second;
 
                 // Handle server cleanup if needed
-                std::visit([&](const auto& storage) {
+                std::visit([&](const auto& storage)
+                {
                     using T = std::decay_t<decltype(storage)>;
 
                     if constexpr (std::is_same_v<T, ServerData>)
                     {
-#if !X64
+                        #if !X64
                         VirtualFile::RemoveFileOnServer(storage.server_handle);
-#endif
+                        #endif
                     }
                 }, virtualFile->storage);
 
@@ -4126,8 +4119,7 @@ namespace OverloadFromFolder
 
                 virtualFilesCount.fetch_sub(1, std::memory_order_release);
             }
-        }
-        catch (...)
+        } catch (...)
         {
         }
     }
@@ -4153,13 +4145,56 @@ namespace OverloadFromFolder
     }
 }
 
-std::set<std::string> importedModulesList;
-bool HookKernel32IAT(HMODULE mod, bool exe)
+const std::unordered_map<std::string, void*> kernel32Customs = {
+    { "GetStartupInfoA",            (void*)CustomGetStartupInfoA            },
+    { "GetStartupInfoW",            (void*)CustomGetStartupInfoW            },
+    { "GetModuleHandleA",           (void*)CustomGetModuleHandleA           },
+    { "GetModuleHandleW",           (void*)CustomGetModuleHandleW           },
+    { "GetProcAddress",             (void*)CustomGetProcAddress             },
+    { "GetShortPathNameA",          (void*)CustomGetShortPathNameA          },
+    { "FindFirstFileA",             (void*)CustomFindFirstFileA             },
+    { "FindNextFileA",              (void*)CustomFindNextFileA              },
+    { "FindFirstFileW",             (void*)CustomFindFirstFileW             },
+    { "FindNextFileW",              (void*)CustomFindNextFileW              },
+    { "FindFirstFileExA",           (void*)CustomFindFirstFileExA           },
+    { "FindFirstFileExW",           (void*)CustomFindFirstFileExW           },
+    { "LoadLibraryExA",             (void*)CustomLoadLibraryExA             },
+    { "LoadLibraryExW",             (void*)CustomLoadLibraryExW             },
+    { "LoadLibraryA",               (void*)CustomLoadLibraryA               },
+    { "LoadLibraryW",               (void*)CustomLoadLibraryW               },
+    { "FreeLibrary",                (void*)CustomFreeLibrary                },
+    { "CreateEventA",               (void*)CustomCreateEventA               },
+    { "CreateEventW",               (void*)CustomCreateEventW               },
+    { "GetSystemInfo",              (void*)CustomGetSystemInfo              },
+    { "InterlockedCompareExchange", (void*)CustomInterlockedCompareExchange },
+    { "Sleep",                      (void*)CustomSleep                      },
+    { "GetSystemTimeAsFileTime",    (void*)CustomGetSystemTimeAsFileTime    },
+    { "GetCurrentProcessId",        (void*)CustomGetCurrentProcessId        },
+    { "GetCommandLineA",            (void*)CustomGetCommandLineA            },
+    { "GetCommandLineW",            (void*)CustomGetCommandLineW            },
+    { "AcquireSRWLockExclusive",    (void*)CustomAcquireSRWLockExclusive    },
+    { "CreateFileA",                (void*)CustomCreateFileA                },
+    { "CreateFileW",                (void*)CustomCreateFileW                },
+    { "GetFileAttributesA",         (void*)CustomGetFileAttributesA         },
+    { "GetFileAttributesW",         (void*)CustomGetFileAttributesW         },
+    { "GetFileAttributesExA",       (void*)CustomGetFileAttributesExA       },
+    { "GetFileAttributesExW",       (void*)CustomGetFileAttributesExW       },
+};
+
+const std::unordered_map<std::string, void*> ole32Customs = {
+    { "CoCreateInstance", (void*)CustomCoCreateInstance },
+};
+
+const std::unordered_map<std::string, void*> vccorlibCustoms = {
+    { "?GetCmdArguments@Details@Platform@@YAPEAPEA_WPEAH@Z", (void*)CustomGetCmdArguments },
+};
+
+bool PatchKernel32IAT(HMODULE mod, ModuleIATData& data)
 {
     auto hExecutableInstance = (size_t)mod;
-    IMAGE_NT_HEADERS*           ntHeader = (IMAGE_NT_HEADERS*)(hExecutableInstance + ((IMAGE_DOS_HEADER*)hExecutableInstance)->e_lfanew);
-    IMAGE_IMPORT_DESCRIPTOR*    pImports = (IMAGE_IMPORT_DESCRIPTOR*)(hExecutableInstance + ntHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress);
-    size_t                      nNumImports = 0;
+    IMAGE_NT_HEADERS* ntHeader = (IMAGE_NT_HEADERS*)(hExecutableInstance + ((IMAGE_DOS_HEADER*)hExecutableInstance)->e_lfanew);
+    IMAGE_IMPORT_DESCRIPTOR* pImports = (IMAGE_IMPORT_DESCRIPTOR*)(hExecutableInstance + ntHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress);
+    size_t nNumImports = 0;
     if (ntHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress != 0)
     {
         IMAGE_IMPORT_DESCRIPTOR* importDesc = pImports;
@@ -4169,382 +4204,16 @@ bool HookKernel32IAT(HMODULE mod, bool exe)
             importDesc++;
         }
     }
-
-    if (exe)
-    {
-        Kernel32Data[eGetStartupInfoA][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "GetStartupInfoA");
-        Kernel32Data[eGetStartupInfoW][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "GetStartupInfoW");
-        Kernel32Data[eGetModuleHandleA][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "GetModuleHandleA");
-        Kernel32Data[eGetModuleHandleW][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "GetModuleHandleW");
-        Kernel32Data[eGetProcAddress][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "GetProcAddress");
-        Kernel32Data[eGetShortPathNameA][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "GetShortPathNameA");
-        Kernel32Data[eFindFirstFileA][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "FindFirstFileA");
-        Kernel32Data[eFindNextFileA][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "FindNextFileA");
-        Kernel32Data[eFindFirstFileW][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "FindFirstFileW");
-        Kernel32Data[eFindNextFileW][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "FindNextFileW");
-        Kernel32Data[eFindFirstFileExA][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "FindFirstFileExA");
-        Kernel32Data[eFindFirstFileExW][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "FindFirstFileExW");
-        Kernel32Data[eLoadLibraryExA][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "LoadLibraryExA");
-        Kernel32Data[eLoadLibraryExW][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "LoadLibraryExW");
-        Kernel32Data[eLoadLibraryA][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "LoadLibraryA");
-        Kernel32Data[eLoadLibraryW][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "LoadLibraryW");
-        Kernel32Data[eFreeLibrary][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "FreeLibrary");
-        Kernel32Data[eCreateEventA][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "CreateEventA");
-        Kernel32Data[eCreateEventW][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "CreateEventW");
-        Kernel32Data[eGetSystemInfo][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "GetSystemInfo");
-        Kernel32Data[eInterlockedCompareExchange][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "InterlockedCompareExchange");
-        Kernel32Data[eSleep][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "Sleep");
-        Kernel32Data[eGetSystemTimeAsFileTime][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "GetSystemTimeAsFileTime");
-        Kernel32Data[eGetCurrentProcessId][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "GetCurrentProcessId");
-        Kernel32Data[eGetCommandLineA][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "GetCommandLineA");
-        Kernel32Data[eGetCommandLineW][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "GetCommandLineW");
-        Kernel32Data[eAcquireSRWLockExclusive][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "AcquireSRWLockExclusive");
-        Kernel32Data[eCreateFileA][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "CreateFileA");
-        Kernel32Data[eCreateFileW][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "CreateFileW");
-        Kernel32Data[eGetFileAttributesA][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "GetFileAttributesA");
-        Kernel32Data[eGetFileAttributesW][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "GetFileAttributesW");
-        Kernel32Data[eGetFileAttributesExA][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "GetFileAttributesExA");
-        Kernel32Data[eGetFileAttributesExW][ProcAddress] = (size_t)GetProcAddress(GetModuleHandle(TEXT("KERNEL32.DLL")), "GetFileAttributesExW");
-    }
-
     uint32_t matchedImports = 0;
-
-    auto PatchIAT = [&](size_t start, size_t end, size_t exe_end)
+    auto getSectionEnd = [](IMAGE_NT_HEADERS* ntHeader, size_t inst) -> size_t
     {
-        for (size_t i = 0; i < nNumImports; i++)
-        {
-            if (hExecutableInstance + (pImports + i)->FirstThunk > start && !(end && hExecutableInstance + (pImports + i)->FirstThunk > end))
-                end = hExecutableInstance + (pImports + i)->FirstThunk;
-        }
-
-        if (!end) { end = start + 0x100; }
-        if (end > exe_end) //for very broken exes
-        {
-            start = hExecutableInstance;
-            end = exe_end;
-        }
-
-        for (auto i = start; i < end; i += sizeof(size_t))
-        {
-            DWORD dwProtect[2];
-            VirtualProtect((size_t*)i, sizeof(size_t), PAGE_EXECUTE_READWRITE, &dwProtect[0]);
-
-            auto ptr = *(size_t*)i;
-            if (!ptr)
-                continue;
-
-            if (ptr == Kernel32Data[eGetStartupInfoA][ProcAddress])
-            {
-                if (exe) Kernel32Data[eGetStartupInfoA][IATPtr] = i;
-                *(size_t*)i = (size_t)CustomGetStartupInfoA;
-                matchedImports++;
-            }
-            else if (ptr == Kernel32Data[eGetStartupInfoW][ProcAddress])
-            {
-                if (exe) Kernel32Data[eGetStartupInfoW][IATPtr] = i;
-                *(size_t*)i = (size_t)CustomGetStartupInfoW;
-                matchedImports++;
-            }
-            else if (ptr == Kernel32Data[eGetModuleHandleA][ProcAddress])
-            {
-                if (exe) Kernel32Data[eGetModuleHandleA][IATPtr] = i;
-                *(size_t*)i = (size_t)CustomGetModuleHandleA;
-                matchedImports++;
-            }
-            else if (ptr == Kernel32Data[eGetModuleHandleW][ProcAddress])
-            {
-                if (exe) Kernel32Data[eGetModuleHandleW][IATPtr] = i;
-                *(size_t*)i = (size_t)CustomGetModuleHandleW;
-                matchedImports++;
-            }
-            else if (ptr == Kernel32Data[eGetProcAddress][ProcAddress])
-            {
-                if (exe) Kernel32Data[eGetProcAddress][IATPtr] = i;
-                *(size_t*)i = (size_t)CustomGetProcAddress;
-                matchedImports++;
-            }
-            else if (ptr == Kernel32Data[eGetShortPathNameA][ProcAddress])
-            {
-                if (exe) Kernel32Data[eGetShortPathNameA][IATPtr] = i;
-                *(size_t*)i = (size_t)CustomGetShortPathNameA;
-                matchedImports++;
-            }
-            else if (ptr == Kernel32Data[eFindFirstFileA][ProcAddress])
-            {
-                if (exe) Kernel32Data[eFindFirstFileA][IATPtr] = i;
-                *(size_t*)i = (size_t)CustomFindFirstFileA;
-                matchedImports++;
-            }
-            else if (ptr == Kernel32Data[eFindNextFileA][ProcAddress])
-            {
-                if (exe) Kernel32Data[eFindNextFileA][IATPtr] = i;
-                *(size_t*)i = (size_t)CustomFindNextFileA;
-                matchedImports++;
-            }
-            else if (ptr == Kernel32Data[eFindFirstFileW][ProcAddress])
-            {
-                if (exe) Kernel32Data[eFindFirstFileW][IATPtr] = i;
-                *(size_t*)i = (size_t)CustomFindFirstFileW;
-                matchedImports++;
-            }
-            else if (ptr == Kernel32Data[eFindNextFileW][ProcAddress])
-            {
-                if (exe) Kernel32Data[eFindNextFileW][IATPtr] = i;
-                *(size_t*)i = (size_t)CustomFindNextFileW;
-                matchedImports++;
-            }
-            else if (ptr == Kernel32Data[eFindFirstFileExA][ProcAddress])
-            {
-                if (exe) Kernel32Data[eFindFirstFileExA][IATPtr] = i;
-                *(size_t*)i = (size_t)CustomFindFirstFileExA;
-                matchedImports++;
-            }
-            else if (ptr == Kernel32Data[eFindFirstFileExW][ProcAddress])
-            {
-                if (exe) Kernel32Data[eFindFirstFileExW][IATPtr] = i;
-                *(size_t*)i = (size_t)CustomFindFirstFileExW;
-                matchedImports++;
-            }
-            else if (ptr == Kernel32Data[eLoadLibraryExA][ProcAddress])
-            {
-                if (exe) Kernel32Data[eLoadLibraryExA][IATPtr] = i;
-                *(size_t*)i = (size_t)CustomLoadLibraryExA;
-                matchedImports++;
-            }
-            else if (ptr == Kernel32Data[eLoadLibraryExW][ProcAddress])
-            {
-                if (exe) Kernel32Data[eLoadLibraryExW][IATPtr] = i;
-                *(size_t*)i = (size_t)CustomLoadLibraryExW;
-                matchedImports++;
-            }
-            else if (ptr == Kernel32Data[eLoadLibraryA][ProcAddress])
-            {
-                if (exe) Kernel32Data[eLoadLibraryA][IATPtr] = i;
-                *(size_t*)i = (size_t)CustomLoadLibraryA;
-                matchedImports++;
-            }
-            else if (ptr == Kernel32Data[eLoadLibraryW][ProcAddress])
-            {
-                if (exe) Kernel32Data[eLoadLibraryW][IATPtr] = i;
-                *(size_t*)i = (size_t)CustomLoadLibraryW;
-                matchedImports++;
-            }
-            else if (ptr == Kernel32Data[eFreeLibrary][ProcAddress])
-            {
-                if (exe) Kernel32Data[eFreeLibrary][IATPtr] = i;
-                *(size_t*)i = (size_t)CustomFreeLibrary;
-                matchedImports++;
-            }
-            else if (ptr == Kernel32Data[eCreateEventA][ProcAddress])
-            {
-                if (exe) Kernel32Data[eCreateEventA][IATPtr] = i;
-                *(size_t*)i = (size_t)CustomCreateEventA;
-                matchedImports++;
-            }
-            else if (ptr == Kernel32Data[eCreateEventW][ProcAddress])
-            {
-                if (exe) Kernel32Data[eCreateEventW][IATPtr] = i;
-                *(size_t*)i = (size_t)CustomCreateEventW;
-                matchedImports++;
-            }
-            else if (ptr == Kernel32Data[eGetSystemInfo][ProcAddress])
-            {
-                if (exe) Kernel32Data[eGetSystemInfo][IATPtr] = i;
-                *(size_t*)i = (size_t)CustomGetSystemInfo;
-                matchedImports++;
-            }
-            else if (ptr == Kernel32Data[eInterlockedCompareExchange][ProcAddress])
-            {
-                if (exe) Kernel32Data[eInterlockedCompareExchange][IATPtr] = i;
-                *(size_t*)i = (size_t)CustomInterlockedCompareExchange;
-                matchedImports++;
-            }
-            else if (ptr == Kernel32Data[eSleep][ProcAddress])
-            {
-                if (exe) Kernel32Data[eSleep][IATPtr] = i;
-                *(size_t*)i = (size_t)CustomSleep;
-                matchedImports++;
-            }
-            else if (ptr == Kernel32Data[eGetSystemTimeAsFileTime][ProcAddress])
-            {
-                if (exe) Kernel32Data[eGetSystemTimeAsFileTime][IATPtr] = i;
-                *(size_t*)i = (size_t)CustomGetSystemTimeAsFileTime;
-                matchedImports++;
-            }
-            else if (ptr == Kernel32Data[eGetCurrentProcessId][ProcAddress])
-            {
-                if (exe) Kernel32Data[eGetCurrentProcessId][IATPtr] = i;
-                *(size_t*)i = (size_t)CustomGetCurrentProcessId;
-                matchedImports++;
-            }
-            else if (ptr == Kernel32Data[eGetCommandLineA][ProcAddress])
-            {
-                if (exe) Kernel32Data[eGetCommandLineA][IATPtr] = i;
-                *(size_t*)i = (size_t)CustomGetCommandLineA;
-                matchedImports++;
-            }
-            else if (ptr == Kernel32Data[eGetCommandLineW][ProcAddress])
-            {
-                if (exe) Kernel32Data[eGetCommandLineW][IATPtr] = i;
-                *(size_t*)i = (size_t)CustomGetCommandLineW;
-                matchedImports++;
-            }
-            else if (ptr == Kernel32Data[eAcquireSRWLockExclusive][ProcAddress])
-            {
-                if (exe) Kernel32Data[eAcquireSRWLockExclusive][IATPtr] = i;
-                *(size_t*)i = (size_t)CustomAcquireSRWLockExclusive;
-                matchedImports++;
-            }
-            else if (ptr == Kernel32Data[eCreateFileA][ProcAddress])
-            {
-                if (exe) Kernel32Data[eCreateFileA][IATPtr] = i;
-                *(size_t*)i = (size_t)CustomCreateFileA;
-                matchedImports++;
-            }
-            else if (ptr == Kernel32Data[eCreateFileW][ProcAddress])
-            {
-                if (exe) Kernel32Data[eCreateFileW][IATPtr] = i;
-                *(size_t*)i = (size_t)CustomCreateFileW;
-                matchedImports++;
-            }
-            else if (ptr == Kernel32Data[eGetFileAttributesA][ProcAddress])
-            {
-                if (exe) Kernel32Data[eGetFileAttributesA][IATPtr] = i;
-                *(size_t*)i = (size_t)CustomGetFileAttributesA;
-                matchedImports++;
-            }
-            else if (ptr == Kernel32Data[eGetFileAttributesW][ProcAddress])
-            {
-                if (exe) Kernel32Data[eGetFileAttributesW][IATPtr] = i;
-                *(size_t*)i = (size_t)CustomGetFileAttributesW;
-                matchedImports++;
-            }
-            else if (ptr == Kernel32Data[eGetFileAttributesExA][ProcAddress])
-            {
-                if (exe) Kernel32Data[eGetFileAttributesExA][IATPtr] = i;
-                *(size_t*)i = (size_t)CustomGetFileAttributesExA;
-                matchedImports++;
-            }
-            else if (ptr == Kernel32Data[eGetFileAttributesExW][ProcAddress])
-            {
-                if (exe) Kernel32Data[eGetFileAttributesExW][IATPtr] = i;
-                *(size_t*)i = (size_t)CustomGetFileAttributesExW;
-                matchedImports++;
-            }
-
-            VirtualProtect((size_t*)i, sizeof(size_t), dwProtect[0], &dwProtect[1]);
-        }
-    };
-
-    auto PatchCoCreateInstance = [&](size_t start, size_t end, size_t exe_end)
-    {
-        if (iequals(GetSelfName(), L"dinput8.dll") || iequals(GetSelfName(), L"dinput.dll") || iequals(GetSelfName(), L"wininet.dll"))
-            return;
-
-        for (size_t i = 0; i < nNumImports; i++)
-        {
-            if (hExecutableInstance + (pImports + i)->FirstThunk > start && !(end && hExecutableInstance + (pImports + i)->FirstThunk > end))
-                end = hExecutableInstance + (pImports + i)->FirstThunk;
-        }
-
-        if (!end) { end = start + 0x100; }
-        if (end > exe_end) //for very broken exes
-        {
-            start = hExecutableInstance;
-            end = exe_end;
-        }
-
-        if (exe)
-            if (auto pOLE32 = GetModuleHandle(TEXT("OLE32.DLL")))
-                OLE32Data[eCoCreateInstance][ProcAddress] = (size_t)GetProcAddress(pOLE32, "CoCreateInstance");
-
-        for (auto i = start; i < end; i += sizeof(size_t))
-        {
-            DWORD dwProtect[2];
-            VirtualProtect((size_t*)i, sizeof(size_t), PAGE_EXECUTE_READWRITE, &dwProtect[0]);
-
-            auto ptr = *(size_t*)i;
-            if (!ptr)
-                continue;
-
-            if (ptr == OLE32Data[eCoCreateInstance][ProcAddress])
-            {
-                if (exe) OLE32Data[eCoCreateInstance][IATPtr] = i;
-                *(size_t*)i = (size_t)CustomCoCreateInstance;
-                VirtualProtect((size_t*)i, sizeof(size_t), dwProtect[0], &dwProtect[1]);
-                break;
-            }
-
-            VirtualProtect((size_t*)i, sizeof(size_t), dwProtect[0], &dwProtect[1]);
-        }
-    };
-
-    auto Patchvccorlib = [&](const char* dllname, size_t start, size_t end, size_t exe_end)
-    {
-        auto hHandle = GetModuleHandleA(dllname);
-        if (!hHandle)
-            return;
-
-        for (size_t i = 0; i < nNumImports; i++)
-        {
-            if (hExecutableInstance + (pImports + i)->FirstThunk > start && !(end && hExecutableInstance + (pImports + i)->FirstThunk > end))
-                end = hExecutableInstance + (pImports + i)->FirstThunk;
-        }
-
-        if (!end) { end = start + 0x100; }
-        if (end > exe_end) //for very broken exes
-        {
-            start = hExecutableInstance;
-            end = exe_end;
-        }
-
-        if (exe)
-            vccorlibData[eGetCmdArguments][ProcAddress] = (size_t)GetProcAddress(hHandle, "?GetCmdArguments@Details@Platform@@YAPEAPEA_WPEAH@Z");
-
-        for (auto i = start; i < end; i += sizeof(size_t))
-        {
-            DWORD dwProtect[2];
-            VirtualProtect((size_t*)i, sizeof(size_t), PAGE_EXECUTE_READWRITE, &dwProtect[0]);
-
-            auto ptr = *(size_t*)i;
-            if (!ptr)
-                continue;
-
-            if (ptr == vccorlibData[eGetCmdArguments][ProcAddress])
-            {
-                if (exe) vccorlibData[eGetCmdArguments][IATPtr] = i;
-                *(size_t*)i = (size_t)CustomGetCmdArguments;
-                VirtualProtect((size_t*)i, sizeof(size_t), dwProtect[0], &dwProtect[1]);
-                break;
-            }
-
-            VirtualProtect((size_t*)i, sizeof(size_t), dwProtect[0], &dwProtect[1]);
-        }
-    };
-
-    static auto getSection = [](const PIMAGE_NT_HEADERS nt_headers, unsigned section) -> PIMAGE_SECTION_HEADER
-    {
-        return reinterpret_cast<PIMAGE_SECTION_HEADER>(
-            (UCHAR*)nt_headers->OptionalHeader.DataDirectory +
-            nt_headers->OptionalHeader.NumberOfRvaAndSizes * sizeof(IMAGE_DATA_DIRECTORY) +
-            section * sizeof(IMAGE_SECTION_HEADER));
-    };
-
-    static auto getSectionEnd = [](IMAGE_NT_HEADERS* ntHeader, size_t inst) -> auto
-    {
-        auto sec = getSection(ntHeader, ntHeader->FileHeader.NumberOfSections - 1);
-        // .bind section may have vanished from the executable (test case: Yakuza 4)
-        // so back to the first valid section if that happened
+        auto sec = reinterpret_cast<PIMAGE_SECTION_HEADER>((UCHAR*)ntHeader->OptionalHeader.DataDirectory + ntHeader->OptionalHeader.NumberOfRvaAndSizes * sizeof(IMAGE_DATA_DIRECTORY) + (ntHeader->FileHeader.NumberOfSections - 1) * sizeof(IMAGE_SECTION_HEADER));
         while (sec->Misc.VirtualSize == 0) sec--;
-
         auto secSize = max(sec->SizeOfRawData, sec->Misc.VirtualSize);
         auto end = inst + max(sec->PointerToRawData, sec->VirtualAddress) + secSize;
         return end;
     };
-
     auto hExecutableInstance_end = getSectionEnd(ntHeader, hExecutableInstance);
-
-    // Find kernel32.dll
     for (size_t i = 0; i < nNumImports; i++)
     {
         if ((size_t)(hExecutableInstance + (pImports + i)->Name) < hExecutableInstance_end)
@@ -4552,71 +4221,221 @@ bool HookKernel32IAT(HMODULE mod, bool exe)
             auto szName = (const char*)(hExecutableInstance + (pImports + i)->Name);
             auto dllname = std::string(szName);
             std::transform(dllname.begin(), dllname.end(), dllname.begin(), [](char c) { return ::tolower(c); });
-
             if (dllname == "kernel32.dll")
-                PatchIAT(hExecutableInstance + (pImports + i)->FirstThunk, 0, hExecutableInstance_end);
-            else if (dllname == "ole32.dll")
-                PatchCoCreateInstance(hExecutableInstance + (pImports + i)->FirstThunk, 0, hExecutableInstance_end);
-            else if (dllname.contains("vccorlib"))
-                Patchvccorlib(szName, hExecutableInstance + (pImports + i)->FirstThunk, 0, hExecutableInstance_end);
-
-            importedModulesList.insert(dllname);
-        }
-    }
-
-    // Fixing ordinals
-    auto szSelfName = GetSelfName();
-
-    static auto PatchOrdinals = [&szSelfName](size_t hInstance)
-    {
-        IMAGE_NT_HEADERS*           ntHeader = (IMAGE_NT_HEADERS*)(hInstance + ((IMAGE_DOS_HEADER*)hInstance)->e_lfanew);
-        IMAGE_IMPORT_DESCRIPTOR*    pImports = (IMAGE_IMPORT_DESCRIPTOR*)(hInstance + ntHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress);
-        size_t                      nNumImports = 0;
-        if (ntHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress != 0)
-        {
-            IMAGE_IMPORT_DESCRIPTOR* importDesc = pImports;
-            while (importDesc->Name != 0)
             {
-                nNumImports++;
-                importDesc++;
+                PIMAGE_THUNK_DATA thunk = (PIMAGE_THUNK_DATA)(hExecutableInstance + (pImports + i)->OriginalFirstThunk);
+                size_t* iat = (size_t*)(hExecutableInstance + (pImports + i)->FirstThunk);
+                size_t j = 0;
+                while (thunk->u1.Function)
+                {
+                    if ((thunk->u1.Ordinal & IMAGE_ORDINAL_FLAG) == 0)
+                    {
+                        auto importName = (PIMAGE_IMPORT_BY_NAME)(hExecutableInstance + thunk->u1.AddressOfData);
+                        std::string funcName = importName->Name;
+                        auto it = kernel32Customs.find(funcName);
+                        if (it != kernel32Customs.end())
+                        {
+                            DWORD dwProtect[2];
+                            VirtualProtect(&iat[j], sizeof(size_t), PAGE_EXECUTE_READWRITE, &dwProtect[0]);
+                            size_t original = iat[j];
+                            iat[j] = (size_t)it->second;
+                            data.kernel32Functions[funcName] = { (size_t)&iat[j], original };
+                            VirtualProtect(&iat[j], sizeof(size_t), dwProtect[0], &dwProtect[1]);
+                            matchedImports++;
+                        }
+                    }
+                    j++;
+                    thunk++;
+                }
             }
         }
+    }
+    return matchedImports > 0;
+}
 
-        for (size_t i = 0; i < nNumImports; i++)
+void PatchCoCreateInstance(HMODULE mod, ModuleIATData& data)
+{
+    if (iequals(GetSelfName(), L"dsound.dll") || iequals(GetSelfName(), L"dinput8.dll") || iequals(GetSelfName(), L"dinput.dll") || iequals(GetSelfName(), L"wininet.dll"))
+        return;
+    auto hExecutableInstance = (size_t)mod;
+    IMAGE_NT_HEADERS* ntHeader = (IMAGE_NT_HEADERS*)(hExecutableInstance + ((IMAGE_DOS_HEADER*)hExecutableInstance)->e_lfanew);
+    IMAGE_IMPORT_DESCRIPTOR* pImports = (IMAGE_IMPORT_DESCRIPTOR*)(hExecutableInstance + ntHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress);
+    size_t nNumImports = 0;
+    if (ntHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress != 0)
+    {
+        IMAGE_IMPORT_DESCRIPTOR* importDesc = pImports;
+        while (importDesc->Name != 0)
         {
-            if ((size_t)(hInstance + (pImports + i)->Name) < getSectionEnd(ntHeader, (size_t)hInstance))
+            nNumImports++;
+            importDesc++;
+        }
+    }
+    auto getSectionEnd = [](IMAGE_NT_HEADERS* ntHeader, size_t inst) -> size_t
+    {
+        auto sec = reinterpret_cast<PIMAGE_SECTION_HEADER>((UCHAR*)ntHeader->OptionalHeader.DataDirectory + ntHeader->OptionalHeader.NumberOfRvaAndSizes * sizeof(IMAGE_DATA_DIRECTORY) + (ntHeader->FileHeader.NumberOfSections - 1) * sizeof(IMAGE_SECTION_HEADER));
+        while (sec->Misc.VirtualSize == 0) sec--;
+        auto secSize = max(sec->SizeOfRawData, sec->Misc.VirtualSize);
+        auto end = inst + max(sec->PointerToRawData, sec->VirtualAddress) + secSize;
+        return end;
+    };
+    auto hExecutableInstance_end = getSectionEnd(ntHeader, hExecutableInstance);
+    for (size_t i = 0; i < nNumImports; i++)
+    {
+        if ((size_t)(hExecutableInstance + (pImports + i)->Name) < hExecutableInstance_end)
+        {
+            auto szName = (const char*)(hExecutableInstance + (pImports + i)->Name);
+            auto dllname = std::string(szName);
+            std::transform(dllname.begin(), dllname.end(), dllname.begin(), [](char c) { return ::tolower(c); });
+            if (dllname == "ole32.dll")
             {
-                if (iequals(szSelfName, (to_wstring((const char*)(hInstance + (pImports + i)->Name)))))
+                PIMAGE_THUNK_DATA thunk = (PIMAGE_THUNK_DATA)(hExecutableInstance + (pImports + i)->OriginalFirstThunk);
+                size_t* iat = (size_t*)(hExecutableInstance + (pImports + i)->FirstThunk);
+                size_t j = 0;
+                while (thunk->u1.Function)
                 {
-                    PIMAGE_THUNK_DATA thunk = (PIMAGE_THUNK_DATA)(hInstance + (pImports + i)->OriginalFirstThunk);
-                    size_t j = 0;
-                    while (thunk->u1.Function)
+                    if ((thunk->u1.Ordinal & IMAGE_ORDINAL_FLAG) == 0)
                     {
-                        if (thunk->u1.Ordinal & IMAGE_ORDINAL_FLAG)
+                        auto importName = (PIMAGE_IMPORT_BY_NAME)(hExecutableInstance + thunk->u1.AddressOfData);
+                        std::string funcName = importName->Name;
+                        auto it = ole32Customs.find(funcName);
+                        if (it != ole32Customs.end())
                         {
-                            PIMAGE_IMPORT_BY_NAME import = (PIMAGE_IMPORT_BY_NAME)(hInstance + thunk->u1.AddressOfData);
-                            void** p = (void**)(hInstance + (pImports + i)->FirstThunk);
-                            if (iequals(szSelfName, L"dsound.dll"))
+                            DWORD dwProtect[2];
+                            VirtualProtect(&iat[j], sizeof(size_t), PAGE_EXECUTE_READWRITE, &dwProtect[0]);
+                            size_t original = iat[j];
+                            iat[j] = (size_t)it->second;
+                            data.ole32Functions[funcName] = { (size_t)&iat[j], original };
+                            VirtualProtect(&iat[j], sizeof(size_t), dwProtect[0], &dwProtect[1]);
+                        }
+                    }
+                    j++;
+                    thunk++;
+                }
+            }
+        }
+    }
+}
+
+void Patchvccorlib(HMODULE mod, ModuleIATData& data)
+{
+    auto hExecutableInstance = (size_t)mod;
+    IMAGE_NT_HEADERS* ntHeader = (IMAGE_NT_HEADERS*)(hExecutableInstance + ((IMAGE_DOS_HEADER*)hExecutableInstance)->e_lfanew);
+    IMAGE_IMPORT_DESCRIPTOR* pImports = (IMAGE_IMPORT_DESCRIPTOR*)(hExecutableInstance + ntHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress);
+    size_t nNumImports = 0;
+    if (ntHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress != 0)
+    {
+        IMAGE_IMPORT_DESCRIPTOR* importDesc = pImports;
+        while (importDesc->Name != 0)
+        {
+            nNumImports++;
+            importDesc++;
+        }
+    }
+    auto getSectionEnd = [](IMAGE_NT_HEADERS* ntHeader, size_t inst) -> size_t
+    {
+        auto sec = reinterpret_cast<PIMAGE_SECTION_HEADER>((UCHAR*)ntHeader->OptionalHeader.DataDirectory + ntHeader->OptionalHeader.NumberOfRvaAndSizes * sizeof(IMAGE_DATA_DIRECTORY) + (ntHeader->FileHeader.NumberOfSections - 1) * sizeof(IMAGE_SECTION_HEADER));
+        while (sec->Misc.VirtualSize == 0) sec--;
+        auto secSize = max(sec->SizeOfRawData, sec->Misc.VirtualSize);
+        auto end = inst + max(sec->PointerToRawData, sec->VirtualAddress) + secSize;
+        return end;
+    };
+    auto hExecutableInstance_end = getSectionEnd(ntHeader, hExecutableInstance);
+    for (size_t i = 0; i < nNumImports; i++)
+    {
+        if ((size_t)(hExecutableInstance + (pImports + i)->Name) < hExecutableInstance_end)
+        {
+            auto szName = (const char*)(hExecutableInstance + (pImports + i)->Name);
+            auto dllname = std::string(szName);
+            std::transform(dllname.begin(), dllname.end(), dllname.begin(), [](char c) { return ::tolower(c); });
+            if (dllname.find("vccorlib") != std::string::npos)
+            {
+                auto hHandle = GetModuleHandleA(szName);
+                if (!hHandle) return;
+                PIMAGE_THUNK_DATA thunk = (PIMAGE_THUNK_DATA)(hExecutableInstance + (pImports + i)->OriginalFirstThunk);
+                size_t* iat = (size_t*)(hExecutableInstance + (pImports + i)->FirstThunk);
+                size_t j = 0;
+                while (thunk->u1.Function)
+                {
+                    if ((thunk->u1.Ordinal & IMAGE_ORDINAL_FLAG) == 0)
+                    {
+                        auto importName = (PIMAGE_IMPORT_BY_NAME)(hExecutableInstance + thunk->u1.AddressOfData);
+                        std::string funcName = importName->Name;
+                        auto it = vccorlibCustoms.find(funcName);
+                        if (it != vccorlibCustoms.end())
+                        {
+                            DWORD dwProtect[2];
+                            VirtualProtect(&iat[j], sizeof(size_t), PAGE_EXECUTE_READWRITE, &dwProtect[0]);
+                            size_t original = iat[j];
+                            iat[j] = (size_t)it->second;
+                            data.vccorlibFunctions[funcName] = { (size_t)&iat[j], original };
+                            VirtualProtect(&iat[j], sizeof(size_t), dwProtect[0], &dwProtect[1]);
+                        }
+                    }
+                    j++;
+                    thunk++;
+                }
+            }
+        }
+    }
+}
+
+void PatchOrdinals(HMODULE mod)
+{
+    auto szSelfName = GetSelfName();
+    auto hInstance = (size_t)mod;
+    IMAGE_NT_HEADERS* ntHeader = (IMAGE_NT_HEADERS*)(hInstance + ((IMAGE_DOS_HEADER*)hInstance)->e_lfanew);
+    IMAGE_IMPORT_DESCRIPTOR* pImports = (IMAGE_IMPORT_DESCRIPTOR*)(hInstance + ntHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress);
+    size_t nNumImports = 0;
+    if (ntHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress != 0)
+    {
+        IMAGE_IMPORT_DESCRIPTOR* importDesc = pImports;
+        while (importDesc->Name != 0)
+        {
+            nNumImports++;
+            importDesc++;
+        }
+    }
+    for (size_t i = 0; i < nNumImports; i++)
+    {
+        auto getSectionEnd = [](IMAGE_NT_HEADERS* ntHeader, size_t inst) -> size_t
+        {
+            auto sec = reinterpret_cast<PIMAGE_SECTION_HEADER>((UCHAR*)ntHeader->OptionalHeader.DataDirectory + ntHeader->OptionalHeader.NumberOfRvaAndSizes * sizeof(IMAGE_DATA_DIRECTORY) + (ntHeader->FileHeader.NumberOfSections - 1) * sizeof(IMAGE_SECTION_HEADER));
+            while (sec->Misc.VirtualSize == 0) sec--;
+            auto secSize = max(sec->SizeOfRawData, sec->Misc.VirtualSize);
+            auto end = inst + max(sec->PointerToRawData, sec->VirtualAddress) + secSize;
+            return end;
+        };
+        if ((size_t)(hInstance + (pImports + i)->Name) < getSectionEnd(ntHeader, hInstance))
+        {
+            if (iequals(szSelfName, (to_wstring((const char*)(hInstance + (pImports + i)->Name)))))
+            {
+                PIMAGE_THUNK_DATA thunk = (PIMAGE_THUNK_DATA)(hInstance + (pImports + i)->OriginalFirstThunk);
+                size_t j = 0;
+                while (thunk->u1.Function)
+                {
+                    if (thunk->u1.Ordinal & IMAGE_ORDINAL_FLAG)
+                    {
+                        PIMAGE_IMPORT_BY_NAME import = (PIMAGE_IMPORT_BY_NAME)(hInstance + thunk->u1.AddressOfData);
+                        void** p = (void**)(hInstance + (pImports + i)->FirstThunk);
+                        if (iequals(szSelfName, L"dsound.dll"))
+                        {
+                            DWORD Protect;
+                            VirtualProtect(&p[j], 4, PAGE_EXECUTE_READWRITE, &Protect);
+                            const enum edsound
                             {
-                                DWORD Protect;
-                                VirtualProtect(&p[j], 4, PAGE_EXECUTE_READWRITE, &Protect);
-
-                                const enum edsound
-                                {
-                                    DirectSoundCaptureCreate = 6,
-                                    DirectSoundCaptureCreate8 = 12,
-                                    DirectSoundCaptureEnumerateA = 7,
-                                    DirectSoundCaptureEnumerateW = 8,
-                                    DirectSoundCreate = 1,
-                                    DirectSoundCreate8 = 11,
-                                    DirectSoundEnumerateA = 2,
-                                    DirectSoundEnumerateW = 3,
-                                    DirectSoundFullDuplexCreate = 10,
-                                    GetDeviceID = 9
-                                };
-
-                                switch (IMAGE_ORDINAL(thunk->u1.Ordinal))
-                                {
+                                DirectSoundCaptureCreate = 6,
+                                DirectSoundCaptureCreate8 = 12,
+                                DirectSoundCaptureEnumerateA = 7,
+                                DirectSoundCaptureEnumerateW = 8,
+                                DirectSoundCreate = 1,
+                                DirectSoundCreate8 = 11,
+                                DirectSoundEnumerateA = 2,
+                                DirectSoundEnumerateW = 3,
+                                DirectSoundFullDuplexCreate = 10,
+                                GetDeviceID = 9
+                            };
+                            switch (IMAGE_ORDINAL(thunk->u1.Ordinal))
+                            {
                                 case edsound::DirectSoundCaptureCreate:
                                     p[j] = _DirectSoundCaptureCreate;
                                     break;
@@ -4649,107 +4468,104 @@ bool HookKernel32IAT(HMODULE mod, bool exe)
                                     break;
                                 default:
                                     break;
-                                }
                             }
-                            else if (iequals(szSelfName, L"dinput8.dll"))
+                        }
+                        else if (iequals(szSelfName, L"dinput8.dll"))
+                        {
+                            DWORD Protect;
+                            VirtualProtect(&p[j], 4, PAGE_EXECUTE_READWRITE, &Protect);
+                            if ((IMAGE_ORDINAL(thunk->u1.Ordinal)) == 1)
+                                p[j] = _DirectInput8Create;
+                        }
+                        else if (iequals(szSelfName, L"winhttp.dll"))
+                        {
+                            DWORD Protect;
+                            VirtualProtect(&p[j], 4, PAGE_EXECUTE_READWRITE, &Protect);
+                            const enum ewinhttp
                             {
-                                DWORD Protect;
-                                VirtualProtect(&p[j], 4, PAGE_EXECUTE_READWRITE, &Protect);
-
-                                if ((IMAGE_ORDINAL(thunk->u1.Ordinal)) == 1)
-                                    p[j] = _DirectInput8Create;
-                            }
-                            else if (iequals(szSelfName, L"winhttp.dll"))
+                                Private1 = 4,
+                                SvchostPushServiceGlobals = 5,
+                                WinHttpAddRequestHeaders = 6,
+                                WinHttpAddRequestHeadersEx = 7,
+                                WinHttpAutoProxySvcMain = 8,
+                                WinHttpCheckPlatform = 9,
+                                WinHttpCloseHandle = 10,
+                                WinHttpConnect = 11,
+                                WinHttpConnectionDeletePolicyEntries = 12,
+                                WinHttpConnectionDeleteProxyInfo = 13,
+                                WinHttpConnectionFreeNameList = 14,
+                                WinHttpConnectionFreeProxyInfo = 15,
+                                WinHttpConnectionFreeProxyList = 16,
+                                WinHttpConnectionGetNameList = 17,
+                                WinHttpConnectionGetProxyInfo = 18,
+                                WinHttpConnectionGetProxyList = 19,
+                                WinHttpConnectionOnlyConvert = 20,
+                                WinHttpConnectionOnlyReceive = 21,
+                                WinHttpConnectionOnlySend = 22,
+                                WinHttpConnectionSetPolicyEntries = 23,
+                                WinHttpConnectionSetProxyInfo = 24,
+                                WinHttpConnectionUpdateIfIndexTable = 25,
+                                WinHttpCrackUrl = 26,
+                                WinHttpCreateProxyResolver = 27,
+                                WinHttpCreateUrl = 28,
+                                WinHttpDetectAutoProxyConfigUrl = 29,
+                                WinHttpFreeProxyResult = 30,
+                                WinHttpFreeProxyResultEx = 31,
+                                WinHttpFreeProxySettings = 32,
+                                WinHttpFreeProxySettingsEx = 33,
+                                WinHttpFreeQueryConnectionGroupResult = 34,
+                                WinHttpGetDefaultProxyConfiguration = 35,
+                                WinHttpGetIEProxyConfigForCurrentUser = 36,
+                                WinHttpGetProxyForUrl = 37,
+                                WinHttpGetProxyForUrlEx = 38,
+                                WinHttpGetProxyForUrlEx2 = 39,
+                                WinHttpGetProxyForUrlHvsi = 40,
+                                WinHttpGetProxyResult = 41,
+                                WinHttpGetProxyResultEx = 42,
+                                WinHttpGetProxySettingsEx = 43,
+                                WinHttpGetProxySettingsResultEx = 44,
+                                WinHttpGetProxySettingsVersion = 45,
+                                WinHttpGetTunnelSocket = 46,
+                                WinHttpOpen = 47,
+                                WinHttpOpenRequest = 48,
+                                WinHttpPacJsWorkerMain = 49,
+                                WinHttpProbeConnectivity = 50,
+                                WinHttpQueryAuthSchemes = 51,
+                                WinHttpQueryConnectionGroup = 52,
+                                WinHttpQueryDataAvailable = 53,
+                                WinHttpQueryHeaders = 54,
+                                WinHttpQueryHeadersEx = 55,
+                                WinHttpQueryOption = 56,
+                                WinHttpReadData = 57,
+                                WinHttpReadDataEx = 58,
+                                WinHttpReadProxySettings = 59,
+                                WinHttpReadProxySettingsHvsi = 60,
+                                WinHttpReceiveResponse = 61,
+                                WinHttpRegisterProxyChangeNotification = 62,
+                                WinHttpResetAutoProxy = 63,
+                                WinHttpSaveProxyCredentials = 64,
+                                WinHttpSendRequest = 65,
+                                WinHttpSetCredentials = 66,
+                                WinHttpSetDefaultProxyConfiguration = 67,
+                                WinHttpSetOption = 68,
+                                WinHttpSetProxySettingsPerUser = 69,
+                                WinHttpSetSecureLegacyServersAppCompat = 1,
+                                WinHttpSetStatusCallback = 70,
+                                WinHttpSetTimeouts = 71,
+                                WinHttpTimeFromSystemTime = 72,
+                                WinHttpTimeToSystemTime = 73,
+                                WinHttpUnregisterProxyChangeNotification = 74,
+                                WinHttpWebSocketClose = 75,
+                                WinHttpWebSocketCompleteUpgrade = 76,
+                                WinHttpWebSocketQueryCloseStatus = 77,
+                                WinHttpWebSocketReceive = 78,
+                                WinHttpWebSocketSend = 79,
+                                WinHttpWebSocketShutdown = 80,
+                                WinHttpWriteData = 81,
+                                WinHttpWriteProxySettings = 82
+                            };
+                            switch (IMAGE_ORDINAL(thunk->u1.Ordinal))
                             {
-                                DWORD Protect;
-                                VirtualProtect(&p[j], 4, PAGE_EXECUTE_READWRITE, &Protect);
-
-                                const enum ewinhttp
-                                {
-                                    Private1 = 4,
-                                    SvchostPushServiceGlobals = 5,
-                                    WinHttpAddRequestHeaders = 6,
-                                    WinHttpAddRequestHeadersEx = 7,
-                                    WinHttpAutoProxySvcMain = 8,
-                                    WinHttpCheckPlatform = 9,
-                                    WinHttpCloseHandle = 10,
-                                    WinHttpConnect = 11,
-                                    WinHttpConnectionDeletePolicyEntries = 12,
-                                    WinHttpConnectionDeleteProxyInfo = 13,
-                                    WinHttpConnectionFreeNameList = 14,
-                                    WinHttpConnectionFreeProxyInfo = 15,
-                                    WinHttpConnectionFreeProxyList = 16,
-                                    WinHttpConnectionGetNameList = 17,
-                                    WinHttpConnectionGetProxyInfo = 18,
-                                    WinHttpConnectionGetProxyList = 19,
-                                    WinHttpConnectionOnlyConvert = 20,
-                                    WinHttpConnectionOnlyReceive = 21,
-                                    WinHttpConnectionOnlySend = 22,
-                                    WinHttpConnectionSetPolicyEntries = 23,
-                                    WinHttpConnectionSetProxyInfo = 24,
-                                    WinHttpConnectionUpdateIfIndexTable = 25,
-                                    WinHttpCrackUrl = 26,
-                                    WinHttpCreateProxyResolver = 27,
-                                    WinHttpCreateUrl = 28,
-                                    WinHttpDetectAutoProxyConfigUrl = 29,
-                                    WinHttpFreeProxyResult = 30,
-                                    WinHttpFreeProxyResultEx = 31,
-                                    WinHttpFreeProxySettings = 32,
-                                    WinHttpFreeProxySettingsEx = 33,
-                                    WinHttpFreeQueryConnectionGroupResult = 34,
-                                    WinHttpGetDefaultProxyConfiguration = 35,
-                                    WinHttpGetIEProxyConfigForCurrentUser = 36,
-                                    WinHttpGetProxyForUrl = 37,
-                                    WinHttpGetProxyForUrlEx = 38,
-                                    WinHttpGetProxyForUrlEx2 = 39,
-                                    WinHttpGetProxyForUrlHvsi = 40,
-                                    WinHttpGetProxyResult = 41,
-                                    WinHttpGetProxyResultEx = 42,
-                                    WinHttpGetProxySettingsEx = 43,
-                                    WinHttpGetProxySettingsResultEx = 44,
-                                    WinHttpGetProxySettingsVersion = 45,
-                                    WinHttpGetTunnelSocket = 46,
-                                    WinHttpOpen = 47,
-                                    WinHttpOpenRequest = 48,
-                                    WinHttpPacJsWorkerMain = 49,
-                                    WinHttpProbeConnectivity = 50,
-                                    WinHttpQueryAuthSchemes = 51,
-                                    WinHttpQueryConnectionGroup = 52,
-                                    WinHttpQueryDataAvailable = 53,
-                                    WinHttpQueryHeaders = 54,
-                                    WinHttpQueryHeadersEx = 55,
-                                    WinHttpQueryOption = 56,
-                                    WinHttpReadData = 57,
-                                    WinHttpReadDataEx = 58,
-                                    WinHttpReadProxySettings = 59,
-                                    WinHttpReadProxySettingsHvsi = 60,
-                                    WinHttpReceiveResponse = 61,
-                                    WinHttpRegisterProxyChangeNotification = 62,
-                                    WinHttpResetAutoProxy = 63,
-                                    WinHttpSaveProxyCredentials = 64,
-                                    WinHttpSendRequest = 65,
-                                    WinHttpSetCredentials = 66,
-                                    WinHttpSetDefaultProxyConfiguration = 67,
-                                    WinHttpSetOption = 68,
-                                    WinHttpSetProxySettingsPerUser = 69,
-                                    WinHttpSetSecureLegacyServersAppCompat = 1,
-                                    WinHttpSetStatusCallback = 70,
-                                    WinHttpSetTimeouts = 71,
-                                    WinHttpTimeFromSystemTime = 72,
-                                    WinHttpTimeToSystemTime = 73,
-                                    WinHttpUnregisterProxyChangeNotification = 74,
-                                    WinHttpWebSocketClose = 75,
-                                    WinHttpWebSocketCompleteUpgrade = 76,
-                                    WinHttpWebSocketQueryCloseStatus = 77,
-                                    WinHttpWebSocketReceive = 78,
-                                    WinHttpWebSocketSend = 79,
-                                    WinHttpWebSocketShutdown = 80,
-                                    WinHttpWriteData = 81,
-                                    WinHttpWriteProxySettings = 82
-                                };
-
-                                switch (IMAGE_ORDINAL(thunk->u1.Ordinal))
-                                {
                                 case ewinhttp::Private1:
                                     p[j] = _Private1;
                                     break;
@@ -4992,25 +4808,23 @@ bool HookKernel32IAT(HMODULE mod, bool exe)
                                     break;
                                 default:
                                     break;
-                                }
                             }
-                            else if (iequals(szSelfName, L"xinput1_1.dll") || iequals(szSelfName, L"xinput1_2.dll"))
+                        }
+                        else if (iequals(szSelfName, L"xinput1_1.dll") || iequals(szSelfName, L"xinput1_2.dll"))
+                        {
+                            DWORD Protect;
+                            VirtualProtect(&p[j], 4, PAGE_EXECUTE_READWRITE, &Protect);
+                            const enum exinput1_1
                             {
-                                DWORD Protect;
-                                VirtualProtect(&p[j], 4, PAGE_EXECUTE_READWRITE, &Protect);
-
-                                const enum exinput1_1
-                                {
-                                    DllMain = 1,
-                                    XInputEnable = 2,
-                                    XInputGetCapabilities = 3,
-                                    XInputGetDSoundAudioDeviceGuids = 4,
-                                    XInputGetState = 5,
-                                    XInputSetState = 6,
-                                };
-
-                                switch (IMAGE_ORDINAL(thunk->u1.Ordinal))
-                                {
+                                DllMain = 1,
+                                XInputEnable = 2,
+                                XInputGetCapabilities = 3,
+                                XInputGetDSoundAudioDeviceGuids = 4,
+                                XInputGetState = 5,
+                                XInputSetState = 6,
+                            };
+                            switch (IMAGE_ORDINAL(thunk->u1.Ordinal))
+                            {
                                 case exinput1_1::DllMain:
                                     p[j] = _DllMain;
                                     break;
@@ -5031,31 +4845,29 @@ bool HookKernel32IAT(HMODULE mod, bool exe)
                                     break;
                                 default:
                                     break;
-                                }
                             }
-                            else if (iequals(szSelfName, L"xinput1_3.dll"))
+                        }
+                        else if (iequals(szSelfName, L"xinput1_3.dll"))
+                        {
+                            DWORD Protect;
+                            VirtualProtect(&p[j], 4, PAGE_EXECUTE_READWRITE, &Protect);
+                            const enum exinput1_3
                             {
-                                DWORD Protect;
-                                VirtualProtect(&p[j], 4, PAGE_EXECUTE_READWRITE, &Protect);
-
-                                const enum exinput1_3
-                                {
-                                    DllMain = 1,
-                                    XInputGetState = 2,
-                                    XInputSetState = 3,
-                                    XInputGetCapabilities = 4,
-                                    XInputEnable = 5,
-                                    XInputGetDSoundAudioDeviceGuids = 6,
-                                    XInputGetBatteryInformation = 7,
-                                    XInputGetKeystroke = 8,
-                                    XInputGetStateEx = 100,
-                                    XInputWaitForGuideButton = 101,
-                                    XInputCancelGuideButtonWait = 102,
-                                    XInputPowerOffController = 103,
-                                };
-
-                                switch (IMAGE_ORDINAL(thunk->u1.Ordinal))
-                                {
+                                DllMain = 1,
+                                XInputGetState = 2,
+                                XInputSetState = 3,
+                                XInputGetCapabilities = 4,
+                                XInputEnable = 5,
+                                XInputGetDSoundAudioDeviceGuids = 6,
+                                XInputGetBatteryInformation = 7,
+                                XInputGetKeystroke = 8,
+                                XInputGetStateEx = 100,
+                                XInputWaitForGuideButton = 101,
+                                XInputCancelGuideButtonWait = 102,
+                                XInputPowerOffController = 103,
+                            };
+                            switch (IMAGE_ORDINAL(thunk->u1.Ordinal))
+                            {
                                 case exinput1_3::DllMain:
                                     p[j] = _DllMain;
                                     break;
@@ -5094,33 +4906,31 @@ bool HookKernel32IAT(HMODULE mod, bool exe)
                                     break;
                                 default:
                                     break;
-                                }
                             }
-                            else if (iequals(szSelfName, L"xinput1_4.dll"))
+                        }
+                        else if (iequals(szSelfName, L"xinput1_4.dll"))
+                        {
+                            DWORD Protect;
+                            VirtualProtect(&p[j], 4, PAGE_EXECUTE_READWRITE, &Protect);
+                            const enum exinput1_4
                             {
-                                DWORD Protect;
-                                VirtualProtect(&p[j], 4, PAGE_EXECUTE_READWRITE, &Protect);
-
-                                const enum exinput1_4
-                                {
-                                    DllMain = 1,
-                                    XInputGetState = 2,
-                                    XInputSetState = 3,
-                                    XInputGetCapabilities = 4,
-                                    XInputEnable = 5,
-                                    XInputGetBatteryInformation = 7,
-                                    XInputGetKeystroke = 8,
-                                    XInputGetAudioDeviceIds = 10,
-                                    XInputGetStateEx = 100,
-                                    XInputWaitForGuideButton = 101,
-                                    XInputCancelGuideButtonWait = 102,
-                                    XInputPowerOffController = 103,
-                                    XInputGetBaseBusInformation = 104,
-                                    XInputGetCapabilitiesEx = 108,
-                                };
-
-                                switch (IMAGE_ORDINAL(thunk->u1.Ordinal))
-                                {
+                                DllMain = 1,
+                                XInputGetState = 2,
+                                XInputSetState = 3,
+                                XInputGetCapabilities = 4,
+                                XInputEnable = 5,
+                                XInputGetBatteryInformation = 7,
+                                XInputGetKeystroke = 8,
+                                XInputGetAudioDeviceIds = 10,
+                                XInputGetStateEx = 100,
+                                XInputWaitForGuideButton = 101,
+                                XInputCancelGuideButtonWait = 102,
+                                XInputPowerOffController = 103,
+                                XInputGetBaseBusInformation = 104,
+                                XInputGetCapabilitiesEx = 108,
+                            };
+                            switch (IMAGE_ORDINAL(thunk->u1.Ordinal))
+                            {
                                 case exinput1_4::DllMain:
                                     p[j] = _DllMain;
                                     break;
@@ -5165,24 +4975,22 @@ bool HookKernel32IAT(HMODULE mod, bool exe)
                                     break;
                                 default:
                                     break;
-                                }
                             }
-                            else if (iequals(szSelfName, L"xinput9_1_0.dll"))
+                        }
+                        else if (iequals(szSelfName, L"xinput9_1_0.dll"))
+                        {
+                            DWORD Protect;
+                            VirtualProtect(&p[j], 4, PAGE_EXECUTE_READWRITE, &Protect);
+                            const enum exinput9_1_0
                             {
-                                DWORD Protect;
-                                VirtualProtect(&p[j], 4, PAGE_EXECUTE_READWRITE, &Protect);
-
-                                const enum exinput9_1_0
-                                {
-                                    DllMain = 1,
-                                    XInputGetCapabilities = 2,
-                                    XInputGetDSoundAudioDeviceGuids = 3,
-                                    XInputGetState = 4,
-                                    XInputSetState = 5,
-                                };
-
-                                switch (IMAGE_ORDINAL(thunk->u1.Ordinal))
-                                {
+                                DllMain = 1,
+                                XInputGetCapabilities = 2,
+                                XInputGetDSoundAudioDeviceGuids = 3,
+                                XInputGetState = 4,
+                                XInputSetState = 5,
+                            };
+                            switch (IMAGE_ORDINAL(thunk->u1.Ordinal))
+                            {
                                 case exinput9_1_0::DllMain:
                                     p[j] = _DllMain;
                                     break;
@@ -5200,27 +5008,25 @@ bool HookKernel32IAT(HMODULE mod, bool exe)
                                     break;
                                 default:
                                     break;
-                                }
                             }
-                            else if (iequals(szSelfName, L"xinputuap.dll"))
+                        }
+                        else if (iequals(szSelfName, L"xinputuap.dll"))
+                        {
+                            DWORD Protect;
+                            VirtualProtect(&p[j], 4, PAGE_EXECUTE_READWRITE, &Protect);
+                            const enum exinputuap
                             {
-                                DWORD Protect;
-                                VirtualProtect(&p[j], 4, PAGE_EXECUTE_READWRITE, &Protect);
-
-                                const enum exinputuap
-                                {
-                                    DllMain = 1,
-                                    XInputEnable = 2,
-                                    XInputGetAudioDeviceIds = 3,
-                                    XInputGetBatteryInformation = 4,
-                                    XInputGetCapabilities = 5,
-                                    XInputGetKeystroke = 6,
-                                    XInputGetState = 7,
-                                    XInputSetState = 8,
-                                };
-
-                                switch (IMAGE_ORDINAL(thunk->u1.Ordinal))
-                                {
+                                DllMain = 1,
+                                XInputEnable = 2,
+                                XInputGetAudioDeviceIds = 3,
+                                XInputGetBatteryInformation = 4,
+                                XInputGetCapabilities = 5,
+                                XInputGetKeystroke = 6,
+                                XInputGetState = 7,
+                                XInputSetState = 8,
+                            };
+                            switch (IMAGE_ORDINAL(thunk->u1.Ordinal))
+                            {
                                 case exinputuap::DllMain:
                                     p[j] = _DllMain;
                                     break;
@@ -5247,25 +5053,65 @@ bool HookKernel32IAT(HMODULE mod, bool exe)
                                     break;
                                 default:
                                     break;
-                                }
                             }
-                            ++j;
                         }
-                        ++thunk;
+                        ++j;
                     }
-                    break;
+                    ++thunk;
                 }
+                break;
             }
         }
-    };
-
-    ModuleList dlls;
-    dlls.Enumerate(ModuleList::SearchLocation::LocalOnly);
-    for (auto& e : dlls.m_moduleList)
-    {
-        PatchOrdinals((size_t)std::get<HMODULE>(e));
     }
-    return matchedImports > 0;
+}
+
+bool HookIAT()
+{
+    std::wstring mutexName = L"Ultimate-ASI-Loader-HookIAT" + std::to_wstring(GetCurrentProcessId());
+
+    auto hMutex = OpenMutexW(MUTEX_ALL_ACCESS, FALSE, mutexName.c_str());
+    if (hMutex)
+    {
+        CloseHandle(hMutex);
+        return false;
+    }
+
+    hMutex = CreateMutexW(nullptr, TRUE, mutexName.c_str());
+    if (!hMutex || GetLastError() == ERROR_ALREADY_EXISTS)
+    {
+        if (hMutex)
+            CloseHandle(hMutex);
+        return false;
+    }
+
+    ModuleList modules;
+    modules.Enumerate(ModuleList::SearchLocation::All);
+    for (auto& e : modules.m_moduleList)
+    {
+        auto mod = std::get<HMODULE>(e);
+        if (mod != hm)
+        {
+            auto name = std::get<std::wstring>(e);
+            auto bIsLocal = std::get<bool>(e);
+            std::transform(name.begin(), name.end(), name.begin(), [](wchar_t c) { return ::towlower(c); });
+
+            if (bIsLocal || name == L"unityplayer" || name == L"clr" || name == L"coreclr")
+            {
+                ModuleIATData data;
+                data.module = mod;
+                PatchKernel32IAT(mod, data);
+                Patchvccorlib(mod, data);
+                PatchCoCreateInstance(mod, data);
+                PatchOrdinals(mod);
+                moduleIATs.push_back(data);
+            }
+        }
+    }
+
+    if (hMutex)
+        CloseHandle(hMutex);
+
+    return !moduleIATs.empty();
 }
 
 LONG WINAPI CustomUnhandledExceptionFilter(LPEXCEPTION_POINTERS ExceptionInfo)
@@ -5372,7 +5218,6 @@ void Init()
     auto nForceEPHook = GetPrivateProfileIntW(TEXT("globalsets"), TEXT("forceentrypointhook"), FALSE, iniPaths);
     auto nDontLoadFromDllMain = GetPrivateProfileIntW(TEXT("globalsets"), TEXT("dontloadfromdllmain"), TRUE, iniPaths);
     sLoadFromAPI = GetPrivateProfileStringW(TEXT("globalsets"), TEXT("loadfromapi"), L"", iniPaths);
-    auto nFindModule = GetPrivateProfileIntW(TEXT("globalsets"), TEXT("findmodule"), FALSE, iniPaths);
     auto nDisableCrashDumps = GetPrivateProfileIntW(TEXT("globalsets"), TEXT("disablecrashdumps"), FALSE, iniPaths);
 
     if (!nDisableCrashDumps)
@@ -5381,11 +5226,11 @@ void Init()
         {
             SetUnhandledExceptionFilter(CustomUnhandledExceptionFilter);
             // Now stub out CustomUnhandledExceptionFilter so NO ONE ELSE can set it!
-#if !X64
+            #if !X64
             uint32_t ret = 0x900004C2; //ret4
-#else
+            #else
             uint32_t ret = 0x909090C3; //ret
-#endif
+            #endif
             DWORD protect[2];
             VirtualProtect(&SetUnhandledExceptionFilter, sizeof(ret), PAGE_EXECUTE_READWRITE, &protect[0]);
             memcpy(&SetUnhandledExceptionFilter, &ret, sizeof(ret));
@@ -5404,56 +5249,25 @@ void Init()
                 if (iequals(exeName, L"GTA5") || iequals(exeName, L"RDR2") || iequals(exeName, L"game_win64_master"))
                     sLoadFromAPI = L"GetSystemTimeAsFileTime";
             }
-        }
-        catch (...) {}
+        } catch (...) {}
 
-        HMODULE mainModule = GetModuleHandle(NULL);
-        bool hookedSuccessfully = HookKernel32IAT(mainModule, true);
-        if (!hookedSuccessfully)
+        bool hookedSuccessfully = HookIAT();
+
+        for (const auto& m : moduleIATs)
         {
-            LoadOriginalLibrary();
-        }
-
-        const auto it = std::find_if(std::begin(importedModulesList), std::end(importedModulesList), [&](const auto& str) { return str == "unityplayer.dll"; });
-        const auto bUnityPlayerImported = it != std::end(importedModulesList);
-
-        HMODULE m = mainModule;
-        if (nFindModule || importedModulesList.size() <= 2 || bUnityPlayerImported)
-        {
-            ModuleList dlls;
-            dlls.Enumerate(ModuleList::SearchLocation::All);
-
-            auto ual = std::find_if(dlls.m_moduleList.begin(), dlls.m_moduleList.end(), [](auto const& it)
+            if (m.module == GetModuleHandle(NULL))
             {
-                return std::get<HMODULE>(it) == hm;
-            });
-
-            auto sim = std::find_if(dlls.m_moduleList.rbegin(), dlls.m_moduleList.rend(), [&ual](auto const& it)
-            {
-                auto str1 = std::get<std::wstring>(*ual);
-                auto str2 = std::get<std::wstring>(it);
-                auto bIsLocal = std::get<bool>(it);
-                std::transform(str1.begin(), str1.end(), str1.begin(), [](wchar_t c) { return ::towlower(c); });
-                std::transform(str2.begin(), str2.end(), str2.begin(), [](wchar_t c) { return ::towlower(c); });
-
-                if (str2 == L"unityplayer" || str2 == L"clr" || str2 == L"coreclr")
-                    return true;
-
-                return bIsLocal && (str2 != str1) && (str2.find(str1) != std::wstring::npos);
-            });
-
-            if (ual != dlls.m_moduleList.begin())
-            {
-                if (sim != dlls.m_moduleList.rend())
-                    m = std::get<HMODULE>(*sim);
-                else
-                    m = std::get<HMODULE>(*std::prev(ual, 1));
+                if (m.kernel32Functions.empty() && m.vccorlibFunctions.empty())
+                {
+                    hookedSuccessfully = false;
+                }
+                break;
             }
         }
 
-        if (m != mainModule)
+        if (!hookedSuccessfully)
         {
-            HookKernel32IAT(m, false);
+            LoadOriginalLibrary();
         }
     }
     else
@@ -5471,16 +5285,10 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID /*lpReserved*/)
     }
     else if (reason == DLL_PROCESS_DETACH)
     {
-        for (size_t i = 0; i < OLE32ExportsNamesCount; i++)
+        for (auto& modData : moduleIATs)
         {
-            if (OLE32Data[i][IATPtr] && OLE32Data[i][ProcAddress])
-            {
-                auto ptr = (size_t*)OLE32Data[i][IATPtr];
-                DWORD dwProtect[2];
-                VirtualProtect(ptr, sizeof(size_t), PAGE_EXECUTE_READWRITE, &dwProtect[0]);
-                *ptr = OLE32Data[i][ProcAddress];
-                VirtualProtect(ptr, sizeof(size_t), dwProtect[0], &dwProtect[1]);
-            }
+            for (auto& [name, data] : modData.ole32Functions)
+                data.Restore();
         }
     }
     return TRUE;
