@@ -4223,29 +4223,101 @@ bool PatchKernel32IAT(HMODULE mod, ModuleIATData& data)
             std::transform(dllname.begin(), dllname.end(), dllname.begin(), [](char c) { return ::tolower(c); });
             if (dllname == "kernel32.dll")
             {
-                PIMAGE_THUNK_DATA thunk = (PIMAGE_THUNK_DATA)(hExecutableInstance + (pImports + i)->OriginalFirstThunk);
-                size_t* iat = (size_t*)(hExecutableInstance + (pImports + i)->FirstThunk);
-                size_t j = 0;
-                while (thunk->u1.Function)
+                // Try to use OriginalFirstThunk if available (unbound executables)
+                if ((pImports + i)->OriginalFirstThunk != 0)
                 {
-                    if ((thunk->u1.Ordinal & IMAGE_ORDINAL_FLAG) == 0)
+                    PIMAGE_THUNK_DATA thunk = (PIMAGE_THUNK_DATA)(hExecutableInstance + (pImports + i)->OriginalFirstThunk);
+                    size_t* iat = (size_t*)(hExecutableInstance + (pImports + i)->FirstThunk);
+                    size_t j = 0;
+                    while (thunk && thunk->u1.Function && (size_t)&iat[j] < hExecutableInstance_end)
                     {
-                        auto importName = (PIMAGE_IMPORT_BY_NAME)(hExecutableInstance + thunk->u1.AddressOfData);
-                        std::string funcName = importName->Name;
-                        auto it = kernel32Customs.find(funcName);
-                        if (it != kernel32Customs.end())
+                        if ((thunk->u1.Ordinal & IMAGE_ORDINAL_FLAG) == 0)
                         {
-                            DWORD dwProtect[2];
-                            VirtualProtect(&iat[j], sizeof(size_t), PAGE_EXECUTE_READWRITE, &dwProtect[0]);
-                            size_t original = iat[j];
-                            iat[j] = (size_t)it->second;
-                            data.kernel32Functions[funcName] = { (size_t)&iat[j], original };
-                            VirtualProtect(&iat[j], sizeof(size_t), dwProtect[0], &dwProtect[1]);
-                            matchedImports++;
+                            auto importName = (PIMAGE_IMPORT_BY_NAME)(hExecutableInstance + thunk->u1.AddressOfData);
+                            if ((size_t)importName < hExecutableInstance_end)
+                            {
+                                std::string funcName = importName->Name;
+                                auto it = kernel32Customs.find(funcName);
+                                if (it != kernel32Customs.end())
+                                {
+                                    DWORD dwProtect[2];
+                                    VirtualProtect(&iat[j], sizeof(size_t), PAGE_EXECUTE_READWRITE, &dwProtect[0]);
+                                    size_t original = iat[j];
+                                    iat[j] = (size_t)it->second;
+                                    data.kernel32Functions[funcName] = { (size_t)&iat[j], original };
+                                    VirtualProtect(&iat[j], sizeof(size_t), dwProtect[0], &dwProtect[1]);
+                                    matchedImports++;
+                                }
+                            }
+                        }
+                        j++;
+                        thunk++;
+                    }
+                }
+                else if ((pImports + i)->FirstThunk != 0) // Fallback to FirstThunk for bound executables (where OriginalFirstThunk is null)
+                {
+                    auto pFunctions = reinterpret_cast<void**>(hExecutableInstance + (pImports + i)->FirstThunk);
+                    for (ptrdiff_t j = 0; pFunctions[j] != nullptr && (size_t)&pFunctions[j] < hExecutableInstance_end; j++)
+                    {
+                        auto pAddress = &pFunctions[j];
+                        for (const auto& [funcName, replacement] : kernel32Customs)
+                        {
+                            if (*pAddress && *pAddress == (void*)GetProcAddress(GetModuleHandleA("kernel32.dll"), funcName.c_str()))
+                            {
+                                DWORD dwProtect[2];
+                                VirtualProtect(pAddress, sizeof(void*), PAGE_EXECUTE_READWRITE, &dwProtect[0]);
+                                void* original = *pAddress;
+                                *pAddress = replacement;
+                                data.kernel32Functions[funcName] = { (uintptr_t)pAddress, (uintptr_t)original };
+                                VirtualProtect(pAddress, sizeof(void*), dwProtect[0], &dwProtect[1]);
+                                matchedImports++;
+                                break;
+                            }
                         }
                     }
-                    j++;
-                    thunk++;
+                }
+                else // Third fallback: brute-force section scan (only if previous fallbacks fail)
+                {
+                    static auto getSection = [](const PIMAGE_NT_HEADERS nt_headers, unsigned section) -> PIMAGE_SECTION_HEADER
+                    {
+                        return reinterpret_cast<PIMAGE_SECTION_HEADER>(
+                            (UCHAR*)nt_headers->OptionalHeader.DataDirectory +
+                            nt_headers->OptionalHeader.NumberOfRvaAndSizes * sizeof(IMAGE_DATA_DIRECTORY) +
+                            section * sizeof(IMAGE_SECTION_HEADER));
+                    };
+
+                    auto hDll = GetModuleHandleA("kernel32.dll");
+                    if (!hDll) continue;
+
+                    for (auto secIdx = 0; secIdx < ntHeader->FileHeader.NumberOfSections; secIdx++)
+                    {
+                        auto sec = getSection(ntHeader, secIdx);
+                        if (!(sec->Characteristics & IMAGE_SCN_MEM_EXECUTE)) continue;
+                        auto pFunctions = reinterpret_cast<void**>(hExecutableInstance + max(sec->PointerToRawData, sec->VirtualAddress));
+                        size_t sectionSize = max(sec->SizeOfRawData, sec->Misc.VirtualSize);
+                        size_t maxScan = min(300, sectionSize / sizeof(void*)); // Limit to 300 or section size
+
+                        for (ptrdiff_t j = 0; j < maxScan; j++)
+                        {
+                            auto pAddress = &pFunctions[j];
+                            if ((size_t)pAddress >= hExecutableInstance + sectionSize) break; // Bounds check
+                            // Reverse lookup for names (similar to second fallback)
+                            for (const auto& [funcName, replacement] : kernel32Customs)
+                            {
+                                if (*pAddress && *pAddress == GetProcAddress(hDll, funcName.c_str()))
+                                {
+                                    DWORD dwProtect[2];
+                                    VirtualProtect(pAddress, sizeof(void*), PAGE_EXECUTE_READWRITE, &dwProtect[0]);
+                                    void* original = *pAddress;
+                                    *pAddress = replacement;
+                                    data.kernel32Functions[funcName] = { (uintptr_t)pAddress, (uintptr_t)original };
+                                    VirtualProtect(pAddress, sizeof(void*), dwProtect[0], &dwProtect[1]);
+                                    matchedImports++;
+                                    break; // Patched, move to next function
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -4288,28 +4360,56 @@ void PatchCoCreateInstance(HMODULE mod, ModuleIATData& data)
             std::transform(dllname.begin(), dllname.end(), dllname.begin(), [](char c) { return ::tolower(c); });
             if (dllname == "ole32.dll")
             {
-                PIMAGE_THUNK_DATA thunk = (PIMAGE_THUNK_DATA)(hExecutableInstance + (pImports + i)->OriginalFirstThunk);
-                size_t* iat = (size_t*)(hExecutableInstance + (pImports + i)->FirstThunk);
-                size_t j = 0;
-                while (thunk->u1.Function)
+                // Try to use OriginalFirstThunk if available (unbound executables)
+                if ((pImports + i)->OriginalFirstThunk != 0)
                 {
-                    if ((thunk->u1.Ordinal & IMAGE_ORDINAL_FLAG) == 0)
+                    PIMAGE_THUNK_DATA thunk = (PIMAGE_THUNK_DATA)(hExecutableInstance + (pImports + i)->OriginalFirstThunk);
+                    size_t* iat = (size_t*)(hExecutableInstance + (pImports + i)->FirstThunk);
+                    size_t j = 0;
+                    while (thunk && thunk->u1.Function && (size_t)&iat[j] < hExecutableInstance_end)
                     {
-                        auto importName = (PIMAGE_IMPORT_BY_NAME)(hExecutableInstance + thunk->u1.AddressOfData);
-                        std::string funcName = importName->Name;
-                        auto it = ole32Customs.find(funcName);
-                        if (it != ole32Customs.end())
+                        if ((thunk->u1.Ordinal & IMAGE_ORDINAL_FLAG) == 0)
                         {
-                            DWORD dwProtect[2];
-                            VirtualProtect(&iat[j], sizeof(size_t), PAGE_EXECUTE_READWRITE, &dwProtect[0]);
-                            size_t original = iat[j];
-                            iat[j] = (size_t)it->second;
-                            data.ole32Functions[funcName] = { (size_t)&iat[j], original };
-                            VirtualProtect(&iat[j], sizeof(size_t), dwProtect[0], &dwProtect[1]);
+                            auto importName = (PIMAGE_IMPORT_BY_NAME)(hExecutableInstance + thunk->u1.AddressOfData);
+                            if ((size_t)importName < hExecutableInstance_end)
+                            {
+                                std::string funcName = importName->Name;
+                                auto it = ole32Customs.find(funcName);
+                                if (it != ole32Customs.end())
+                                {
+                                    DWORD dwProtect[2];
+                                    VirtualProtect(&iat[j], sizeof(size_t), PAGE_EXECUTE_READWRITE, &dwProtect[0]);
+                                    size_t original = iat[j];
+                                    iat[j] = (size_t)it->second;
+                                    data.ole32Functions[funcName] = { (size_t)&iat[j], original };
+                                    VirtualProtect(&iat[j], sizeof(size_t), dwProtect[0], &dwProtect[1]);
+                                }
+                            }
+                        }
+                        j++;
+                        thunk++;
+                    }
+                }
+                else if ((pImports + i)->FirstThunk != 0) // Fallback to FirstThunk for bound executables (where OriginalFirstThunk is null)
+                {
+                    auto pFunctions = reinterpret_cast<void**>(hExecutableInstance + (pImports + i)->FirstThunk);
+                    for (ptrdiff_t j = 0; pFunctions[j] != nullptr && (size_t)&pFunctions[j] < hExecutableInstance_end; j++)
+                    {
+                        auto pAddress = &pFunctions[j];
+                        for (const auto& [funcName, replacement] : ole32Customs)
+                        {
+                            if (*pAddress && *pAddress == (void*)GetProcAddress(GetModuleHandleA("ole32.dll"), funcName.c_str()))
+                            {
+                                DWORD dwProtect[2];
+                                VirtualProtect(pAddress, sizeof(void*), PAGE_EXECUTE_READWRITE, &dwProtect[0]);
+                                void* original = *pAddress;
+                                *pAddress = replacement;
+                                data.ole32Functions[funcName] = { (uintptr_t)pAddress, (uintptr_t)original };
+                                VirtualProtect(pAddress, sizeof(void*), dwProtect[0], &dwProtect[1]);
+                                break;
+                            }
                         }
                     }
-                    j++;
-                    thunk++;
                 }
             }
         }
@@ -4351,28 +4451,57 @@ void Patchvccorlib(HMODULE mod, ModuleIATData& data)
             {
                 auto hHandle = GetModuleHandleA(szName);
                 if (!hHandle) return;
-                PIMAGE_THUNK_DATA thunk = (PIMAGE_THUNK_DATA)(hExecutableInstance + (pImports + i)->OriginalFirstThunk);
-                size_t* iat = (size_t*)(hExecutableInstance + (pImports + i)->FirstThunk);
-                size_t j = 0;
-                while (thunk->u1.Function)
+                // Try to use OriginalFirstThunk if available (unbound executables)
+                if ((pImports + i)->OriginalFirstThunk != 0)
                 {
-                    if ((thunk->u1.Ordinal & IMAGE_ORDINAL_FLAG) == 0)
+                    PIMAGE_THUNK_DATA thunk = (PIMAGE_THUNK_DATA)(hExecutableInstance + (pImports + i)->OriginalFirstThunk);
+                    size_t* iat = (size_t*)(hExecutableInstance + (pImports + i)->FirstThunk);
+                    size_t j = 0;
+                    while (thunk->u1.Function && (size_t)&iat[j] < hExecutableInstance_end)
                     {
-                        auto importName = (PIMAGE_IMPORT_BY_NAME)(hExecutableInstance + thunk->u1.AddressOfData);
-                        std::string funcName = importName->Name;
-                        auto it = vccorlibCustoms.find(funcName);
-                        if (it != vccorlibCustoms.end())
+                        if ((thunk->u1.Ordinal & IMAGE_ORDINAL_FLAG) == 0)
                         {
-                            DWORD dwProtect[2];
-                            VirtualProtect(&iat[j], sizeof(size_t), PAGE_EXECUTE_READWRITE, &dwProtect[0]);
-                            size_t original = iat[j];
-                            iat[j] = (size_t)it->second;
-                            data.vccorlibFunctions[funcName] = { (size_t)&iat[j], original };
-                            VirtualProtect(&iat[j], sizeof(size_t), dwProtect[0], &dwProtect[1]);
+                            auto importName = (PIMAGE_IMPORT_BY_NAME)(hExecutableInstance + thunk->u1.AddressOfData);
+                            if ((size_t)importName < hExecutableInstance_end)
+                            {
+                                std::string funcName = importName->Name;
+                                auto it = vccorlibCustoms.find(funcName);
+                                if (it != vccorlibCustoms.end())
+                                {
+                                    DWORD dwProtect[2];
+                                    VirtualProtect(&iat[j], sizeof(size_t), PAGE_EXECUTE_READWRITE, &dwProtect[0]);
+                                    size_t original = iat[j];
+                                    iat[j] = (size_t)it->second;
+                                    data.vccorlibFunctions[funcName] = { (size_t)&iat[j], original };
+                                    VirtualProtect(&iat[j], sizeof(size_t), dwProtect[0], &dwProtect[1]);
+                                }
+                            }
+                        }
+                        j++;
+                        thunk++;
+                    }
+                }
+                // Fallback to FirstThunk for bound executables (where OriginalFirstThunk is null)
+                else if ((pImports + i)->FirstThunk != 0)
+                {
+                    auto pFunctions = reinterpret_cast<void**>(hExecutableInstance + (pImports + i)->FirstThunk);
+                    for (ptrdiff_t j = 0; pFunctions[j] != nullptr && (size_t)&pFunctions[j] < hExecutableInstance_end; j++)
+                    {
+                        auto pAddress = &pFunctions[j];
+                        for (const auto& [funcName, replacement] : vccorlibCustoms)
+                        {
+                            if (*pAddress && *pAddress == (void*)GetProcAddress(hHandle, funcName.c_str()))
+                            {
+                                DWORD dwProtect[2];
+                                VirtualProtect(pAddress, sizeof(void*), PAGE_EXECUTE_READWRITE, &dwProtect[0]);
+                                void* original = *pAddress;
+                                *pAddress = replacement;
+                                data.vccorlibFunctions[funcName] = { (uintptr_t)pAddress, (uintptr_t)original };
+                                VirtualProtect(pAddress, sizeof(void*), dwProtect[0], &dwProtect[1]);
+                                break; // Found and patched, move to next function
+                            }
                         }
                     }
-                    j++;
-                    thunk++;
                 }
             }
         }
@@ -4395,6 +4524,361 @@ void PatchOrdinals(HMODULE mod)
             importDesc++;
         }
     }
+
+    // Lambda to handle ordinal patching (keeps enums and switches intact)
+    auto patchOrdinal = [&](void** p, WORD ordinal)
+    {
+        DWORD Protect;
+        VirtualProtect(p, 4, PAGE_EXECUTE_READWRITE, &Protect);
+
+        if (iequals(szSelfName, L"dsound.dll"))
+        {
+            const enum edsound
+            {
+                DirectSoundCaptureCreate = 6,
+                DirectSoundCaptureCreate8 = 12,
+                DirectSoundCaptureEnumerateA = 7,
+                DirectSoundCaptureEnumerateW = 8,
+                DirectSoundCreate = 1,
+                DirectSoundCreate8 = 11,
+                DirectSoundEnumerateA = 2,
+                DirectSoundEnumerateW = 3,
+                DirectSoundFullDuplexCreate = 10,
+                GetDeviceID = 9
+            };
+            switch (ordinal)
+            {
+                case edsound::DirectSoundCaptureCreate: *p = _DirectSoundCaptureCreate; break;
+                case edsound::DirectSoundCaptureCreate8: *p = _DirectSoundCaptureCreate8; break;
+                case edsound::DirectSoundCaptureEnumerateA: *p = _DirectSoundCaptureEnumerateA; break;
+                case edsound::DirectSoundCaptureEnumerateW: *p = _DirectSoundCaptureEnumerateW; break;
+                case edsound::DirectSoundCreate: *p = _DirectSoundCreate; break;
+                case edsound::DirectSoundCreate8: *p = _DirectSoundCreate8; break;
+                case edsound::DirectSoundEnumerateA: *p = _DirectSoundEnumerateA; break;
+                case edsound::DirectSoundEnumerateW: *p = _DirectSoundEnumerateW; break;
+                case edsound::DirectSoundFullDuplexCreate: *p = _DirectSoundFullDuplexCreate; break;
+                case edsound::GetDeviceID: *p = _GetDeviceID; break;
+                default: break;
+            }
+        }
+        else if (iequals(szSelfName, L"dinput8.dll"))
+        {
+            if (ordinal == 1) *p = _DirectInput8Create;
+        }
+        else if (iequals(szSelfName, L"winhttp.dll"))
+        {
+            const enum ewinhttp
+            {
+                Private1 = 4,
+                SvchostPushServiceGlobals = 5,
+                WinHttpAddRequestHeaders = 6,
+                WinHttpAddRequestHeadersEx = 7,
+                WinHttpAutoProxySvcMain = 8,
+                WinHttpCheckPlatform = 9,
+                WinHttpCloseHandle = 10,
+                WinHttpConnect = 11,
+                WinHttpConnectionDeletePolicyEntries = 12,
+                WinHttpConnectionDeleteProxyInfo = 13,
+                WinHttpConnectionFreeNameList = 14,
+                WinHttpConnectionFreeProxyInfo = 15,
+                WinHttpConnectionFreeProxyList = 16,
+                WinHttpConnectionGetNameList = 17,
+                WinHttpConnectionGetProxyInfo = 18,
+                WinHttpConnectionGetProxyList = 19,
+                WinHttpConnectionOnlyConvert = 20,
+                WinHttpConnectionOnlyReceive = 21,
+                WinHttpConnectionOnlySend = 22,
+                WinHttpConnectionSetPolicyEntries = 23,
+                WinHttpConnectionSetProxyInfo = 24,
+                WinHttpConnectionUpdateIfIndexTable = 25,
+                WinHttpCrackUrl = 26,
+                WinHttpCreateProxyResolver = 27,
+                WinHttpCreateUrl = 28,
+                WinHttpDetectAutoProxyConfigUrl = 29,
+                WinHttpFreeProxyResult = 30,
+                WinHttpFreeProxyResultEx = 31,
+                WinHttpFreeProxySettings = 32,
+                WinHttpFreeProxySettingsEx = 33,
+                WinHttpFreeQueryConnectionGroupResult = 34,
+                WinHttpGetDefaultProxyConfiguration = 35,
+                WinHttpGetIEProxyConfigForCurrentUser = 36,
+                WinHttpGetProxyForUrl = 37,
+                WinHttpGetProxyForUrlEx = 38,
+                WinHttpGetProxyForUrlEx2 = 39,
+                WinHttpGetProxyForUrlHvsi = 40,
+                WinHttpGetProxyResult = 41,
+                WinHttpGetProxyResultEx = 42,
+                WinHttpGetProxySettingsEx = 43,
+                WinHttpGetProxySettingsResultEx = 44,
+                WinHttpGetProxySettingsVersion = 45,
+                WinHttpGetTunnelSocket = 46,
+                WinHttpOpen = 47,
+                WinHttpOpenRequest = 48,
+                WinHttpPacJsWorkerMain = 49,
+                WinHttpProbeConnectivity = 50,
+                WinHttpQueryAuthSchemes = 51,
+                WinHttpQueryConnectionGroup = 52,
+                WinHttpQueryDataAvailable = 53,
+                WinHttpQueryHeaders = 54,
+                WinHttpQueryHeadersEx = 55,
+                WinHttpQueryOption = 56,
+                WinHttpReadData = 57,
+                WinHttpReadDataEx = 58,
+                WinHttpReadProxySettings = 59,
+                WinHttpReadProxySettingsHvsi = 60,
+                WinHttpReceiveResponse = 61,
+                WinHttpRegisterProxyChangeNotification = 62,
+                WinHttpResetAutoProxy = 63,
+                WinHttpSaveProxyCredentials = 64,
+                WinHttpSendRequest = 65,
+                WinHttpSetCredentials = 66,
+                WinHttpSetDefaultProxyConfiguration = 67,
+                WinHttpSetOption = 68,
+                WinHttpSetProxySettingsPerUser = 69,
+                WinHttpSetSecureLegacyServersAppCompat = 1,
+                WinHttpSetStatusCallback = 70,
+                WinHttpSetTimeouts = 71,
+                WinHttpTimeFromSystemTime = 72,
+                WinHttpTimeToSystemTime = 73,
+                WinHttpUnregisterProxyChangeNotification = 74,
+                WinHttpWebSocketClose = 75,
+                WinHttpWebSocketCompleteUpgrade = 76,
+                WinHttpWebSocketQueryCloseStatus = 77,
+                WinHttpWebSocketReceive = 78,
+                WinHttpWebSocketSend = 79,
+                WinHttpWebSocketShutdown = 80,
+                WinHttpWriteData = 81,
+                WinHttpWriteProxySettings = 82
+            };
+            switch (ordinal)
+            {
+                case ewinhttp::Private1: *p = _Private1; break;
+                case ewinhttp::SvchostPushServiceGlobals: *p = _SvchostPushServiceGlobals; break;
+                case ewinhttp::WinHttpAddRequestHeaders: *p = _WinHttpAddRequestHeaders; break;
+                case ewinhttp::WinHttpAddRequestHeadersEx: *p = _WinHttpAddRequestHeadersEx; break;
+                case ewinhttp::WinHttpAutoProxySvcMain: *p = _WinHttpAutoProxySvcMain; break;
+                case ewinhttp::WinHttpCheckPlatform: *p = _WinHttpCheckPlatform; break;
+                case ewinhttp::WinHttpCloseHandle: *p = _WinHttpCloseHandle; break;
+                case ewinhttp::WinHttpConnect: *p = _WinHttpConnect; break;
+                case ewinhttp::WinHttpConnectionDeletePolicyEntries: *p = _WinHttpConnectionDeletePolicyEntries; break;
+                case ewinhttp::WinHttpConnectionDeleteProxyInfo: *p = _WinHttpConnectionDeleteProxyInfo; break;
+                case ewinhttp::WinHttpConnectionFreeNameList: *p = _WinHttpConnectionFreeNameList; break;
+                case ewinhttp::WinHttpConnectionFreeProxyInfo: *p = _WinHttpConnectionFreeProxyInfo; break;
+                case ewinhttp::WinHttpConnectionFreeProxyList: *p = _WinHttpConnectionFreeProxyList; break;
+                case ewinhttp::WinHttpConnectionGetNameList: *p = _WinHttpConnectionGetNameList; break;
+                case ewinhttp::WinHttpConnectionGetProxyInfo: *p = _WinHttpConnectionGetProxyInfo; break;
+                case ewinhttp::WinHttpConnectionGetProxyList: *p = _WinHttpConnectionGetProxyList; break;
+                case ewinhttp::WinHttpConnectionOnlyConvert: *p = _WinHttpConnectionOnlyConvert; break;
+                case ewinhttp::WinHttpConnectionOnlyReceive: *p = _WinHttpConnectionOnlyReceive; break;
+                case ewinhttp::WinHttpConnectionOnlySend: *p = _WinHttpConnectionOnlySend; break;
+                case ewinhttp::WinHttpConnectionSetPolicyEntries: *p = _WinHttpConnectionSetPolicyEntries; break;
+                case ewinhttp::WinHttpConnectionSetProxyInfo: *p = _WinHttpConnectionSetProxyInfo; break;
+                case ewinhttp::WinHttpConnectionUpdateIfIndexTable: *p = _WinHttpConnectionUpdateIfIndexTable; break;
+                case ewinhttp::WinHttpCrackUrl: *p = _WinHttpCrackUrl; break;
+                case ewinhttp::WinHttpCreateProxyResolver: *p = _WinHttpCreateProxyResolver; break;
+                case ewinhttp::WinHttpCreateUrl: *p = _WinHttpCreateUrl; break;
+                case ewinhttp::WinHttpDetectAutoProxyConfigUrl: *p = _WinHttpDetectAutoProxyConfigUrl; break;
+                case ewinhttp::WinHttpFreeProxyResult: *p = _WinHttpFreeProxyResult; break;
+                case ewinhttp::WinHttpFreeProxyResultEx: *p = _WinHttpFreeProxyResultEx; break;
+                case ewinhttp::WinHttpFreeProxySettings: *p = _WinHttpFreeProxySettings; break;
+                case ewinhttp::WinHttpFreeProxySettingsEx: *p = _WinHttpFreeProxySettingsEx; break;
+                case ewinhttp::WinHttpFreeQueryConnectionGroupResult: *p = _WinHttpFreeQueryConnectionGroupResult; break;
+                case ewinhttp::WinHttpGetDefaultProxyConfiguration: *p = _WinHttpGetDefaultProxyConfiguration; break;
+                case ewinhttp::WinHttpGetIEProxyConfigForCurrentUser: *p = _WinHttpGetIEProxyConfigForCurrentUser; break;
+                case ewinhttp::WinHttpGetProxyForUrl: *p = _WinHttpGetProxyForUrl; break;
+                case ewinhttp::WinHttpGetProxyForUrlEx: *p = _WinHttpGetProxyForUrlEx; break;
+                case ewinhttp::WinHttpGetProxyForUrlEx2: *p = _WinHttpGetProxyForUrlEx2; break;
+                case ewinhttp::WinHttpGetProxyForUrlHvsi: *p = _WinHttpGetProxyForUrlHvsi; break;
+                case ewinhttp::WinHttpGetProxyResult: *p = _WinHttpGetProxyResult; break;
+                case ewinhttp::WinHttpGetProxyResultEx: *p = _WinHttpGetProxyResultEx; break;
+                case ewinhttp::WinHttpGetProxySettingsEx: *p = _WinHttpGetProxySettingsEx; break;
+                case ewinhttp::WinHttpGetProxySettingsResultEx: *p = _WinHttpGetProxySettingsResultEx; break;
+                case ewinhttp::WinHttpGetProxySettingsVersion: *p = _WinHttpGetProxySettingsVersion; break;
+                case ewinhttp::WinHttpGetTunnelSocket: *p = _WinHttpGetTunnelSocket; break;
+                case ewinhttp::WinHttpOpen: *p = _WinHttpOpen; break;
+                case ewinhttp::WinHttpOpenRequest: *p = _WinHttpOpenRequest; break;
+                case ewinhttp::WinHttpPacJsWorkerMain: *p = _WinHttpPacJsWorkerMain; break;
+                case ewinhttp::WinHttpProbeConnectivity: *p = _WinHttpProbeConnectivity; break;
+                case ewinhttp::WinHttpQueryAuthSchemes: *p = _WinHttpQueryAuthSchemes; break;
+                case ewinhttp::WinHttpQueryConnectionGroup: *p = _WinHttpQueryConnectionGroup; break;
+                case ewinhttp::WinHttpQueryDataAvailable: *p = _WinHttpQueryDataAvailable; break;
+                case ewinhttp::WinHttpQueryHeaders: *p = _WinHttpQueryHeaders; break;
+                case ewinhttp::WinHttpQueryHeadersEx: *p = _WinHttpQueryHeadersEx; break;
+                case ewinhttp::WinHttpQueryOption: *p = _WinHttpQueryOption; break;
+                case ewinhttp::WinHttpReadData: *p = _WinHttpReadData; break;
+                case ewinhttp::WinHttpReadDataEx: *p = _WinHttpReadDataEx; break;
+                case ewinhttp::WinHttpReadProxySettings: *p = _WinHttpReadProxySettings; break;
+                case ewinhttp::WinHttpReadProxySettingsHvsi: *p = _WinHttpReadProxySettingsHvsi; break;
+                case ewinhttp::WinHttpReceiveResponse: *p = _WinHttpReceiveResponse; break;
+                case ewinhttp::WinHttpRegisterProxyChangeNotification: *p = _WinHttpRegisterProxyChangeNotification; break;
+                case ewinhttp::WinHttpResetAutoProxy: *p = _WinHttpResetAutoProxy; break;
+                case ewinhttp::WinHttpSaveProxyCredentials: *p = _WinHttpSaveProxyCredentials; break;
+                case ewinhttp::WinHttpSendRequest: *p = _WinHttpSendRequest; break;
+                case ewinhttp::WinHttpSetCredentials: *p = _WinHttpSetCredentials; break;
+                case ewinhttp::WinHttpSetDefaultProxyConfiguration: *p = _WinHttpSetDefaultProxyConfiguration; break;
+                case ewinhttp::WinHttpSetOption: *p = _WinHttpSetOption; break;
+                case ewinhttp::WinHttpSetProxySettingsPerUser: *p = _WinHttpSetProxySettingsPerUser; break;
+                case ewinhttp::WinHttpSetSecureLegacyServersAppCompat: *p = _WinHttpSetSecureLegacyServersAppCompat; break;
+                case ewinhttp::WinHttpSetStatusCallback: *p = _WinHttpSetStatusCallback; break;
+                case ewinhttp::WinHttpSetTimeouts: *p = _WinHttpSetTimeouts; break;
+                case ewinhttp::WinHttpTimeFromSystemTime: *p = _WinHttpTimeFromSystemTime; break;
+                case ewinhttp::WinHttpTimeToSystemTime: *p = _WinHttpTimeToSystemTime; break;
+                case ewinhttp::WinHttpUnregisterProxyChangeNotification: *p = _WinHttpUnregisterProxyChangeNotification; break;
+                case ewinhttp::WinHttpWebSocketClose: *p = _WinHttpWebSocketClose; break;
+                case ewinhttp::WinHttpWebSocketCompleteUpgrade: *p = _WinHttpWebSocketCompleteUpgrade; break;
+                case ewinhttp::WinHttpWebSocketQueryCloseStatus: *p = _WinHttpWebSocketQueryCloseStatus; break;
+                case ewinhttp::WinHttpWebSocketReceive: *p = _WinHttpWebSocketReceive; break;
+                case ewinhttp::WinHttpWebSocketSend: *p = _WinHttpWebSocketSend; break;
+                case ewinhttp::WinHttpWebSocketShutdown: *p = _WinHttpWebSocketShutdown; break;
+                case ewinhttp::WinHttpWriteData: *p = _WinHttpWriteData; break;
+                case ewinhttp::WinHttpWriteProxySettings: *p = _WinHttpWriteProxySettings; break;
+                default: break;
+            }
+        }
+        else if (iequals(szSelfName, L"xinput1_1.dll") || iequals(szSelfName, L"xinput1_2.dll"))
+        {
+            const enum exinput1_1
+            {
+                DllMain = 1,
+                XInputEnable = 2,
+                XInputGetCapabilities = 3,
+                XInputGetDSoundAudioDeviceGuids = 4,
+                XInputGetState = 5,
+                XInputSetState = 6,
+            };
+            switch (ordinal)
+            {
+                case exinput1_1::DllMain: *p = _DllMain; break;
+                case exinput1_1::XInputEnable: *p = _XInputEnable; break;
+                case exinput1_1::XInputGetCapabilities: *p = _XInputGetCapabilities; break;
+                case exinput1_1::XInputGetDSoundAudioDeviceGuids: *p = _XInputGetDSoundAudioDeviceGuids; break;
+                case exinput1_1::XInputGetState: *p = _XInputGetState; break;
+                case exinput1_1::XInputSetState: *p = _XInputSetState; break;
+                default: break;
+            }
+        }
+        else if (iequals(szSelfName, L"xinput1_3.dll"))
+        {
+            const enum exinput1_3
+            {
+                DllMain = 1,
+                XInputGetState = 2,
+                XInputSetState = 3,
+                XInputGetCapabilities = 4,
+                XInputEnable = 5,
+                XInputGetDSoundAudioDeviceGuids = 6,
+                XInputGetBatteryInformation = 7,
+                XInputGetKeystroke = 8,
+                XInputGetStateEx = 100,
+                XInputWaitForGuideButton = 101,
+                XInputCancelGuideButtonWait = 102,
+                XInputPowerOffController = 103,
+            };
+            switch (ordinal)
+            {
+                case exinput1_3::DllMain: *p = _DllMain; break;
+                case exinput1_3::XInputGetState: *p = _XInputGetState; break;
+                case exinput1_3::XInputSetState: *p = _XInputSetState; break;
+                case exinput1_3::XInputGetCapabilities: *p = _XInputGetCapabilities; break;
+                case exinput1_3::XInputEnable: *p = _XInputEnable; break;
+                case exinput1_3::XInputGetDSoundAudioDeviceGuids: *p = _XInputGetDSoundAudioDeviceGuids; break;
+                case exinput1_3::XInputGetBatteryInformation: *p = _XInputGetBatteryInformation; break;
+                case exinput1_3::XInputGetKeystroke: *p = _XInputGetKeystroke; break;
+                case exinput1_3::XInputGetStateEx: *p = _XInputGetStateEx; break;
+                case exinput1_3::XInputWaitForGuideButton: *p = _XInputWaitForGuideButton; break;
+                case exinput1_3::XInputCancelGuideButtonWait: *p = _XInputCancelGuideButtonWait; break;
+                case exinput1_3::XInputPowerOffController: *p = _XInputPowerOffController; break;
+                default: break;
+            }
+        }
+        else if (iequals(szSelfName, L"xinput1_4.dll"))
+        {
+            const enum exinput1_4
+            {
+                DllMain = 1,
+                XInputGetState = 2,
+                XInputSetState = 3,
+                XInputGetCapabilities = 4,
+                XInputEnable = 5,
+                XInputGetBatteryInformation = 7,
+                XInputGetKeystroke = 8,
+                XInputGetAudioDeviceIds = 10,
+                XInputGetStateEx = 100,
+                XInputWaitForGuideButton = 101,
+                XInputCancelGuideButtonWait = 102,
+                XInputPowerOffController = 103,
+                XInputGetBaseBusInformation = 104,
+                XInputGetCapabilitiesEx = 108,
+            };
+            switch (ordinal)
+            {
+                case exinput1_4::DllMain: *p = _DllMain; break;
+                case exinput1_4::XInputGetState: *p = _XInputGetState; break;
+                case exinput1_4::XInputSetState: *p = _XInputSetState; break;
+                case exinput1_4::XInputGetCapabilities: *p = _XInputGetCapabilities; break;
+                case exinput1_4::XInputEnable: *p = _XInputEnable; break;
+                case exinput1_4::XInputGetBatteryInformation: *p = _XInputGetBatteryInformation; break;
+                case exinput1_4::XInputGetKeystroke: *p = _XInputGetKeystroke; break;
+                case exinput1_4::XInputGetAudioDeviceIds: *p = _XInputGetAudioDeviceIds; break;
+                case exinput1_4::XInputGetStateEx: *p = _XInputGetStateEx; break;
+                case exinput1_4::XInputWaitForGuideButton: *p = _XInputWaitForGuideButton; break;
+                case exinput1_4::XInputCancelGuideButtonWait: *p = _XInputCancelGuideButtonWait; break;
+                case exinput1_4::XInputPowerOffController: *p = _XInputPowerOffController; break;
+                case exinput1_4::XInputGetBaseBusInformation: *p = _XInputGetBaseBusInformation; break;
+                case exinput1_4::XInputGetCapabilitiesEx: *p = _XInputGetCapabilitiesEx; break;
+                default: break;
+            }
+        }
+        else if (iequals(szSelfName, L"xinput9_1_0.dll"))
+        {
+            const enum exinput9_1_0
+            {
+                DllMain = 1,
+                XInputGetCapabilities = 2,
+                XInputGetDSoundAudioDeviceGuids = 3,
+                XInputGetState = 4,
+                XInputSetState = 5,
+            };
+            switch (ordinal)
+            {
+                case exinput9_1_0::DllMain: *p = _DllMain; break;
+                case exinput9_1_0::XInputGetCapabilities: *p = _XInputGetCapabilities; break;
+                case exinput9_1_0::XInputGetDSoundAudioDeviceGuids: *p = _XInputGetDSoundAudioDeviceGuids; break;
+                case exinput9_1_0::XInputGetState: *p = _XInputGetState; break;
+                case exinput9_1_0::XInputSetState: *p = _XInputSetState; break;
+                default: break;
+            }
+        }
+        else if (iequals(szSelfName, L"xinputuap.dll"))
+        {
+            const enum exinputuap
+            {
+                DllMain = 1,
+                XInputEnable = 2,
+                XInputGetAudioDeviceIds = 3,
+                XInputGetBatteryInformation = 4,
+                XInputGetCapabilities = 5,
+                XInputGetKeystroke = 6,
+                XInputGetState = 7,
+                XInputSetState = 8,
+            };
+            switch (ordinal)
+            {
+                case exinputuap::DllMain: *p = _DllMain; break;
+                case exinputuap::XInputEnable: *p = _XInputEnable; break;
+                case exinputuap::XInputGetAudioDeviceIds: *p = _XInputGetAudioDeviceIds; break;
+                case exinputuap::XInputGetBatteryInformation: *p = _XInputGetBatteryInformation; break;
+                case exinputuap::XInputGetCapabilities: *p = _XInputGetCapabilities; break;
+                case exinputuap::XInputGetKeystroke: *p = _XInputGetKeystroke; break;
+                case exinputuap::XInputGetState: *p = _XInputGetState; break;
+                case exinputuap::XInputSetState: *p = _XInputSetState; break;
+                default: break;
+            }
+        }
+
+        VirtualProtect(p, 4, Protect, &Protect);
+    };
+
     for (size_t i = 0; i < nNumImports; i++)
     {
         auto getSectionEnd = [](IMAGE_NT_HEADERS* ntHeader, size_t inst) -> size_t
@@ -4409,655 +4893,61 @@ void PatchOrdinals(HMODULE mod)
         {
             if (iequals(szSelfName, (to_wstring((const char*)(hInstance + (pImports + i)->Name)))))
             {
-                PIMAGE_THUNK_DATA thunk = (PIMAGE_THUNK_DATA)(hInstance + (pImports + i)->OriginalFirstThunk);
-                size_t j = 0;
-                while (thunk->u1.Function)
+                // Try to use OriginalFirstThunk if available (unbound executables)
+                if ((pImports + i)->OriginalFirstThunk != 0)
                 {
-                    if (thunk->u1.Ordinal & IMAGE_ORDINAL_FLAG)
+                    PIMAGE_THUNK_DATA thunk = (PIMAGE_THUNK_DATA)(hInstance + (pImports + i)->OriginalFirstThunk);
+                    size_t j = 0;
+                    while (thunk->u1.Function)
                     {
-                        PIMAGE_IMPORT_BY_NAME import = (PIMAGE_IMPORT_BY_NAME)(hInstance + thunk->u1.AddressOfData);
-                        void** p = (void**)(hInstance + (pImports + i)->FirstThunk);
-                        if (iequals(szSelfName, L"dsound.dll"))
+                        if (thunk->u1.Ordinal & IMAGE_ORDINAL_FLAG)
                         {
-                            DWORD Protect;
-                            VirtualProtect(&p[j], 4, PAGE_EXECUTE_READWRITE, &Protect);
-                            const enum edsound
-                            {
-                                DirectSoundCaptureCreate = 6,
-                                DirectSoundCaptureCreate8 = 12,
-                                DirectSoundCaptureEnumerateA = 7,
-                                DirectSoundCaptureEnumerateW = 8,
-                                DirectSoundCreate = 1,
-                                DirectSoundCreate8 = 11,
-                                DirectSoundEnumerateA = 2,
-                                DirectSoundEnumerateW = 3,
-                                DirectSoundFullDuplexCreate = 10,
-                                GetDeviceID = 9
-                            };
-                            switch (IMAGE_ORDINAL(thunk->u1.Ordinal))
-                            {
-                                case edsound::DirectSoundCaptureCreate:
-                                    p[j] = _DirectSoundCaptureCreate;
-                                    break;
-                                case edsound::DirectSoundCaptureCreate8:
-                                    p[j] = _DirectSoundCaptureCreate8;
-                                    break;
-                                case edsound::DirectSoundCaptureEnumerateA:
-                                    p[j] = _DirectSoundCaptureEnumerateA;
-                                    break;
-                                case edsound::DirectSoundCaptureEnumerateW:
-                                    p[j] = _DirectSoundCaptureEnumerateW;
-                                    break;
-                                case edsound::DirectSoundCreate:
-                                    p[j] = _DirectSoundCreate;
-                                    break;
-                                case edsound::DirectSoundCreate8:
-                                    p[j] = _DirectSoundCreate8;
-                                    break;
-                                case edsound::DirectSoundEnumerateA:
-                                    p[j] = _DirectSoundEnumerateA;
-                                    break;
-                                case edsound::DirectSoundEnumerateW:
-                                    p[j] = _DirectSoundEnumerateW;
-                                    break;
-                                case edsound::DirectSoundFullDuplexCreate:
-                                    p[j] = _DirectSoundFullDuplexCreate;
-                                    break;
-                                case edsound::GetDeviceID:
-                                    p[j] = _GetDeviceID;
-                                    break;
-                                default:
-                                    break;
-                            }
+                            void** p = (void**)(hInstance + (pImports + i)->FirstThunk);
+                            WORD ordinal = IMAGE_ORDINAL(thunk->u1.Ordinal);
+                            patchOrdinal(&p[j], ordinal);
                         }
-                        else if (iequals(szSelfName, L"dinput8.dll"))
-                        {
-                            DWORD Protect;
-                            VirtualProtect(&p[j], 4, PAGE_EXECUTE_READWRITE, &Protect);
-                            if ((IMAGE_ORDINAL(thunk->u1.Ordinal)) == 1)
-                                p[j] = _DirectInput8Create;
-                        }
-                        else if (iequals(szSelfName, L"winhttp.dll"))
-                        {
-                            DWORD Protect;
-                            VirtualProtect(&p[j], 4, PAGE_EXECUTE_READWRITE, &Protect);
-                            const enum ewinhttp
-                            {
-                                Private1 = 4,
-                                SvchostPushServiceGlobals = 5,
-                                WinHttpAddRequestHeaders = 6,
-                                WinHttpAddRequestHeadersEx = 7,
-                                WinHttpAutoProxySvcMain = 8,
-                                WinHttpCheckPlatform = 9,
-                                WinHttpCloseHandle = 10,
-                                WinHttpConnect = 11,
-                                WinHttpConnectionDeletePolicyEntries = 12,
-                                WinHttpConnectionDeleteProxyInfo = 13,
-                                WinHttpConnectionFreeNameList = 14,
-                                WinHttpConnectionFreeProxyInfo = 15,
-                                WinHttpConnectionFreeProxyList = 16,
-                                WinHttpConnectionGetNameList = 17,
-                                WinHttpConnectionGetProxyInfo = 18,
-                                WinHttpConnectionGetProxyList = 19,
-                                WinHttpConnectionOnlyConvert = 20,
-                                WinHttpConnectionOnlyReceive = 21,
-                                WinHttpConnectionOnlySend = 22,
-                                WinHttpConnectionSetPolicyEntries = 23,
-                                WinHttpConnectionSetProxyInfo = 24,
-                                WinHttpConnectionUpdateIfIndexTable = 25,
-                                WinHttpCrackUrl = 26,
-                                WinHttpCreateProxyResolver = 27,
-                                WinHttpCreateUrl = 28,
-                                WinHttpDetectAutoProxyConfigUrl = 29,
-                                WinHttpFreeProxyResult = 30,
-                                WinHttpFreeProxyResultEx = 31,
-                                WinHttpFreeProxySettings = 32,
-                                WinHttpFreeProxySettingsEx = 33,
-                                WinHttpFreeQueryConnectionGroupResult = 34,
-                                WinHttpGetDefaultProxyConfiguration = 35,
-                                WinHttpGetIEProxyConfigForCurrentUser = 36,
-                                WinHttpGetProxyForUrl = 37,
-                                WinHttpGetProxyForUrlEx = 38,
-                                WinHttpGetProxyForUrlEx2 = 39,
-                                WinHttpGetProxyForUrlHvsi = 40,
-                                WinHttpGetProxyResult = 41,
-                                WinHttpGetProxyResultEx = 42,
-                                WinHttpGetProxySettingsEx = 43,
-                                WinHttpGetProxySettingsResultEx = 44,
-                                WinHttpGetProxySettingsVersion = 45,
-                                WinHttpGetTunnelSocket = 46,
-                                WinHttpOpen = 47,
-                                WinHttpOpenRequest = 48,
-                                WinHttpPacJsWorkerMain = 49,
-                                WinHttpProbeConnectivity = 50,
-                                WinHttpQueryAuthSchemes = 51,
-                                WinHttpQueryConnectionGroup = 52,
-                                WinHttpQueryDataAvailable = 53,
-                                WinHttpQueryHeaders = 54,
-                                WinHttpQueryHeadersEx = 55,
-                                WinHttpQueryOption = 56,
-                                WinHttpReadData = 57,
-                                WinHttpReadDataEx = 58,
-                                WinHttpReadProxySettings = 59,
-                                WinHttpReadProxySettingsHvsi = 60,
-                                WinHttpReceiveResponse = 61,
-                                WinHttpRegisterProxyChangeNotification = 62,
-                                WinHttpResetAutoProxy = 63,
-                                WinHttpSaveProxyCredentials = 64,
-                                WinHttpSendRequest = 65,
-                                WinHttpSetCredentials = 66,
-                                WinHttpSetDefaultProxyConfiguration = 67,
-                                WinHttpSetOption = 68,
-                                WinHttpSetProxySettingsPerUser = 69,
-                                WinHttpSetSecureLegacyServersAppCompat = 1,
-                                WinHttpSetStatusCallback = 70,
-                                WinHttpSetTimeouts = 71,
-                                WinHttpTimeFromSystemTime = 72,
-                                WinHttpTimeToSystemTime = 73,
-                                WinHttpUnregisterProxyChangeNotification = 74,
-                                WinHttpWebSocketClose = 75,
-                                WinHttpWebSocketCompleteUpgrade = 76,
-                                WinHttpWebSocketQueryCloseStatus = 77,
-                                WinHttpWebSocketReceive = 78,
-                                WinHttpWebSocketSend = 79,
-                                WinHttpWebSocketShutdown = 80,
-                                WinHttpWriteData = 81,
-                                WinHttpWriteProxySettings = 82
-                            };
-                            switch (IMAGE_ORDINAL(thunk->u1.Ordinal))
-                            {
-                                case ewinhttp::Private1:
-                                    p[j] = _Private1;
-                                    break;
-                                case ewinhttp::SvchostPushServiceGlobals:
-                                    p[j] = _SvchostPushServiceGlobals;
-                                    break;
-                                case ewinhttp::WinHttpAddRequestHeaders:
-                                    p[j] = _WinHttpAddRequestHeaders;
-                                    break;
-                                case ewinhttp::WinHttpAddRequestHeadersEx:
-                                    p[j] = _WinHttpAddRequestHeadersEx;
-                                    break;
-                                case ewinhttp::WinHttpAutoProxySvcMain:
-                                    p[j] = _WinHttpAutoProxySvcMain;
-                                    break;
-                                case ewinhttp::WinHttpCheckPlatform:
-                                    p[j] = _WinHttpCheckPlatform;
-                                    break;
-                                case ewinhttp::WinHttpCloseHandle:
-                                    p[j] = _WinHttpCloseHandle;
-                                    break;
-                                case ewinhttp::WinHttpConnect:
-                                    p[j] = _WinHttpConnect;
-                                    break;
-                                case ewinhttp::WinHttpConnectionDeletePolicyEntries:
-                                    p[j] = _WinHttpConnectionDeletePolicyEntries;
-                                    break;
-                                case ewinhttp::WinHttpConnectionDeleteProxyInfo:
-                                    p[j] = _WinHttpConnectionDeleteProxyInfo;
-                                    break;
-                                case ewinhttp::WinHttpConnectionFreeNameList:
-                                    p[j] = _WinHttpConnectionFreeNameList;
-                                    break;
-                                case ewinhttp::WinHttpConnectionFreeProxyInfo:
-                                    p[j] = _WinHttpConnectionFreeProxyInfo;
-                                    break;
-                                case ewinhttp::WinHttpConnectionFreeProxyList:
-                                    p[j] = _WinHttpConnectionFreeProxyList;
-                                    break;
-                                case ewinhttp::WinHttpConnectionGetNameList:
-                                    p[j] = _WinHttpConnectionGetNameList;
-                                    break;
-                                case ewinhttp::WinHttpConnectionGetProxyInfo:
-                                    p[j] = _WinHttpConnectionGetProxyInfo;
-                                    break;
-                                case ewinhttp::WinHttpConnectionGetProxyList:
-                                    p[j] = _WinHttpConnectionGetProxyList;
-                                    break;
-                                case ewinhttp::WinHttpConnectionOnlyConvert:
-                                    p[j] = _WinHttpConnectionOnlyConvert;
-                                    break;
-                                case ewinhttp::WinHttpConnectionOnlyReceive:
-                                    p[j] = _WinHttpConnectionOnlyReceive;
-                                    break;
-                                case ewinhttp::WinHttpConnectionOnlySend:
-                                    p[j] = _WinHttpConnectionOnlySend;
-                                    break;
-                                case ewinhttp::WinHttpConnectionSetPolicyEntries:
-                                    p[j] = _WinHttpConnectionSetPolicyEntries;
-                                    break;
-                                case ewinhttp::WinHttpConnectionSetProxyInfo:
-                                    p[j] = _WinHttpConnectionSetProxyInfo;
-                                    break;
-                                case ewinhttp::WinHttpConnectionUpdateIfIndexTable:
-                                    p[j] = _WinHttpConnectionUpdateIfIndexTable;
-                                    break;
-                                case ewinhttp::WinHttpCrackUrl:
-                                    p[j] = _WinHttpCrackUrl;
-                                    break;
-                                case ewinhttp::WinHttpCreateProxyResolver:
-                                    p[j] = _WinHttpCreateProxyResolver;
-                                    break;
-                                case ewinhttp::WinHttpCreateUrl:
-                                    p[j] = _WinHttpCreateUrl;
-                                    break;
-                                case ewinhttp::WinHttpDetectAutoProxyConfigUrl:
-                                    p[j] = _WinHttpDetectAutoProxyConfigUrl;
-                                    break;
-                                case ewinhttp::WinHttpFreeProxyResult:
-                                    p[j] = _WinHttpFreeProxyResult;
-                                    break;
-                                case ewinhttp::WinHttpFreeProxyResultEx:
-                                    p[j] = _WinHttpFreeProxyResultEx;
-                                    break;
-                                case ewinhttp::WinHttpFreeProxySettings:
-                                    p[j] = _WinHttpFreeProxySettings;
-                                    break;
-                                case ewinhttp::WinHttpFreeProxySettingsEx:
-                                    p[j] = _WinHttpFreeProxySettingsEx;
-                                    break;
-                                case ewinhttp::WinHttpFreeQueryConnectionGroupResult:
-                                    p[j] = _WinHttpFreeQueryConnectionGroupResult;
-                                    break;
-                                case ewinhttp::WinHttpGetDefaultProxyConfiguration:
-                                    p[j] = _WinHttpGetDefaultProxyConfiguration;
-                                    break;
-                                case ewinhttp::WinHttpGetIEProxyConfigForCurrentUser:
-                                    p[j] = _WinHttpGetIEProxyConfigForCurrentUser;
-                                    break;
-                                case ewinhttp::WinHttpGetProxyForUrl:
-                                    p[j] = _WinHttpGetProxyForUrl;
-                                    break;
-                                case ewinhttp::WinHttpGetProxyForUrlEx:
-                                    p[j] = _WinHttpGetProxyForUrlEx;
-                                    break;
-                                case ewinhttp::WinHttpGetProxyForUrlEx2:
-                                    p[j] = _WinHttpGetProxyForUrlEx2;
-                                    break;
-                                case ewinhttp::WinHttpGetProxyForUrlHvsi:
-                                    p[j] = _WinHttpGetProxyForUrlHvsi;
-                                    break;
-                                case ewinhttp::WinHttpGetProxyResult:
-                                    p[j] = _WinHttpGetProxyResult;
-                                    break;
-                                case ewinhttp::WinHttpGetProxyResultEx:
-                                    p[j] = _WinHttpGetProxyResultEx;
-                                    break;
-                                case ewinhttp::WinHttpGetProxySettingsEx:
-                                    p[j] = _WinHttpGetProxySettingsEx;
-                                    break;
-                                case ewinhttp::WinHttpGetProxySettingsResultEx:
-                                    p[j] = _WinHttpGetProxySettingsResultEx;
-                                    break;
-                                case ewinhttp::WinHttpGetProxySettingsVersion:
-                                    p[j] = _WinHttpGetProxySettingsVersion;
-                                    break;
-                                case ewinhttp::WinHttpGetTunnelSocket:
-                                    p[j] = _WinHttpGetTunnelSocket;
-                                    break;
-                                case ewinhttp::WinHttpOpen:
-                                    p[j] = _WinHttpOpen;
-                                    break;
-                                case ewinhttp::WinHttpOpenRequest:
-                                    p[j] = _WinHttpOpenRequest;
-                                    break;
-                                case ewinhttp::WinHttpPacJsWorkerMain:
-                                    p[j] = _WinHttpPacJsWorkerMain;
-                                    break;
-                                case ewinhttp::WinHttpProbeConnectivity:
-                                    p[j] = _WinHttpProbeConnectivity;
-                                    break;
-                                case ewinhttp::WinHttpQueryAuthSchemes:
-                                    p[j] = _WinHttpQueryAuthSchemes;
-                                    break;
-                                case ewinhttp::WinHttpQueryConnectionGroup:
-                                    p[j] = _WinHttpQueryConnectionGroup;
-                                    break;
-                                case ewinhttp::WinHttpQueryDataAvailable:
-                                    p[j] = _WinHttpQueryDataAvailable;
-                                    break;
-                                case ewinhttp::WinHttpQueryHeaders:
-                                    p[j] = _WinHttpQueryHeaders;
-                                    break;
-                                case ewinhttp::WinHttpQueryHeadersEx:
-                                    p[j] = _WinHttpQueryHeadersEx;
-                                    break;
-                                case ewinhttp::WinHttpQueryOption:
-                                    p[j] = _WinHttpQueryOption;
-                                    break;
-                                case ewinhttp::WinHttpReadData:
-                                    p[j] = _WinHttpReadData;
-                                    break;
-                                case ewinhttp::WinHttpReadDataEx:
-                                    p[j] = _WinHttpReadDataEx;
-                                    break;
-                                case ewinhttp::WinHttpReadProxySettings:
-                                    p[j] = _WinHttpReadProxySettings;
-                                    break;
-                                case ewinhttp::WinHttpReadProxySettingsHvsi:
-                                    p[j] = _WinHttpReadProxySettingsHvsi;
-                                    break;
-                                case ewinhttp::WinHttpReceiveResponse:
-                                    p[j] = _WinHttpReceiveResponse;
-                                    break;
-                                case ewinhttp::WinHttpRegisterProxyChangeNotification:
-                                    p[j] = _WinHttpRegisterProxyChangeNotification;
-                                    break;
-                                case ewinhttp::WinHttpResetAutoProxy:
-                                    p[j] = _WinHttpResetAutoProxy;
-                                    break;
-                                case ewinhttp::WinHttpSaveProxyCredentials:
-                                    p[j] = _WinHttpSaveProxyCredentials;
-                                    break;
-                                case ewinhttp::WinHttpSendRequest:
-                                    p[j] = _WinHttpSendRequest;
-                                    break;
-                                case ewinhttp::WinHttpSetCredentials:
-                                    p[j] = _WinHttpSetCredentials;
-                                    break;
-                                case ewinhttp::WinHttpSetDefaultProxyConfiguration:
-                                    p[j] = _WinHttpSetDefaultProxyConfiguration;
-                                    break;
-                                case ewinhttp::WinHttpSetOption:
-                                    p[j] = _WinHttpSetOption;
-                                    break;
-                                case ewinhttp::WinHttpSetProxySettingsPerUser:
-                                    p[j] = _WinHttpSetProxySettingsPerUser;
-                                    break;
-                                case ewinhttp::WinHttpSetSecureLegacyServersAppCompat:
-                                    p[j] = _WinHttpSetSecureLegacyServersAppCompat;
-                                    break;
-                                case ewinhttp::WinHttpSetStatusCallback:
-                                    p[j] = _WinHttpSetStatusCallback;
-                                    break;
-                                case ewinhttp::WinHttpSetTimeouts:
-                                    p[j] = _WinHttpSetTimeouts;
-                                    break;
-                                case ewinhttp::WinHttpTimeFromSystemTime:
-                                    p[j] = _WinHttpTimeFromSystemTime;
-                                    break;
-                                case ewinhttp::WinHttpTimeToSystemTime:
-                                    p[j] = _WinHttpTimeToSystemTime;
-                                    break;
-                                case ewinhttp::WinHttpUnregisterProxyChangeNotification:
-                                    p[j] = _WinHttpUnregisterProxyChangeNotification;
-                                    break;
-                                case ewinhttp::WinHttpWebSocketClose:
-                                    p[j] = _WinHttpWebSocketClose;
-                                    break;
-                                case ewinhttp::WinHttpWebSocketCompleteUpgrade:
-                                    p[j] = _WinHttpWebSocketCompleteUpgrade;
-                                    break;
-                                case ewinhttp::WinHttpWebSocketQueryCloseStatus:
-                                    p[j] = _WinHttpWebSocketQueryCloseStatus;
-                                    break;
-                                case ewinhttp::WinHttpWebSocketReceive:
-                                    p[j] = _WinHttpWebSocketReceive;
-                                    break;
-                                case ewinhttp::WinHttpWebSocketSend:
-                                    p[j] = _WinHttpWebSocketSend;
-                                    break;
-                                case ewinhttp::WinHttpWebSocketShutdown:
-                                    p[j] = _WinHttpWebSocketShutdown;
-                                    break;
-                                case ewinhttp::WinHttpWriteData:
-                                    p[j] = _WinHttpWriteData;
-                                    break;
-                                case ewinhttp::WinHttpWriteProxySettings:
-                                    p[j] = _WinHttpWriteProxySettings;
-                                    break;
-                                default:
-                                    break;
-                            }
-                        }
-                        else if (iequals(szSelfName, L"xinput1_1.dll") || iequals(szSelfName, L"xinput1_2.dll"))
-                        {
-                            DWORD Protect;
-                            VirtualProtect(&p[j], 4, PAGE_EXECUTE_READWRITE, &Protect);
-                            const enum exinput1_1
-                            {
-                                DllMain = 1,
-                                XInputEnable = 2,
-                                XInputGetCapabilities = 3,
-                                XInputGetDSoundAudioDeviceGuids = 4,
-                                XInputGetState = 5,
-                                XInputSetState = 6,
-                            };
-                            switch (IMAGE_ORDINAL(thunk->u1.Ordinal))
-                            {
-                                case exinput1_1::DllMain:
-                                    p[j] = _DllMain;
-                                    break;
-                                case exinput1_1::XInputEnable:
-                                    p[j] = _XInputEnable;
-                                    break;
-                                case exinput1_1::XInputGetCapabilities:
-                                    p[j] = _XInputGetCapabilities;
-                                    break;
-                                case exinput1_1::XInputGetDSoundAudioDeviceGuids:
-                                    p[j] = _XInputGetDSoundAudioDeviceGuids;
-                                    break;
-                                case exinput1_1::XInputGetState:
-                                    p[j] = _XInputGetState;
-                                    break;
-                                case exinput1_1::XInputSetState:
-                                    p[j] = _XInputSetState;
-                                    break;
-                                default:
-                                    break;
-                            }
-                        }
-                        else if (iequals(szSelfName, L"xinput1_3.dll"))
-                        {
-                            DWORD Protect;
-                            VirtualProtect(&p[j], 4, PAGE_EXECUTE_READWRITE, &Protect);
-                            const enum exinput1_3
-                            {
-                                DllMain = 1,
-                                XInputGetState = 2,
-                                XInputSetState = 3,
-                                XInputGetCapabilities = 4,
-                                XInputEnable = 5,
-                                XInputGetDSoundAudioDeviceGuids = 6,
-                                XInputGetBatteryInformation = 7,
-                                XInputGetKeystroke = 8,
-                                XInputGetStateEx = 100,
-                                XInputWaitForGuideButton = 101,
-                                XInputCancelGuideButtonWait = 102,
-                                XInputPowerOffController = 103,
-                            };
-                            switch (IMAGE_ORDINAL(thunk->u1.Ordinal))
-                            {
-                                case exinput1_3::DllMain:
-                                    p[j] = _DllMain;
-                                    break;
-                                case exinput1_3::XInputGetState:
-                                    p[j] = _XInputGetState;
-                                    break;
-                                case exinput1_3::XInputSetState:
-                                    p[j] = _XInputSetState;
-                                    break;
-                                case exinput1_3::XInputGetCapabilities:
-                                    p[j] = _XInputGetCapabilities;
-                                    break;
-                                case exinput1_3::XInputEnable:
-                                    p[j] = _XInputEnable;
-                                    break;
-                                case exinput1_3::XInputGetDSoundAudioDeviceGuids:
-                                    p[j] = _XInputGetDSoundAudioDeviceGuids;
-                                    break;
-                                case exinput1_3::XInputGetBatteryInformation:
-                                    p[j] = _XInputGetBatteryInformation;
-                                    break;
-                                case exinput1_3::XInputGetKeystroke:
-                                    p[j] = _XInputGetKeystroke;
-                                    break;
-                                case exinput1_3::XInputGetStateEx:
-                                    p[j] = _XInputGetStateEx;
-                                    break;
-                                case exinput1_3::XInputWaitForGuideButton:
-                                    p[j] = _XInputWaitForGuideButton;
-                                    break;
-                                case exinput1_3::XInputCancelGuideButtonWait:
-                                    p[j] = _XInputCancelGuideButtonWait;
-                                    break;
-                                case exinput1_3::XInputPowerOffController:
-                                    p[j] = _XInputPowerOffController;
-                                    break;
-                                default:
-                                    break;
-                            }
-                        }
-                        else if (iequals(szSelfName, L"xinput1_4.dll"))
-                        {
-                            DWORD Protect;
-                            VirtualProtect(&p[j], 4, PAGE_EXECUTE_READWRITE, &Protect);
-                            const enum exinput1_4
-                            {
-                                DllMain = 1,
-                                XInputGetState = 2,
-                                XInputSetState = 3,
-                                XInputGetCapabilities = 4,
-                                XInputEnable = 5,
-                                XInputGetBatteryInformation = 7,
-                                XInputGetKeystroke = 8,
-                                XInputGetAudioDeviceIds = 10,
-                                XInputGetStateEx = 100,
-                                XInputWaitForGuideButton = 101,
-                                XInputCancelGuideButtonWait = 102,
-                                XInputPowerOffController = 103,
-                                XInputGetBaseBusInformation = 104,
-                                XInputGetCapabilitiesEx = 108,
-                            };
-                            switch (IMAGE_ORDINAL(thunk->u1.Ordinal))
-                            {
-                                case exinput1_4::DllMain:
-                                    p[j] = _DllMain;
-                                    break;
-                                case exinput1_4::XInputGetState:
-                                    p[j] = _XInputGetState;
-                                    break;
-                                case exinput1_4::XInputSetState:
-                                    p[j] = _XInputSetState;
-                                    break;
-                                case exinput1_4::XInputGetCapabilities:
-                                    p[j] = _XInputGetCapabilities;
-                                    break;
-                                case exinput1_4::XInputEnable:
-                                    p[j] = _XInputEnable;
-                                    break;
-                                case exinput1_4::XInputGetBatteryInformation:
-                                    p[j] = _XInputGetBatteryInformation;
-                                    break;
-                                case exinput1_4::XInputGetKeystroke:
-                                    p[j] = _XInputGetKeystroke;
-                                    break;
-                                case exinput1_4::XInputGetAudioDeviceIds:
-                                    p[j] = _XInputGetAudioDeviceIds;
-                                    break;
-                                case exinput1_4::XInputGetStateEx:
-                                    p[j] = _XInputGetStateEx;
-                                    break;
-                                case exinput1_4::XInputWaitForGuideButton:
-                                    p[j] = _XInputWaitForGuideButton;
-                                    break;
-                                case exinput1_4::XInputCancelGuideButtonWait:
-                                    p[j] = _XInputCancelGuideButtonWait;
-                                    break;
-                                case exinput1_4::XInputPowerOffController:
-                                    p[j] = _XInputPowerOffController;
-                                    break;
-                                case exinput1_4::XInputGetBaseBusInformation:
-                                    p[j] = _XInputGetBaseBusInformation;
-                                    break;
-                                case exinput1_4::XInputGetCapabilitiesEx:
-                                    p[j] = _XInputGetCapabilitiesEx;
-                                    break;
-                                default:
-                                    break;
-                            }
-                        }
-                        else if (iequals(szSelfName, L"xinput9_1_0.dll"))
-                        {
-                            DWORD Protect;
-                            VirtualProtect(&p[j], 4, PAGE_EXECUTE_READWRITE, &Protect);
-                            const enum exinput9_1_0
-                            {
-                                DllMain = 1,
-                                XInputGetCapabilities = 2,
-                                XInputGetDSoundAudioDeviceGuids = 3,
-                                XInputGetState = 4,
-                                XInputSetState = 5,
-                            };
-                            switch (IMAGE_ORDINAL(thunk->u1.Ordinal))
-                            {
-                                case exinput9_1_0::DllMain:
-                                    p[j] = _DllMain;
-                                    break;
-                                case exinput9_1_0::XInputGetCapabilities:
-                                    p[j] = _XInputGetCapabilities;
-                                    break;
-                                case exinput9_1_0::XInputGetDSoundAudioDeviceGuids:
-                                    p[j] = _XInputGetDSoundAudioDeviceGuids;
-                                    break;
-                                case exinput9_1_0::XInputGetState:
-                                    p[j] = _XInputGetState;
-                                    break;
-                                case exinput9_1_0::XInputSetState:
-                                    p[j] = _XInputSetState;
-                                    break;
-                                default:
-                                    break;
-                            }
-                        }
-                        else if (iequals(szSelfName, L"xinputuap.dll"))
-                        {
-                            DWORD Protect;
-                            VirtualProtect(&p[j], 4, PAGE_EXECUTE_READWRITE, &Protect);
-                            const enum exinputuap
-                            {
-                                DllMain = 1,
-                                XInputEnable = 2,
-                                XInputGetAudioDeviceIds = 3,
-                                XInputGetBatteryInformation = 4,
-                                XInputGetCapabilities = 5,
-                                XInputGetKeystroke = 6,
-                                XInputGetState = 7,
-                                XInputSetState = 8,
-                            };
-                            switch (IMAGE_ORDINAL(thunk->u1.Ordinal))
-                            {
-                                case exinputuap::DllMain:
-                                    p[j] = _DllMain;
-                                    break;
-                                case exinputuap::XInputEnable:
-                                    p[j] = _XInputEnable;
-                                    break;
-                                case exinputuap::XInputGetAudioDeviceIds:
-                                    p[j] = _XInputGetAudioDeviceIds;
-                                    break;
-                                case exinputuap::XInputGetBatteryInformation:
-                                    p[j] = _XInputGetBatteryInformation;
-                                    break;
-                                case exinputuap::XInputGetCapabilities:
-                                    p[j] = _XInputGetCapabilities;
-                                    break;
-                                case exinputuap::XInputGetKeystroke:
-                                    p[j] = _XInputGetKeystroke;
-                                    break;
-                                case exinputuap::XInputGetState:
-                                    p[j] = _XInputGetState;
-                                    break;
-                                case exinputuap::XInputSetState:
-                                    p[j] = _XInputSetState;
-                                    break;
-                                default:
-                                    break;
-                            }
-                        }
-                        ++j;
+                        j++;
+                        thunk++;
                     }
-                    ++thunk;
+                }
+                else if ((pImports + i)->FirstThunk != 0) // Fallback to FirstThunk for bound executables (where OriginalFirstThunk is null)
+                {
+                    auto pFunctions = reinterpret_cast<void**>(hInstance + (pImports + i)->FirstThunk);
+                    auto hDll = GetModuleHandleW(szSelfName.c_str());
+                    if (!hDll) continue;
+
+                    // Define expected ordinals for reverse lookup (based on switch cases)
+                    std::vector<WORD> expectedOrdinals;
+                    if (iequals(szSelfName, L"dsound.dll"))
+                        expectedOrdinals = { 1, 6, 7, 8, 9, 10, 11, 12 };
+                    else if (iequals(szSelfName, L"dinput8.dll"))
+                        expectedOrdinals = { 1 };
+                    else if (iequals(szSelfName, L"winhttp.dll"))
+                        expectedOrdinals = { 1, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82 };
+                    else if (iequals(szSelfName, L"xinput1_1.dll") || iequals(szSelfName, L"xinput1_2.dll"))
+                        expectedOrdinals = { 1, 2, 3, 4, 5, 6 };
+                    else if (iequals(szSelfName, L"xinput1_3.dll"))
+                        expectedOrdinals = { 1, 2, 3, 4, 5, 6, 7, 8, 100, 101, 102, 103 };
+                    else if (iequals(szSelfName, L"xinput1_4.dll"))
+                        expectedOrdinals = { 1, 2, 3, 4, 5, 7, 8, 10, 100, 101, 102, 103, 104, 108 };
+                    else if (iequals(szSelfName, L"xinput9_1_0.dll"))
+                        expectedOrdinals = { 1, 2, 3, 4, 5 };
+                    else if (iequals(szSelfName, L"xinputuap.dll"))
+                        expectedOrdinals = { 1, 2, 3, 4, 5, 6, 7, 8 };
+
+                    for (ptrdiff_t j = 0; pFunctions[j] != nullptr && (size_t)&pFunctions[j] < getSectionEnd(ntHeader, hInstance); j++)
+                    {
+                        auto pAddress = &pFunctions[j];
+                        // Reverse lookup: check if the address matches any expected ordinal
+                        for (auto ord : expectedOrdinals)
+                        {
+                            if (*pAddress == GetProcAddress(hDll, MAKEINTRESOURCEA(ord)))
+                            {
+                                patchOrdinal(pAddress, ord);
+                                break; // Patched, move to next IAT entry
+                            }
+                        }
+                    }
                 }
                 break;
             }
