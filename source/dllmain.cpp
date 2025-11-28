@@ -1123,8 +1123,27 @@ void LoadEverything()
 static LONG RestoredOnce = 0;
 void LoadPluginsAndRestoreIAT(uintptr_t retaddr, std::wstring_view calledFrom = L"")
 {
-    if (!sLoadFromAPI.empty() && calledFrom != sLoadFromAPI)
-        return;
+    if (!sLoadFromAPI.empty())
+    {
+        std::wstring LoadFromAPI = sLoadFromAPI;
+        std::wstring LoadFromModule = L"";
+
+        size_t dotPos = sLoadFromAPI.find(L'.');
+        if (dotPos != std::wstring::npos)
+        {
+            LoadFromModule = sLoadFromAPI.substr(0, dotPos);
+            LoadFromAPI = sLoadFromAPI.substr(dotPos + 1);
+        }
+
+        if (calledFrom != LoadFromAPI)
+            return;
+
+        HMODULE mod = NULL;
+        GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, (LPCTSTR)retaddr, &mod);
+
+        if (mod != GetModuleHandle(LoadFromModule.empty() ? NULL : LoadFromModule.c_str()))
+            return;
+    }
 
     bool calledFromBind = false;
 
