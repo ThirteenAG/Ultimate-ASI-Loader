@@ -1721,6 +1721,33 @@ namespace OverloadFromFolder
     thread_local std::unordered_map<HANDLE, std::string> mFindFileDirsA;
     thread_local std::unordered_map<HANDLE, std::wstring> mFindFileDirsW;
 
+    extern "C" extern DWORD _tls_index;
+
+    bool IsTlsInitialized()
+    {
+        __try
+        {
+            // Get TEB pointer - ThreadLocalStoragePointer is at offset 0x2C (32-bit) or 0x58 (64-bit)
+            #if !X64
+            void* tlsPtr = reinterpret_cast<void*>(__readfsdword(0x2C));
+            #else
+            void* tlsPtr = reinterpret_cast<void*>(__readgsqword(0x58));
+            #endif
+
+            if (!tlsPtr)
+                return false;
+
+            // Verify the TLS slot for this module is accessible
+            auto tlsArray = static_cast<void**>(tlsPtr);
+            volatile void* tlsSlot = tlsArray[_tls_index];
+            (void)tlsSlot; // Suppress unused variable warning
+            return true;
+        } __except (EXCEPTION_EXECUTE_HANDLER)
+        {
+            return false;
+        }
+    }
+
     HANDLE serverPipe = INVALID_HANDLE_VALUE;
     std::mutex serverMutex;
 
@@ -2569,11 +2596,15 @@ namespace OverloadFromFolder
             if (HasVirtualPaths())
             {
                 auto normalized = NormalizePath(lpFilename);
-                if (recursionGuard.count(normalized))
+
+                if (IsTlsInitialized())
                 {
-                    return {};
+                    if (recursionGuard.count(normalized))
+                    {
+                        return {};
+                    }
+                    recursionGuard.insert(normalized);
                 }
-                recursionGuard.insert(normalized);
 
                 std::shared_lock lock(virtualPathMutex);
                 auto it = virtualPathMappings.find(normalized);
@@ -2581,12 +2612,14 @@ namespace OverloadFromFolder
                 {
                     std::filesystem::path vpath(it->second.first);
                     auto recursive = GetOverloadedFilePath(vpath);
-                    recursionGuard.erase(normalized);
+                    if (IsTlsInitialized())
+                        recursionGuard.erase(normalized);
                     if (!recursive.empty())
                         return recursive;
                     return vpath;
                 }
-                recursionGuard.erase(normalized);
+                if (IsTlsInitialized())
+                    recursionGuard.erase(normalized);
             }
 
             std::error_code ec;
@@ -2949,7 +2982,7 @@ namespace OverloadFromFolder
         if (isRecursive(raddr))
             return ret;
 
-        if (ret != INVALID_HANDLE_VALUE)
+        if (ret != INVALID_HANDLE_VALUE && IsTlsInitialized())
         {
             mFindFileDirsA[ret] = lpFileName;
             FindFileCheckOverloadedPath(lpFileName, lpFindFileData, lpFindFileData->cFileName);
@@ -2966,7 +2999,7 @@ namespace OverloadFromFolder
         if (isRecursive(raddr))
             return ret;
 
-        if (ret)
+        if (ret && IsTlsInitialized())
         {
             auto it = mFindFileDirsA.find(hFindFile);
             if (it != mFindFileDirsA.end())
@@ -2984,7 +3017,7 @@ namespace OverloadFromFolder
         if (isRecursive(raddr))
             return ret;
 
-        if (ret != INVALID_HANDLE_VALUE)
+        if (ret != INVALID_HANDLE_VALUE && IsTlsInitialized())
         {
             mFindFileDirsW[ret] = lpFileName;
             FindFileCheckOverloadedPath(lpFileName, lpFindFileData, lpFindFileData->cFileName);
@@ -3001,7 +3034,7 @@ namespace OverloadFromFolder
         if (isRecursive(raddr))
             return ret;
 
-        if (ret)
+        if (ret && IsTlsInitialized())
         {
             auto it = mFindFileDirsW.find(hFindFile);
             if (it != mFindFileDirsW.end())
@@ -3019,7 +3052,7 @@ namespace OverloadFromFolder
         if (isRecursive(raddr))
             return ret;
 
-        if (ret != INVALID_HANDLE_VALUE)
+        if (ret != INVALID_HANDLE_VALUE && IsTlsInitialized())
         {
             if (fInfoLevelId != FindExInfoMaxInfoLevel)
             {
@@ -3039,7 +3072,7 @@ namespace OverloadFromFolder
         if (isRecursive(raddr))
             return ret;
 
-        if (ret != INVALID_HANDLE_VALUE)
+        if (ret != INVALID_HANDLE_VALUE && IsTlsInitialized())
         {
             if (fInfoLevelId != FindExInfoMaxInfoLevel)
             {
@@ -3056,7 +3089,7 @@ namespace OverloadFromFolder
         auto raddr = _ReturnAddress();
         auto ret = mhFindClose->get_original<decltype(FindClose)>()(hFindFile);
 
-        if (!isRecursive(raddr))
+        if (!isRecursive(raddr) && IsTlsInitialized())
         {
             mFindFileDirsA.erase(hFindFile);
             mFindFileDirsW.erase(hFindFile);
