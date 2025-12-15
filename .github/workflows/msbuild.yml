@@ -82,13 +82,13 @@ jobs:
         test.bat
 
     - name: Upload artifact (Win32)
-      uses: actions/upload-artifact@v5
+      uses: actions/upload-artifact@v6
       with:
         name: Ultimate-ASI-Loader-Win32
         path: dist/Win32/dll/*
 
     - name: Upload artifact (x64)
-      uses: actions/upload-artifact@v5
+      uses: actions/upload-artifact@v6
       with:
         name: Ultimate-ASI-Loader-x64
         path: dist/x64/dll/*
