@@ -5030,30 +5030,50 @@ bool HookIAT()
 
     g_hHookIATMutex = hMutex;
 
+    auto PatchModule = [](HMODULE mod) -> bool
+    {
+        ModuleIATData data;
+        data.module = mod;
+        PatchKernel32IAT(mod, data);
+        Patchvccorlib(mod, data);
+        PatchCoCreateInstance(mod, data);
+        PatchOrdinals(mod);
+        moduleIATs.push_back(data);
+        return !data.kernel32Functions.empty() || !data.vccorlibFunctions.empty();
+    };
+
     ModuleList modules;
     modules.Enumerate(ModuleList::SearchLocation::All);
+
+    HMODULE hExe = GetModuleHandle(NULL);
+    bool exePatched = false;
+
+    // First pass: Only patch the exe module
     for (auto& e : modules.m_moduleList)
     {
-        auto mod = std::get<HMODULE>(e);
-        if (mod != hm)
+        if (std::get<HMODULE>(e) == hExe)
         {
-            auto name = std::get<std::wstring>(e);
-            auto bIsLocal = std::get<bool>(e);
-            std::transform(name.begin(), name.end(), name.begin(), [](wchar_t c) { return ::towlower(c); });
+            exePatched = PatchModule(hExe);
+            break;
+        }
+    }
 
-            if (bIsLocal || name == L"unityplayer" || name == L"clr" || name == L"coreclr")
+    // If exe doesn't have hooks, also patch DLLs
+    if (!exePatched)
+    {
+        for (auto& e : modules.m_moduleList)
+        {
+            auto mod = std::get<HMODULE>(e);
+            if (mod != hm && mod != hExe)
             {
-                // Skip patching mss32 for backwards compatibility
-                if (sLoadFromAPI.empty() && name == L"mss32")
-                    continue;
+                auto name = std::get<std::wstring>(e);
+                auto bIsLocal = std::get<bool>(e);
+                std::transform(name.begin(), name.end(), name.begin(), ::towlower);
 
-                ModuleIATData data;
-                data.module = mod;
-                PatchKernel32IAT(mod, data);
-                Patchvccorlib(mod, data);
-                PatchCoCreateInstance(mod, data);
-                PatchOrdinals(mod);
-                moduleIATs.push_back(data);
+                if (bIsLocal || name == L"unityplayer" || name == L"clr" || name == L"coreclr")
+                {
+                    PatchModule(mod);
+                }
             }
         }
     }
