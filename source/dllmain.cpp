@@ -5043,6 +5043,10 @@ bool HookIAT()
 
             if (bIsLocal || name == L"unityplayer" || name == L"clr" || name == L"coreclr")
             {
+                // Skip patching mss32 for backwards compatibility
+                if (sLoadFromAPI.empty() && name == L"mss32")
+                    continue;
+
                 ModuleIATData data;
                 data.module = mod;
                 PatchKernel32IAT(mod, data);
