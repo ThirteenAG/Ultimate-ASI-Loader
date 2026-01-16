@@ -1120,9 +1120,22 @@ void LoadEverything()
     LoadPlugins();
 }
 
+static bool g_bExePatched = false;
 static LONG RestoredOnce = 0;
 void LoadPluginsAndRestoreIAT(uintptr_t retaddr, std::wstring_view calledFrom = L"")
 {
+    // Load original library ASAP from any call
+    LoadOriginalLibrary();
+
+    // If exe was patched, only proceed when called from exe
+    if (g_bExePatched)
+    {
+        HMODULE mod = NULL;
+        GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, (LPCTSTR)retaddr, &mod);
+        if (mod != GetModuleHandle(NULL))
+            return;
+    }
+
     if (!sLoadFromAPI.empty())
     {
         std::wstring LoadFromAPI = sLoadFromAPI;
@@ -5046,34 +5059,27 @@ bool HookIAT()
     modules.Enumerate(ModuleList::SearchLocation::All);
 
     HMODULE hExe = GetModuleHandle(NULL);
-    bool exePatched = false;
 
-    // First pass: Only patch the exe module
+    // Patch all modules
     for (auto& e : modules.m_moduleList)
     {
-        if (std::get<HMODULE>(e) == hExe)
+        auto mod = std::get<HMODULE>(e);
+        if (mod == hm)
+            continue; // Skip self
+
+        if (mod == hExe)
         {
-            exePatched = PatchModule(hExe);
-            break;
+            g_bExePatched = PatchModule(hExe);
         }
-    }
-
-    // If exe doesn't have hooks, also patch DLLs
-    if (!exePatched)
-    {
-        for (auto& e : modules.m_moduleList)
+        else
         {
-            auto mod = std::get<HMODULE>(e);
-            if (mod != hm && mod != hExe)
-            {
-                auto name = std::get<std::wstring>(e);
-                auto bIsLocal = std::get<bool>(e);
-                std::transform(name.begin(), name.end(), name.begin(), ::towlower);
+            auto name = std::get<std::wstring>(e);
+            auto bIsLocal = std::get<bool>(e);
+            std::transform(name.begin(), name.end(), name.begin(), ::towlower);
 
-                if (bIsLocal || name == L"unityplayer" || name == L"clr" || name == L"coreclr")
-                {
-                    PatchModule(mod);
-                }
+            if (bIsLocal || name == L"unityplayer" || name == L"clr" || name == L"coreclr")
+            {
+                PatchModule(mod);
             }
         }
     }
