@@ -63,7 +63,7 @@ jobs:
         github_token: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Configure build
-      run: ./premake5 vs2022 --with-version=${{ steps.versioning.outputs.version }}
+      run: ./premake5 vs2026 --with-version=${{ steps.versioning.outputs.version }}
 
     - name: Build
       run: |
