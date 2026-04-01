@@ -14,6 +14,10 @@ before_package:
 - cmd: msbuild.exe build/Ultimate-ASI-Loader-x64.sln /t:Build /p:Configuration=Release;Platform=x64
 after_build:
 - cmd: >-
+    embedpdb.bat
+
+    sign.bat
+
     release.bat
 
 
