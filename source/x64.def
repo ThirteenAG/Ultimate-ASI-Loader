@@ -485,6 +485,27 @@ D3D12SerializeVersionedRootSignature = _D3D12SerializeVersionedRootSignature
 GetBehaviorValue = _GetBehaviorValue
 SetAppCompatStringPointer = _SetAppCompatStringPointer
 
+LIBRARY "dxgi"
+EXPORTS
+ApplyCompatResolutionQuirking = _ApplyCompatResolutionQuirking
+CompatString = _CompatString
+CompatValue = _CompatValue
+CreateDXGIFactory = _CreateDXGIFactory
+CreateDXGIFactory1 = _CreateDXGIFactory1
+CreateDXGIFactory2 = _CreateDXGIFactory2
+DXGID3D10CreateDevice = _DXGID3D10CreateDevice
+DXGID3D10CreateLayeredDevice = _DXGID3D10CreateLayeredDevice
+DXGID3D10GetLayeredDeviceSize = _DXGID3D10GetLayeredDeviceSize
+DXGID3D10RegisterLayers = _DXGID3D10RegisterLayers
+DXGIDeclareAdapterRemovalSupport = _DXGIDeclareAdapterRemovalSupport
+DXGIDisableVBlankVirtualization = _DXGIDisableVBlankVirtualization
+DXGIDumpJournal = _DXGIDumpJournal
+DXGIGetDebugInterface1 = _DXGIGetDebugInterface1
+DXGIReportAdapterConfiguration = _DXGIReportAdapterConfiguration
+PIXBeginCapture = _PIXBeginCapture
+PIXEndCapture = _PIXEndCapture
+PIXGetCaptureState = _PIXGetCaptureState
+
 LIBRARY "bink2w64"
 EXPORTS
 BinkAllocateFrameBuffers = _BinkAllocateFrameBuffers

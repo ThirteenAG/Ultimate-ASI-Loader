@@ -583,6 +583,14 @@ void LoadOriginalLibrary()
         else
             d3d12.LoadOriginalLibrary(LoadLib(szSystemPath));
     }
+    else if (iequals(szSelfName, L"dxgi.dll"))
+    {
+        szLocalPath += L"dxgiHooked.dll";
+        if (std::filesystem::exists(szLocalPath))
+            dxgi.LoadOriginalLibrary(LoadLib(szLocalPath));
+        else
+            dxgi.LoadOriginalLibrary(LoadLib(szSystemPath));
+    }
     else if (iequals(szSelfName, L"winmm.dll"))
     {
         szLocalPath += L"winmmHooked.dll";
