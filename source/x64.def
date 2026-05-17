@@ -485,6 +485,10 @@ D3D12SerializeVersionedRootSignature = _D3D12SerializeVersionedRootSignature
 GetBehaviorValue = _GetBehaviorValue
 SetAppCompatStringPointer = _SetAppCompatStringPointer
 
+LIBRARY "NGRWin64ShippingBase"
+EXPORTS
+Ordinal_1=_Ordinal_1
+
 LIBRARY "bink2w64"
 EXPORTS
 BinkAllocateFrameBuffers = _BinkAllocateFrameBuffers

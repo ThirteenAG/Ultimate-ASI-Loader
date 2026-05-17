@@ -684,6 +684,14 @@ void LoadOriginalLibrary()
                 }
             }
         }
+        else if (iequals(szSelfName, L"NGR-Win64-ShippingBase.dll"))
+        {
+            szLocalPath += L"NGR-Win64-ShippingBaseHooked.dll";
+            if (std::filesystem::exists(szLocalPath))
+                dxgi.LoadOriginalLibrary(LoadLib(szLocalPath));
+            else
+                dxgi.LoadOriginalLibrary(LoadLib(szSystemPath));
+        }
         else if (iequals(szSelfName, L"ddraw.dll"))
         {
             szLocalPath += L"ddrawHooked.dll";

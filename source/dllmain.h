@@ -1484,6 +1484,18 @@ struct winmm_dll
     }
 } winmm;
 
+struct NGRWin64ShippingBase_dll 
+{
+    HMODULE dll;
+    FARPROC Ordinal_1;
+    void LoadOriginalLibrary(HMODULE module)
+    {
+        dll = module;
+        shared.LoadOriginalLibrary(dll);
+        Ordinal_1 = GetProcAddress(dll, "Ordinal_1");
+    }
+} NGRWin64ShippingBase;
+
 struct winhttp_dll
 {
     HMODULE dll;
@@ -3482,6 +3494,10 @@ __declspec(naked) void _VerLanguageNameA() { _asm { jmp[version.VerLanguageNameA
 __declspec(naked) void _VerLanguageNameW() { _asm { jmp[version.VerLanguageNameW] } }
 __declspec(naked) void _VerQueryValueA() { _asm { jmp[version.VerQueryValueA] } }
 __declspec(naked) void _VerQueryValueW() { _asm { jmp[version.VerQueryValueW] } }
+
+__declspec(naked) void _Ordinal_1() { _asm { jmp[NGRWin64ShippingBase.Ordinal_1] } }
+
+void _Ordinal_1() { NGRWin64ShippingBase.Ordinal_1(); }
 
 extern "C" __declspec(naked) void __stdcall _BinkAllocateFrameBuffers(int, int, int) { _asm { jmp[bink2w32.BinkAllocateFrameBuffers] } }
 extern "C" __declspec(naked) void __stdcall _BinkBufferBlit(int, int, int) { _asm { jmp[bink2w32.BinkBufferBlit] } }
