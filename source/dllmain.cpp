@@ -284,7 +284,8 @@ std::filesystem::path lexicallyRelativeCaseIns(const std::filesystem::path& path
         input_iterator_range(const std::filesystem::path::const_iterator& first, const std::filesystem::path::const_iterator& last)
             : _first(first)
             , _last(last)
-        {}
+        {
+        }
         std::filesystem::path::const_iterator begin() const { return _first; }
         std::filesystem::path::const_iterator end() const { return _last; }
     private:
@@ -5219,7 +5220,7 @@ void Init()
 
             if (sLoadFromAPI.empty()) // compatibility with GTAV/RDR2 plugins
             {
-                if (iequals(exeName, L"GTA5") || iequals(exeName, L"RDR2") || iequals(exeName, L"game_win64_master"))
+                if (iequals(exeName, L"GTA5") || iequals(exeName, L"GTA5_Enhanced") || iequals(exeName, L"RDR2") || iequals(exeName, L"game_win64_master"))
                     sLoadFromAPI = L"GetSystemTimeAsFileTime";
             }
         } catch (...) {}
