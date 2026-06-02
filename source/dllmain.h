@@ -30,6 +30,8 @@ struct shared
     }
 } shared;
 
+FARPROC pSetAppCompatStringPointer = nullptr;
+
 #if X64
 #include <dsound.h>
 #endif
@@ -1085,8 +1087,59 @@ struct d3d12_dll
         D3D12SerializeVersionedRootSignature = GetProcAddress(dll, "D3D12SerializeVersionedRootSignature");
         GetBehaviorValue = GetProcAddress(dll, "GetBehaviorValue");
         SetAppCompatStringPointer = GetProcAddress(dll, "SetAppCompatStringPointer");
+        pSetAppCompatStringPointer = SetAppCompatStringPointer;
     }
 } d3d12;
+
+struct dxgi_dll
+{
+    HMODULE dll;
+    FARPROC ApplyCompatResolutionQuirking;
+    FARPROC CompatString;
+    FARPROC CompatValue;
+    FARPROC CreateDXGIFactory;
+    FARPROC CreateDXGIFactory1;
+    FARPROC CreateDXGIFactory2;
+    FARPROC DXGID3D10CreateDevice;
+    FARPROC DXGID3D10CreateLayeredDevice;
+    FARPROC DXGID3D10GetLayeredDeviceSize;
+    FARPROC DXGID3D10RegisterLayers;
+    FARPROC DXGIDeclareAdapterRemovalSupport;
+    FARPROC DXGIDisableVBlankVirtualization;
+    FARPROC DXGIDumpJournal;
+    FARPROC DXGIGetDebugInterface1;
+    FARPROC DXGIReportAdapterConfiguration;
+    FARPROC PIXBeginCapture;
+    FARPROC PIXEndCapture;
+    FARPROC PIXGetCaptureState;
+    FARPROC SetAppCompatStringPointer;
+
+    void LoadOriginalLibrary(HMODULE module)
+    {
+        dll = module;
+        shared.LoadOriginalLibrary(dll);
+        ApplyCompatResolutionQuirking = GetProcAddress(dll, "ApplyCompatResolutionQuirking");
+        CompatString = GetProcAddress(dll, "CompatString");
+        CompatValue = GetProcAddress(dll, "CompatValue");
+        CreateDXGIFactory = GetProcAddress(dll, "CreateDXGIFactory");
+        CreateDXGIFactory1 = GetProcAddress(dll, "CreateDXGIFactory1");
+        CreateDXGIFactory2 = GetProcAddress(dll, "CreateDXGIFactory2");
+        DXGID3D10CreateDevice = GetProcAddress(dll, "DXGID3D10CreateDevice");
+        DXGID3D10CreateLayeredDevice = GetProcAddress(dll, "DXGID3D10CreateLayeredDevice");
+        DXGID3D10GetLayeredDeviceSize = GetProcAddress(dll, "DXGID3D10GetLayeredDeviceSize");
+        DXGID3D10RegisterLayers = GetProcAddress(dll, "DXGID3D10RegisterLayers");
+        DXGIDeclareAdapterRemovalSupport = GetProcAddress(dll, "DXGIDeclareAdapterRemovalSupport");
+        DXGIDisableVBlankVirtualization = GetProcAddress(dll, "DXGIDisableVBlankVirtualization");
+        DXGIDumpJournal = GetProcAddress(dll, "DXGIDumpJournal");
+        DXGIGetDebugInterface1 = GetProcAddress(dll, "DXGIGetDebugInterface1");
+        DXGIReportAdapterConfiguration = GetProcAddress(dll, "DXGIReportAdapterConfiguration");
+        PIXBeginCapture = GetProcAddress(dll, "PIXBeginCapture");
+        PIXEndCapture = GetProcAddress(dll, "PIXEndCapture");
+        PIXGetCaptureState = GetProcAddress(dll, "PIXGetCaptureState");
+        SetAppCompatStringPointer = GetProcAddress(dll, "SetAppCompatStringPointer");
+        pSetAppCompatStringPointer = SetAppCompatStringPointer;
+    }
+} dxgi;
 
 #undef PlaySound
 struct winmm_dll
@@ -2759,7 +2812,26 @@ __declspec(naked) void _D3D12PIXReportCounter() { _asm { jmp[d3d12.D3D12PIXRepor
 __declspec(naked) void _D3D12SerializeRootSignature() { _asm { jmp[d3d12.D3D12SerializeRootSignature] } }
 __declspec(naked) void _D3D12SerializeVersionedRootSignature() { _asm { jmp[d3d12.D3D12SerializeVersionedRootSignature] } }
 __declspec(naked) void _GetBehaviorValue() { _asm { jmp[d3d12.GetBehaviorValue] } }
-__declspec(naked) void _SetAppCompatStringPointer() { _asm { jmp[d3d12.SetAppCompatStringPointer] } }
+__declspec(naked) void _SetAppCompatStringPointer() { _asm { jmp[pSetAppCompatStringPointer] } }
+
+__declspec(naked) void _ApplyCompatResolutionQuirking() { _asm { jmp[dxgi.ApplyCompatResolutionQuirking] } }
+__declspec(naked) void _CompatString() { _asm { jmp[dxgi.CompatString] } }
+__declspec(naked) void _CompatValue() { _asm { jmp[dxgi.CompatValue] } }
+__declspec(naked) void _CreateDXGIFactory() { _asm { jmp[dxgi.CreateDXGIFactory] } }
+__declspec(naked) void _CreateDXGIFactory1() { _asm { jmp[dxgi.CreateDXGIFactory1] } }
+__declspec(naked) void _CreateDXGIFactory2() { _asm { jmp[dxgi.CreateDXGIFactory2] } }
+__declspec(naked) void _DXGID3D10CreateDevice() { _asm { jmp[dxgi.DXGID3D10CreateDevice] } }
+__declspec(naked) void _DXGID3D10CreateLayeredDevice() { _asm { jmp[dxgi.DXGID3D10CreateLayeredDevice] } }
+__declspec(naked) void _DXGID3D10GetLayeredDeviceSize() { _asm { jmp[dxgi.DXGID3D10GetLayeredDeviceSize] } }
+__declspec(naked) void _DXGID3D10RegisterLayers() { _asm { jmp[dxgi.DXGID3D10RegisterLayers] } }
+__declspec(naked) void _DXGIDeclareAdapterRemovalSupport() { _asm { jmp[dxgi.DXGIDeclareAdapterRemovalSupport] } }
+__declspec(naked) void _DXGIDisableVBlankVirtualization() { _asm { jmp[dxgi.DXGIDisableVBlankVirtualization] } }
+__declspec(naked) void _DXGIDumpJournal() { _asm { jmp[dxgi.DXGIDumpJournal] } }
+__declspec(naked) void _DXGIGetDebugInterface1() { _asm { jmp[dxgi.DXGIGetDebugInterface1] } }
+__declspec(naked) void _DXGIReportAdapterConfiguration() { _asm { jmp[dxgi.DXGIReportAdapterConfiguration] } }
+__declspec(naked) void _PIXBeginCapture() { _asm { jmp[dxgi.PIXBeginCapture] } }
+__declspec(naked) void _PIXEndCapture() { _asm { jmp[dxgi.PIXEndCapture] } }
+__declspec(naked) void _PIXGetCaptureState() { _asm { jmp[dxgi.PIXGetCaptureState] } }
 
 __declspec(naked) void _AcquireDDThreadLock() { _asm { jmp[ddraw.AcquireDDThreadLock] } }
 __declspec(naked) void _CompleteCreateSysmemSurface() { _asm { jmp[ddraw.CompleteCreateSysmemSurface] } }
@@ -4137,7 +4209,26 @@ void _D3D12PIXReportCounter() { d3d12.D3D12PIXReportCounter(); }
 void _D3D12SerializeRootSignature() { d3d12.D3D12SerializeRootSignature(); }
 void _D3D12SerializeVersionedRootSignature() { d3d12.D3D12SerializeVersionedRootSignature(); }
 void _GetBehaviorValue() { d3d12.GetBehaviorValue(); }
-void _SetAppCompatStringPointer() { d3d12.SetAppCompatStringPointer(); }
+void _SetAppCompatStringPointer() { ((void(*)())pSetAppCompatStringPointer)(); }
+
+void _ApplyCompatResolutionQuirking() { dxgi.ApplyCompatResolutionQuirking(); }
+void _CompatString() { dxgi.CompatString(); }
+void _CompatValue() { dxgi.CompatValue(); }
+void _CreateDXGIFactory() { dxgi.CreateDXGIFactory(); }
+void _CreateDXGIFactory1() { dxgi.CreateDXGIFactory1(); }
+void _CreateDXGIFactory2() { dxgi.CreateDXGIFactory2(); }
+void _DXGID3D10CreateDevice() { dxgi.DXGID3D10CreateDevice(); }
+void _DXGID3D10CreateLayeredDevice() { dxgi.DXGID3D10CreateLayeredDevice(); }
+void _DXGID3D10GetLayeredDeviceSize() { dxgi.DXGID3D10GetLayeredDeviceSize(); }
+void _DXGID3D10RegisterLayers() { dxgi.DXGID3D10RegisterLayers(); }
+void _DXGIDeclareAdapterRemovalSupport() { dxgi.DXGIDeclareAdapterRemovalSupport(); }
+void _DXGIDisableVBlankVirtualization() { dxgi.DXGIDisableVBlankVirtualization(); }
+void _DXGIDumpJournal() { dxgi.DXGIDumpJournal(); }
+void _DXGIGetDebugInterface1() { dxgi.DXGIGetDebugInterface1(); }
+void _DXGIReportAdapterConfiguration() { dxgi.DXGIReportAdapterConfiguration(); }
+void _PIXBeginCapture() { dxgi.PIXBeginCapture(); }
+void _PIXEndCapture() { dxgi.PIXEndCapture(); }
+void _PIXGetCaptureState() { dxgi.PIXGetCaptureState(); }
 
 void _BinkAllocateFrameBuffers() { bink2w64.BinkAllocateFrameBuffers(); }
 void _BinkBufferBlit() { bink2w64.BinkBufferBlit(); }
