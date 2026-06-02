@@ -241,6 +241,7 @@ DXGIReportAdapterConfiguration = _DXGIReportAdapterConfiguration
 PIXBeginCapture = _PIXBeginCapture
 PIXEndCapture = _PIXEndCapture
 PIXGetCaptureState = _PIXGetCaptureState
+SetAppCompatStringPointer = _SetAppCompatStringPointer
 
 LIBRARY "ddraw"
 EXPORTS

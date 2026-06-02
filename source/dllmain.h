@@ -30,6 +30,8 @@ struct shared
     }
 } shared;
 
+FARPROC pSetAppCompatStringPointer = nullptr;
+
 #if X64
 #include <dsound.h>
 #endif
@@ -1085,6 +1087,7 @@ struct d3d12_dll
         D3D12SerializeVersionedRootSignature = GetProcAddress(dll, "D3D12SerializeVersionedRootSignature");
         GetBehaviorValue = GetProcAddress(dll, "GetBehaviorValue");
         SetAppCompatStringPointer = GetProcAddress(dll, "SetAppCompatStringPointer");
+        pSetAppCompatStringPointer = SetAppCompatStringPointer;
     }
 } d3d12;
 
@@ -1109,6 +1112,7 @@ struct dxgi_dll
     FARPROC PIXBeginCapture;
     FARPROC PIXEndCapture;
     FARPROC PIXGetCaptureState;
+    FARPROC SetAppCompatStringPointer;
 
     void LoadOriginalLibrary(HMODULE module)
     {
@@ -1132,6 +1136,8 @@ struct dxgi_dll
         PIXBeginCapture = GetProcAddress(dll, "PIXBeginCapture");
         PIXEndCapture = GetProcAddress(dll, "PIXEndCapture");
         PIXGetCaptureState = GetProcAddress(dll, "PIXGetCaptureState");
+        SetAppCompatStringPointer = GetProcAddress(dll, "SetAppCompatStringPointer");
+        pSetAppCompatStringPointer = SetAppCompatStringPointer;
     }
 } dxgi;
 
@@ -2806,7 +2812,7 @@ __declspec(naked) void _D3D12PIXReportCounter() { _asm { jmp[d3d12.D3D12PIXRepor
 __declspec(naked) void _D3D12SerializeRootSignature() { _asm { jmp[d3d12.D3D12SerializeRootSignature] } }
 __declspec(naked) void _D3D12SerializeVersionedRootSignature() { _asm { jmp[d3d12.D3D12SerializeVersionedRootSignature] } }
 __declspec(naked) void _GetBehaviorValue() { _asm { jmp[d3d12.GetBehaviorValue] } }
-__declspec(naked) void _SetAppCompatStringPointer() { _asm { jmp[d3d12.SetAppCompatStringPointer] } }
+__declspec(naked) void _SetAppCompatStringPointer() { _asm { jmp[pSetAppCompatStringPointer] } }
 
 __declspec(naked) void _ApplyCompatResolutionQuirking() { _asm { jmp[dxgi.ApplyCompatResolutionQuirking] } }
 __declspec(naked) void _CompatString() { _asm { jmp[dxgi.CompatString] } }
@@ -4203,7 +4209,7 @@ void _D3D12PIXReportCounter() { d3d12.D3D12PIXReportCounter(); }
 void _D3D12SerializeRootSignature() { d3d12.D3D12SerializeRootSignature(); }
 void _D3D12SerializeVersionedRootSignature() { d3d12.D3D12SerializeVersionedRootSignature(); }
 void _GetBehaviorValue() { d3d12.GetBehaviorValue(); }
-void _SetAppCompatStringPointer() { d3d12.SetAppCompatStringPointer(); }
+void _SetAppCompatStringPointer() { ((void(*)())pSetAppCompatStringPointer)(); }
 
 void _ApplyCompatResolutionQuirking() { dxgi.ApplyCompatResolutionQuirking(); }
 void _CompatString() { dxgi.CompatString(); }
