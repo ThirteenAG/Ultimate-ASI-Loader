@@ -483,7 +483,7 @@ struct FunctionData
             return;
         auto ptr = (size_t*)IATPtr;
         MEMORY_BASIC_INFORMATION mbi;
-        if (VirtualQuery(ptr, &mbi, sizeof(mbi)) == 0 || mbi.State != MEM_COMMIT || !(mbi.Protect & (PAGE_READWRITE | PAGE_EXECUTE_READWRITE | PAGE_WRITECOPY | PAGE_EXECUTE_WRITECOPY)))
+        if (VirtualQuery(ptr, &mbi, sizeof(mbi)) == 0 || mbi.State != MEM_COMMIT)
             return;
         DWORD dwProtect[2];
         if (!VirtualProtect(ptr, sizeof(size_t), PAGE_EXECUTE_READWRITE, &dwProtect[0]))
@@ -5269,7 +5269,11 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID /*lpReserved*/)
     {
         for (auto& modData : moduleIATs)
         {
+            for (auto& [name, data] : modData.kernel32Functions)
+                data.Restore();
             for (auto& [name, data] : modData.ole32Functions)
+                data.Restore();
+            for (auto& [name, data] : modData.vccorlibFunctions)
                 data.Restore();
         }
 
