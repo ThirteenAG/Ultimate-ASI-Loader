@@ -38,7 +38,7 @@ With **binkw32.dll** and **vorbisFile.dll**, it is optional, and you can simply 
 ## INSTALLATION
 
 To install it, you just need to place the DLL into the game directory. Usually, it works as dinput8.dll, but if that doesn't work, you can rename it (see the list of supported names above).
-NoPDB archives contain a smaller size binaries that do not include debug symbols.
+NoPDB archives contain binaries of a smaller size that do not include debug symbols.
 
 ## USAGE
 
