@@ -97,30 +97,45 @@ jobs:
           cd tests
           test.bat
 
-      - name: Upload artifact (Main)
-        uses: actions/upload-artifact@v7
-        with:
-          name: Ultimate-ASI-Loader
-          archive: false
-          path: |
-            bin/Ultimate-ASI-Loader.zip
-            bin/Ultimate-ASI-Loader_x64.zip
-            bin/Ultimate-ASI-Loader-NoPDB.zip
-            bin/Ultimate-ASI-Loader-NoPDB_x64.zip
+      - name: Install artifact client
+        run: |
+          npm install @actions/artifact
 
-      - name: Upload artifact (Win32)
-        uses: actions/upload-artifact@v7
+      - name: Upload individual zip artifacts
+        uses: actions/github-script@v9
         with:
-          name: Ultimate-ASI-Loader-Win32
-          archive: false
-          path: dist/Win32/zip/*.zip
+          script: |
+            const { DefaultArtifactClient } = require('./node_modules/@actions/artifact')
+            const client = new DefaultArtifactClient()
+            const path = require('path')
 
-      - name: Upload artifact (x64)
-        uses: actions/upload-artifact@v7
-        with:
-          name: Ultimate-ASI-Loader-x64
-          archive: false
-          path: dist/x64/zip/*.zip
+            const patterns = [
+              'bin/Ultimate-ASI-Loader.zip',
+              'bin/Ultimate-ASI-Loader_x64.zip',
+              'bin/Ultimate-ASI-Loader-NoPDB.zip',
+              'bin/Ultimate-ASI-Loader-NoPDB_x64.zip',
+              'dist/Win32/zip/*.zip',
+              'dist/x64/zip/*.zip'
+            ]
+
+            const files = []
+            for (const pattern of patterns) {
+              const globber = await glob.create(pattern)
+              for (const file of await globber.glob()) {
+                files.push(file)
+              }
+            }
+
+            if (files.length === 0) {
+              core.warning('No .zip files found to upload.')
+              return
+            }
+
+            for (const file of files) {
+              const name = path.basename(file)
+              core.info(`Uploading ${name}...`)
+              await client.uploadArtifact(name, [file], path.dirname(file), { retentionDays: 90, skipArchive: true })
+            }
 
       - name: Upload Release (Main)
         if: |
