@@ -4,32 +4,32 @@ on:
   push:
     paths-ignore:
       - "**/*.md"
-      - '**/*.txt'
+      - "**/*.txt"
     branches:
-      - '**'
+      - "**"
   pull_request:
     paths-ignore:
       - "**/*.md"
-      - '**/*.txt'
+      - "**/*.txt"
   workflow_dispatch:
     inputs:
       release:
         description: "Create a release"
         type: choice
         required: false
-        default: 'false'
+        default: "false"
         options:
-          - 'true'
-          - 'false'
+          - "true"
+          - "false"
       version_increment:
         description: "Default semantic version release type"
         type: choice
         required: false
-        default: 'minor'
+        default: "minor"
         options:
-          - 'major'
-          - 'minor'
-          - 'patch'
+          - "major"
+          - "minor"
+          - "patch"
 
 env:
   VERINC: ${{ github.event.inputs.version_increment || 'minor' }}
@@ -46,131 +46,144 @@ jobs:
     runs-on: windows-2025-vs2026
 
     steps:
-    - name: Checkout Repository
-      uses: actions/checkout@v7
-      with:
-        submodules: recursive
+      - name: Checkout Repository
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
 
-    - name: Add msbuild to PATH
-      uses: microsoft/setup-msbuild@main
+      - name: Add msbuild to PATH
+        uses: microsoft/setup-msbuild@main
 
-    - name: Auto Increment Version
-      uses: MCKanpolat/auto-semver-action@1.0.12
-      id: versioning
-      with:
-        releaseType: ${{ env.VERINC }} 
-        incrementPerCommit: false
-        github_token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Auto Increment Version
+        uses: MCKanpolat/auto-semver-action@1.0.12
+        id: versioning
+        with:
+          releaseType: ${{ env.VERINC }}
+          incrementPerCommit: false
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Configure build
-      run: ./premake5 vs2026 --with-version=${{ steps.versioning.outputs.version }}
+      - name: Configure build
+        run: ./premake5 vs2026 --with-version=${{ steps.versioning.outputs.version }}
 
-    - name: Build
-      run: |
-        msbuild -m build/Ultimate-ASI-Loader-x64.slnx /property:Configuration=Release /property:Platform=x64
-        msbuild -m build/Ultimate-ASI-Loader-Win32.slnx /property:Configuration=Release /property:Platform=Win32
+      - name: Build
+        run: |
+          msbuild -m build/Ultimate-ASI-Loader-x64.slnx /property:Configuration=Release /property:Platform=x64
+          msbuild -m build/Ultimate-ASI-Loader-Win32.slnx /property:Configuration=Release /property:Platform=Win32
 
-    - name: Copy NoPDB binaries
-      run: |
-        New-Item -ItemType Directory -Force -Path "dist\NoPDB\Win32", "dist\NoPDB\x64" | Out-Null
-        Copy-Item "bin\Win32\Release\dinput8.dll" "dist\NoPDB\Win32\dinput8.dll" -Force
-        Copy-Item "bin\x64\Release\dinput8.dll" "dist\NoPDB\x64\dinput8.dll" -Force
+      - name: Copy NoPDB binaries
+        run: |
+          New-Item -ItemType Directory -Force -Path "dist\NoPDB\Win32", "dist\NoPDB\x64" | Out-Null
+          Copy-Item "bin\Win32\Release\dinput8.dll" "dist\NoPDB\Win32\dinput8.dll" -Force
+          Copy-Item "bin\x64\Release\dinput8.dll" "dist\NoPDB\x64\dinput8.dll" -Force
 
-    - name: Pack binaries
-      run: |
-        ./embedpdb.bat
-        ./sign.bat
-        ./release.bat
-        ./release.ps1
-      env:
-        CODE_SIGNING_PFX: ${{ github.ref_name == 'master' && (github.event_name == 'push' || github.event.inputs.release == 'true') && secrets.CODE_SIGNING_PFX || '' }}
-        CODE_SIGNING_PASSWORD: ${{ github.ref_name == 'master' && (github.event_name == 'push' || github.event.inputs.release == 'true') && secrets.CODE_SIGNING_PASSWORD || '' }}
+      - name: Pack binaries
+        run: |
+          ./embedpdb.bat
+          ./sign.bat
+          ./release.bat
+          ./release.ps1
+        env:
+          CODE_SIGNING_PFX: ${{ github.ref_name == 'master' && (github.event_name == 'push' || github.event.inputs.release == 'true') && secrets.CODE_SIGNING_PFX || '' }}
+          CODE_SIGNING_PASSWORD: ${{ github.ref_name == 'master' && (github.event_name == 'push' || github.event.inputs.release == 'true') && secrets.CODE_SIGNING_PASSWORD || '' }}
 
-    - name: Pack NoPDB binaries
-      run: |
-        .\7za.exe a -tzip ".\bin\Ultimate-ASI-Loader-NoPDB.zip" ".\dist\NoPDB\Win32\dinput8.dll"
-        .\7za.exe a -tzip ".\bin\Ultimate-ASI-Loader-NoPDB_x64.zip" ".\dist\NoPDB\x64\dinput8.dll"
+      - name: Pack NoPDB binaries
+        run: |
+          .\7za.exe a -tzip ".\bin\Ultimate-ASI-Loader-NoPDB.zip" ".\dist\NoPDB\Win32\dinput8.dll"
+          .\7za.exe a -tzip ".\bin\Ultimate-ASI-Loader-NoPDB_x64.zip" ".\dist\NoPDB\x64\dinput8.dll"
 
-    - name: Test
-      shell: cmd
-      run: |
-        cd tests
-        test.bat
+      - name: Test
+        shell: cmd
+        run: |
+          cd tests
+          test.bat
 
-    - name: Upload artifact (Win32)
-      uses: actions/upload-artifact@v7
-      with:
-        name: Ultimate-ASI-Loader-Win32
-        path: dist/Win32/dll/*
+      - name: Upload artifact (Main)
+        uses: actions/upload-artifact@v7
+        with:
+          name: Ultimate-ASI-Loader
+          archive: false
+          path: |
+            bin/Ultimate-ASI-Loader.zip
+            bin/Ultimate-ASI-Loader_x64.zip
+            bin/Ultimate-ASI-Loader-NoPDB.zip
+            bin/Ultimate-ASI-Loader-NoPDB_x64.zip
 
-    - name: Upload artifact (x64)
-      uses: actions/upload-artifact@v7
-      with:
-        name: Ultimate-ASI-Loader-x64
-        path: dist/x64/dll/*
+      - name: Upload artifact (Win32)
+        uses: actions/upload-artifact@v7
+        with:
+          name: Ultimate-ASI-Loader-Win32
+          archive: false
+          path: dist/Win32/zip/*.zip
 
-    - name: Upload Release (Main)
-      if: |
-        github.event.inputs.release == 'true' &&
-        github.ref_name == 'master' &&
-        github.repository == 'ThirteenAG/Ultimate-ASI-Loader'
-      uses: ncipollo/release-action@main
-      with:
-        token: ${{ secrets.GITHUB_TOKEN }}
-        allowUpdates: false
-        name: Ultimate ASI Loader v${{ steps.versioning.outputs.version }}
-        bodyFile: "release.md"
-        tag: v${{ steps.versioning.outputs.version }}
-        artifacts: bin/Ultimate-ASI-Loader.zip, bin/Ultimate-ASI-Loader_x64.zip, bin/Ultimate-ASI-Loader-NoPDB.zip, bin/Ultimate-ASI-Loader-NoPDB_x64.zip
+      - name: Upload artifact (x64)
+        uses: actions/upload-artifact@v7
+        with:
+          name: Ultimate-ASI-Loader-x64
+          archive: false
+          path: dist/x64/zip/*.zip
 
-    - name: Get release info (Win32)
-      if: |
-        github.event.inputs.release == 'true' &&
-        github.ref_name == 'master' &&
-        github.repository == 'ThirteenAG/Ultimate-ASI-Loader'
-      id: release_info_x86
-      uses: cardinalby/git-get-release-action@master
-      env:
-       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag: Win32-latest
+      - name: Upload Release (Main)
+        if: |
+          github.event.inputs.release == 'true' &&
+          github.ref_name == 'master' &&
+          github.repository == 'ThirteenAG/Ultimate-ASI-Loader'
+        uses: ncipollo/release-action@main
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          allowUpdates: false
+          name: Ultimate ASI Loader v${{ steps.versioning.outputs.version }}
+          bodyFile: "release.md"
+          tag: v${{ steps.versioning.outputs.version }}
+          artifacts: bin/Ultimate-ASI-Loader.zip, bin/Ultimate-ASI-Loader_x64.zip, bin/Ultimate-ASI-Loader-NoPDB.zip, bin/Ultimate-ASI-Loader-NoPDB_x64.zip
 
-    - name: Upload Release (Win32)
-      if: |
-        github.event.inputs.release == 'true' &&
-        github.ref_name == 'master' &&
-        github.repository == 'ThirteenAG/Ultimate-ASI-Loader'
-      uses: ncipollo/release-action@main
-      with:
-        token: ${{ secrets.GITHUB_TOKEN }}
-        allowUpdates: true
-        name: ${{ steps.release_info_x86.outputs.name }}
-        body: ${{ steps.release_info_x86.outputs.body }}
-        tag: ${{ steps.release_info_x86.outputs.tag_name }}
-        artifacts: dist/Win32/zip/*.zip
+      - name: Get release info (Win32)
+        if: |
+          github.event.inputs.release == 'true' &&
+          github.ref_name == 'master' &&
+          github.repository == 'ThirteenAG/Ultimate-ASI-Loader'
+        id: release_info_x86
+        uses: cardinalby/git-get-release-action@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag: Win32-latest
 
-    - name: Get release info (Win64)
-      if: |
-        github.event.inputs.release == 'true' &&
-        github.ref_name == 'master' &&
-        github.repository == 'ThirteenAG/Ultimate-ASI-Loader'
-      id: release_info_x64
-      uses: cardinalby/git-get-release-action@master
-      env:
-       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag: x64-latest
+      - name: Upload Release (Win32)
+        if: |
+          github.event.inputs.release == 'true' &&
+          github.ref_name == 'master' &&
+          github.repository == 'ThirteenAG/Ultimate-ASI-Loader'
+        uses: ncipollo/release-action@main
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          allowUpdates: true
+          name: ${{ steps.release_info_x86.outputs.name }}
+          body: ${{ steps.release_info_x86.outputs.body }}
+          tag: ${{ steps.release_info_x86.outputs.tag_name }}
+          artifacts: dist/Win32/zip/*.zip
 
-    - name: Upload Release (Win64)
-      if: |
-        github.event.inputs.release == 'true' &&
-        github.ref_name == 'master' &&
-        github.repository == 'ThirteenAG/Ultimate-ASI-Loader'
-      uses: ncipollo/release-action@main
-      with:
-        token: ${{ secrets.GITHUB_TOKEN }}
-        allowUpdates: true
-        name: ${{ steps.release_info_x64.outputs.name }}
-        body: ${{ steps.release_info_x64.outputs.body }}
-        tag: ${{ steps.release_info_x64.outputs.tag_name }}
-        artifacts: dist/x64/zip/*.zip
+      - name: Get release info (Win64)
+        if: |
+          github.event.inputs.release == 'true' &&
+          github.ref_name == 'master' &&
+          github.repository == 'ThirteenAG/Ultimate-ASI-Loader'
+        id: release_info_x64
+        uses: cardinalby/git-get-release-action@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag: x64-latest
+
+      - name: Upload Release (Win64)
+        if: |
+          github.event.inputs.release == 'true' &&
+          github.ref_name == 'master' &&
+          github.repository == 'ThirteenAG/Ultimate-ASI-Loader'
+        uses: ncipollo/release-action@main
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          allowUpdates: true
+          name: ${{ steps.release_info_x64.outputs.name }}
+          body: ${{ steps.release_info_x64.outputs.body }}
+          tag: ${{ steps.release_info_x64.outputs.tag_name }}
+          artifacts: dist/x64/zip/*.zip
