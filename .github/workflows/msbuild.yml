@@ -70,6 +70,12 @@ jobs:
         msbuild -m build/Ultimate-ASI-Loader-x64.slnx /property:Configuration=Release /property:Platform=x64
         msbuild -m build/Ultimate-ASI-Loader-Win32.slnx /property:Configuration=Release /property:Platform=Win32
 
+    - name: Copy NoPDB binaries
+      run: |
+        New-Item -ItemType Directory -Force -Path "dist\NoPDB\Win32", "dist\NoPDB\x64" | Out-Null
+        Copy-Item "bin\Win32\Release\dinput8.dll" "dist\NoPDB\Win32\dinput8.dll" -Force
+        Copy-Item "bin\x64\Release\dinput8.dll" "dist\NoPDB\x64\dinput8.dll" -Force
+
     - name: Pack binaries
       run: |
         ./embedpdb.bat
@@ -79,6 +85,11 @@ jobs:
       env:
         CODE_SIGNING_PFX: ${{ github.ref_name == 'master' && (github.event_name == 'push' || github.event.inputs.release == 'true') && secrets.CODE_SIGNING_PFX || '' }}
         CODE_SIGNING_PASSWORD: ${{ github.ref_name == 'master' && (github.event_name == 'push' || github.event.inputs.release == 'true') && secrets.CODE_SIGNING_PASSWORD || '' }}
+
+    - name: Pack NoPDB binaries
+      run: |
+        .\7za.exe a -tzip ".\bin\Ultimate-ASI-Loader-NoPDB.zip" ".\dist\NoPDB\Win32\dinput8.dll"
+        .\7za.exe a -tzip ".\bin\Ultimate-ASI-Loader-NoPDB_x64.zip" ".\dist\NoPDB\x64\dinput8.dll"
 
     - name: Test
       shell: cmd
@@ -110,7 +121,7 @@ jobs:
         name: Ultimate ASI Loader v${{ steps.versioning.outputs.version }}
         bodyFile: "release.md"
         tag: v${{ steps.versioning.outputs.version }}
-        artifacts: bin/Ultimate-ASI-Loader.zip, bin/Ultimate-ASI-Loader_x64.zip
+        artifacts: bin/Ultimate-ASI-Loader.zip, bin/Ultimate-ASI-Loader_x64.zip, bin/Ultimate-ASI-Loader-NoPDB.zip, bin/Ultimate-ASI-Loader-NoPDB_x64.zip
 
     - name: Get release info (Win32)
       if: |

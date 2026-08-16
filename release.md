@@ -7,6 +7,7 @@ This is a DLL file that adds ASI plugin loading functionality to any game that u
 | [d3d10.dll](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/Win32-latest/d3d10-Win32.zip)             |    [d3d10.dll](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/x64-latest/d3d10-x64.zip)          |
 | [d3d11.dll](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/Win32-latest/d3d11-Win32.zip)             |    [d3d11.dll](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/x64-latest/d3d11-x64.zip)          |
 | [d3d12.dll](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/Win32-latest/d3d12-Win32.zip)             |    [d3d12.dll](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/x64-latest/d3d12-x64.zip)          |
+| [dxgi.dll](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/Win32-latest/dxgi-Win32.zip)               |     [dxgi.dll](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/x64-latest/dxgi-x64.zip)           |
 | [ddraw.dll](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/Win32-latest/ddraw-Win32.zip)             |                                                         -                                                             |
 | [dinput.dll](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/Win32-latest/dinput-Win32.zip)           |                                                         -                                                             |
 | [dinput8.dll](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/Win32-latest/dinput8-Win32.zip)         |   [dinput8.dll](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/x64-latest/dinput8-x64.zip)       |
@@ -37,6 +38,7 @@ With **binkw32.dll** and **vorbisFile.dll**, it is optional, and you can simply 
 ## INSTALLATION
 
 To install it, you just need to place the DLL into the game directory. Usually, it works as dinput8.dll, but if that doesn't work, you can rename it (see the list of supported names above).
+NoPDB archives contain a smaller size binaries that do not include debug symbols.
 
 ## USAGE
 
