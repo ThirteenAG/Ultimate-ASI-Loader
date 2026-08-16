@@ -2461,6 +2461,26 @@ namespace OverloadFromFolder
                 }
             }
 
+            // Compute excluded entries once, before any entry gets marked as coming
+            // from a zip. Otherwise, after the first archive marks an entry with
+            // isFromZip, that path would no longer be considered excluded and every
+            // subsequent archive providing the same root directory would be ignored.
+            auto loaderEntriesCopy = sFileLoaderEntries;
+            FilterExistingPathEntries(loaderEntriesCopy);
+
+            std::set<std::filesystem::path> remainingPaths;
+            for (const auto& entry : loaderEntriesCopy)
+                remainingPaths.insert(entry.path);
+
+            std::vector<FileLoaderPathEntry> excludedEntries;
+            for (const auto& entry : sFileLoaderEntries)
+            {
+                if (remainingPaths.find(entry.path) == remainingPaths.end())
+                {
+                    excludedEntries.push_back(entry);
+                }
+            }
+
             for (auto const& [baseName, parts] : groupedArchives)
             {
                 auto sorted_parts = parts;
@@ -2554,22 +2574,6 @@ namespace OverloadFromFolder
                             {
                                 rootDirsInZip.insert(*internalPath.begin());
                             }
-                        }
-                    }
-
-                    auto loaderEntriesCopy = sFileLoaderEntries;
-                    FilterExistingPathEntries(loaderEntriesCopy);
-
-                    std::set<std::filesystem::path> remainingPaths;
-                    for (const auto& entry : loaderEntriesCopy)
-                        remainingPaths.insert(entry.path);
-
-                    std::vector<FileLoaderPathEntry> excludedEntries;
-                    for (const auto& entry : sFileLoaderEntries)
-                    {
-                        if (remainingPaths.find(entry.path) == remainingPaths.end())
-                        {
-                            excludedEntries.push_back(entry);
                         }
                     }
 
