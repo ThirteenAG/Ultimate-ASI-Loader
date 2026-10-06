@@ -67,35 +67,40 @@ jobs:
 
       - name: Build
         run: |
-          msbuild -m build/Ultimate-ASI-Loader-x64.slnx /property:Configuration=Release /property:Platform=x64
-          msbuild -m build/Ultimate-ASI-Loader-Win32.slnx /property:Configuration=Release /property:Platform=Win32
+          msbuild -m build/Ultimate-ASI-Loader.slnx /property:Configuration=Release /property:Platform=x64
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          msbuild -m build/Ultimate-ASI-Loader.slnx /property:Configuration=Release /property:Platform=Win32
 
-      - name: Copy NoPDB binaries
-        run: |
-          New-Item -ItemType Directory -Force -Path "dist\NoPDB\Win32", "dist\NoPDB\x64" | Out-Null
-          Copy-Item "bin\Win32\Release\dinput8.dll" "dist\NoPDB\Win32\dinput8.dll" -Force
-          Copy-Item "bin\x64\Release\dinput8.dll" "dist\NoPDB\x64\dinput8.dll" -Force
+      - name: Unit tests (Win32)
+        run: ./bin/Win32/Release/tests/ual_unit_tests.exe --junit test-results/unit-Win32.xml
 
-      - name: Pack binaries
+      - name: Unit tests (x64)
+        run: ./bin/x64/Release/tests/ual_unit_tests.exe --junit test-results/unit-x64.xml
+
+      - name: Window mode compatibility tests (Win32)
+        run: ./bin/Win32/Release/tests/ual_wndmode_tests.exe --junit test-results/wndmode-Win32.xml
+
+      - name: Integration tests
+        run: ./bin/x64/Release/tests/ual_tests.exe --junit test-results/integration.xml
+
+      - name: .cxx snippet engine tests
         run: |
-          ./embedpdb.bat
-          ./sign.bat
-          ./release.bat
-          ./release.ps1
+          ./bin/Win32/Release/tests/ual_cxxsnippets_tests.exe; if ($LASTEXITCODE) { exit 1 }
+          ./bin/x64/Release/tests/ual_cxxsnippets_tests.exe; if ($LASTEXITCODE) { exit 1 }
+
+      - name: Upload test results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: test-results/
+          retention-days: 30
+
+      - name: Package
+        run: ./tools/package.ps1
         env:
           CODE_SIGNING_PFX: ${{ github.ref_name == 'master' && (github.event_name == 'push' || github.event.inputs.release == 'true') && secrets.CODE_SIGNING_PFX || '' }}
           CODE_SIGNING_PASSWORD: ${{ github.ref_name == 'master' && (github.event_name == 'push' || github.event.inputs.release == 'true') && secrets.CODE_SIGNING_PASSWORD || '' }}
-
-      - name: Pack NoPDB binaries
-        run: |
-          .\7za.exe a -tzip ".\bin\Ultimate-ASI-Loader-NoPDB.zip" ".\dist\NoPDB\Win32\dinput8.dll"
-          .\7za.exe a -tzip ".\bin\Ultimate-ASI-Loader-NoPDB_x64.zip" ".\dist\NoPDB\x64\dinput8.dll"
-
-      - name: Test
-        shell: cmd
-        run: |
-          cd tests
-          test.bat
 
       - name: Install artifact client
         run: |
@@ -110,12 +115,13 @@ jobs:
             const path = require('path')
 
             const patterns = [
-              'bin/Ultimate-ASI-Loader.zip',
-              'bin/Ultimate-ASI-Loader_x64.zip',
-              'bin/Ultimate-ASI-Loader-NoPDB.zip',
-              'bin/Ultimate-ASI-Loader-NoPDB_x64.zip',
+              'dist/Ultimate-ASI-Loader.zip',
+              'dist/Ultimate-ASI-Loader_x64.zip',
+              'dist/Ultimate-ASI-Loader-NoPDB.zip',
+              'dist/Ultimate-ASI-Loader-NoPDB_x64.zip',
               'dist/Win32/zip/*.zip',
-              'dist/x64/zip/*.zip'
+              'dist/x64/zip/*.zip',
+              'dist/plugins/*.zip'
             ]
 
             const files = []
@@ -149,7 +155,7 @@ jobs:
           name: Ultimate ASI Loader v${{ steps.versioning.outputs.version }}
           bodyFile: "release.md"
           tag: v${{ steps.versioning.outputs.version }}
-          artifacts: bin/Ultimate-ASI-Loader.zip, bin/Ultimate-ASI-Loader_x64.zip, bin/Ultimate-ASI-Loader-NoPDB.zip, bin/Ultimate-ASI-Loader-NoPDB_x64.zip
+          artifacts: dist/Ultimate-ASI-Loader.zip, dist/Ultimate-ASI-Loader_x64.zip, dist/Ultimate-ASI-Loader-NoPDB.zip, dist/Ultimate-ASI-Loader-NoPDB_x64.zip
 
       - name: Get release info (Win32)
         if: |

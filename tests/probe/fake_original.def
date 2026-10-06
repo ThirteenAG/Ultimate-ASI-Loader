@@ -1,0 +1,6 @@
+LIBRARY ual_fake_original
+EXPORTS
+    DirectInput8Create
+    GetFileVersionInfoSizeW
+    timeGetTime
+    ov_streams

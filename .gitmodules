@@ -2,12 +2,15 @@
 	path = external/d3d8to9
 	url = https://github.com/crosire/d3d8to9
 	branch = main
-[submodule "external/MemoryModule"]
-	path = external/MemoryModule
-	url = https://github.com/fancycode/MemoryModule
-[submodule "external/minidx9"]
-	path = external/minidx9
-	url = https://github.com/hrydgard/minidx9
 [submodule "external/injector"]
 	path = external/injector
 	url = https://github.com/ThirteenAG/injector
+[submodule "external/ogg"]
+	path = external/ogg
+	url = https://github.com/xiph/ogg
+[submodule "external/vorbis"]
+	path = external/vorbis
+	url = https://github.com/xiph/vorbis
+[submodule "external/Hooking.Patterns"]
+	path = external/Hooking.Patterns
+	url = https://github.com/ThirteenAG/Hooking.Patterns
