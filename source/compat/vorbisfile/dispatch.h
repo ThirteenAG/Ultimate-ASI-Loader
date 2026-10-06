@@ -1,0 +1,25 @@
+/* Included before vorbisfile.c to route its libvorbis calls through vorbisfile.cpp to the game's
+   vorbis.dll or the linked libvorbis. vorbis_synthesis_idheader is not redirected. */
+#pragma once
+
+#define vorbis_block_clear ual_vf_vorbis_block_clear
+#define vorbis_block_init ual_vf_vorbis_block_init
+#define vorbis_comment_clear ual_vf_vorbis_comment_clear
+#define vorbis_comment_init ual_vf_vorbis_comment_init
+#define vorbis_dsp_clear ual_vf_vorbis_dsp_clear
+#define vorbis_info_blocksize ual_vf_vorbis_info_blocksize
+#define vorbis_info_clear ual_vf_vorbis_info_clear
+#define vorbis_info_init ual_vf_vorbis_info_init
+#define vorbis_packet_blocksize ual_vf_vorbis_packet_blocksize
+#define vorbis_synthesis ual_vf_vorbis_synthesis
+#define vorbis_synthesis_blockin ual_vf_vorbis_synthesis_blockin
+#define vorbis_synthesis_halfrate ual_vf_vorbis_synthesis_halfrate
+#define vorbis_synthesis_halfrate_p ual_vf_vorbis_synthesis_halfrate_p
+#define vorbis_synthesis_headerin ual_vf_vorbis_synthesis_headerin
+#define vorbis_synthesis_init ual_vf_vorbis_synthesis_init
+#define vorbis_synthesis_lapout ual_vf_vorbis_synthesis_lapout
+#define vorbis_synthesis_pcmout ual_vf_vorbis_synthesis_pcmout
+#define vorbis_synthesis_read ual_vf_vorbis_synthesis_read
+#define vorbis_synthesis_restart ual_vf_vorbis_synthesis_restart
+#define vorbis_synthesis_trackonly ual_vf_vorbis_synthesis_trackonly
+#define vorbis_window ual_vf_vorbis_window

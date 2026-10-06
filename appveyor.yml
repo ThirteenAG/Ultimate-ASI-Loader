@@ -7,44 +7,51 @@ install:
     git submodule update --init --recursive
 
     premake5.exe vs2022 --with-version=%APPVEYOR_BUILD_VERSION%
-build:
-  project: build/Ultimate-ASI-Loader-Win32.sln
-  verbosity: minimal
-before_package:
-- cmd: msbuild.exe build/Ultimate-ASI-Loader-x64.sln /t:Build /p:Configuration=Release;Platform=x64
-after_build:
+build_script:
 - cmd: >-
-    embedpdb.bat
+    msbuild build/Ultimate-ASI-Loader.sln /m /p:Configuration=Release;Platform=x64 /v:minimal
 
-    sign.bat
+    msbuild build/Ultimate-ASI-Loader.sln /m /p:Configuration=Release;Platform=Win32 /v:minimal
+test_script:
+- cmd: >-
+    bin\Win32\Release\tests\ual_unit_tests.exe
 
-    release.bat
+    bin\x64\Release\tests\ual_unit_tests.exe
 
+    bin\Win32\Release\tests\ual_wndmode_tests.exe
 
-    cd tests
+    bin\x64\Release\tests\ual_tests.exe
 
-    test.bat
+    bin\Win32\Release\tests\ual_cxxsnippets_tests.exe
 
-    cd ..
+    bin\x64\Release\tests\ual_cxxsnippets_tests.exe
+after_test:
+- pwsh: ./tools/package.ps1
 artifacts:
-- path: bin\Ultimate-ASI-Loader.zip
+- path: dist\Ultimate-ASI-Loader.zip
   name: Ultimate-ASI-Loader.zip
-- path: bin\Ultimate-ASI-Loader_x64.zip
+- path: dist\Ultimate-ASI-Loader_x64.zip
   name: Ultimate-ASI-Loader_x64.zip
-- path: bin\RE7Demo.InfiniteAmmo-x64.zip
-  name: RE7Demo.InfiniteAmmo-x64.zip
-- path: bin\MessageBox-x64.zip
-  name: MessageBox-x64.zip
-- path: bin\VirtualFileServer-x64.zip
-  name: OverloadFromFolderDLL-x64.zip
-- path: bin\ExeUnprotect-Win32.zip
+- path: dist\plugins\ExeUnprotect-Win32.zip
   name: ExeUnprotect-Win32.zip
-- path: bin\MessageBox-Win32.zip
+- path: dist\plugins\MessageBox-Win32.zip
   name: MessageBox-Win32.zip
-- path: bin\MonoLoader-Win32.zip
-  name: MonoLoader-Win32.zip
-- path: bin\MonoLoader-x64.zip
-  name: MonoLoader-x64.zip
+- path: dist\plugins\MessageBox-x64.zip
+  name: MessageBox-x64.zip
+- path: dist\plugins\PluginTemplate-Win32.zip
+  name: PluginTemplate-Win32.zip
+- path: dist\plugins\PluginTemplate-x64.zip
+  name: PluginTemplate-x64.zip
+- path: dist\plugins\VirtualFiles-Win32.zip
+  name: VirtualFiles-Win32.zip
+- path: dist\plugins\VirtualFiles-x64.zip
+  name: VirtualFiles-x64.zip
+- path: dist\plugins\FrameLimiter-Win32.zip
+  name: FrameLimiter-Win32.zip
+- path: dist\plugins\FrameLimiter-x64.zip
+  name: FrameLimiter-x64.zip
+- path: dist\plugins\VirtualFileServer-x64.zip
+  name: VirtualFileServer-x64.zip
 deploy:
 - provider: GitHub
   tag: demo-plugins
@@ -52,7 +59,7 @@ deploy:
   description: Demo plugins to test or extend Ultimate ASI Loader's functionality.
   auth_token:
     secure: ugbti+bXX/7zqu39OyiPxgRPd2pQn2FEV/12ABees2fHfpZob0tWXzqD/zSYmibJ
-  artifact: RE7Demo.InfiniteAmmo-x64.zip, MessageBox-x64.zip, OverloadFromFolderDLL-x64.zip, ExeUnprotect-Win32.zip, MessageBox-Win32.zip, OverloadFromFolderDLL-Win32.zip, MonoLoader-Win32.zip, MonoLoader-x64.zip, VirtualFileServer-x64.zip
+  artifact: ExeUnprotect-Win32.zip, MessageBox-Win32.zip, MessageBox-x64.zip, PluginTemplate-Win32.zip, PluginTemplate-x64.zip, VirtualFiles-Win32.zip, VirtualFiles-x64.zip, FrameLimiter-Win32.zip, FrameLimiter-x64.zip, VirtualFileServer-x64.zip
   force_update: true
   on:
     branch: master

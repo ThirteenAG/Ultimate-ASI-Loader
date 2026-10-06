@@ -2,7 +2,7 @@
 [![GitHub Actions Build](https://github.com/ThirteenAG/Ultimate-ASI-Loader/actions/workflows/msbuild.yml/badge.svg)](https://github.com/ThirteenAG/Ultimate-ASI-Loader/actions/workflows/msbuild.yml)
 
 <p align="center">
-  <a href="https://github.com/ThirteenAG/Ultimate-ASI-Loader" target="_blank"><img width="400" src="https://raw.githubusercontent.com/ThirteenAG/Ultimate-ASI-Loader/refs/heads/master/source/resources/logo.svg"></a>
+  <a href="https://github.com/ThirteenAG/Ultimate-ASI-Loader" target="_blank"><img width="400" src="https://raw.githubusercontent.com/ThirteenAG/Ultimate-ASI-Loader/refs/heads/master/source/loader/resources/logo.svg"></a>
   <br />
   <a href="https://patreon.fusionfix.io/" target="_blank"><picture><source media="(max-width: 768px) and (prefers-color-scheme: dark)" srcset="https://fusionlegacyinitiative.com/sponsors-progress/sponsors-progress-ual-mobile-dark.svg"><source media="(max-width: 768px)" srcset="https://fusionlegacyinitiative.com/sponsors-progress/sponsors-progress-ual-mobile.svg"><source media="(prefers-color-scheme: dark)" srcset="https://fusionlegacyinitiative.com/sponsors-progress/sponsors-progress-ual-dark.svg"><img width="100%" src="https://fusionlegacyinitiative.com/sponsors-progress/sponsors-progress-ual.svg"></picture></a>
   <br />
@@ -59,7 +59,8 @@ This is a DLL file that adds ASI plugin loading functionality to any game that u
 | [xinputuap.dll](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/Win32-latest/xinputuap-Win32.zip)     |  [xinputuap.dll](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/x64-latest/xinputuap-x64.zip)    |
 
 It is possible (and sometimes necessary) to load the original DLL by renaming it to `<dllname>Hooked.dll`, e.g. `d3d12Hooked.dll`.
-With **binkw32.dll** and **vorbisFile.dll**, it is optional, and you can simply replace the DLL. Always make a backup before replacing any files.
+The bink proxies (**binkw32.dll**, **bink2w32.dll**, **binkw64.dll**, **bink2w64.dll**) need the original: rename the game's `binkw32.dll` to `binkw32Hooked.dll` and put the loader in its place. **vorbisFile.dll** can replace the original outright. Back up any file before replacing it.
+The original **vorbisFile.dll** can be kept as `vorbisFileHooked.dll` or `vorbisHooked.dll`. Without it, the loader's built-in vorbisfile (built from the official libvorbis 1.3.7 sources) is used, decoding with the game's `vorbis.dll` when the game has one.
 
 
 ## INSTALLATION
@@ -69,8 +70,106 @@ To install it, you just need to place the DLL into the game directory. Usually, 
 ## USAGE
 
 Put ASI files in the game's root directory or in the `scripts`, `plugins`, or `update` folder.
-If configuration is necessary, the global.ini file can be placed in the 'scripts' or 'plugins' folder. It can be used alongside the chosen DLL, and if so, it is also possible to use the DLL name for the ini file (e.g., version.dll/version.ini).
-[See an example of global.ini here](https://github.com/ThirteenAG/Ultimate-ASI-Loader/blob/master/data/scripts/global.ini).
+If configuration is necessary, the global.ini file can be placed next to the loader or in its `scripts`, `plugins` or `update` folder. It can be used alongside the chosen DLL, and if so, it is also possible to use the DLL name for the ini file (e.g., version.dll/version.ini). When several of these files exist, the later ones in that order win.
+[See an example of global.ini here](https://github.com/ThirteenAG/Ultimate-ASI-Loader/blob/master/data/plugins/global.ini).
+
+Plugins are loaded when the game's own code starts running (`[GlobalSets] DontLoadFromDllMain=1`, the default), also for games wrapped in a protection stub (e.g. Origin) that unpacks the game and loads its DLLs itself. `DontLoadFromDllMain=0` loads them as soon as the loader itself is loaded instead. If plugins do not load, or load at the wrong moment, `[GlobalSets] DebugLog=1` writes `<loader name>.log` next to the loader: what it patched, which calls it ignored and why, what started plugin loading and the plugins it loaded.
+
+All `[GlobalSets]` options and their defaults:
+
+| Option | Default | |
+|---|---|---|
+| `LoadPlugins` | `1` | `0` disables plugin loading entirely |
+| `LoadFromScriptsOnly` | `0` | `1` skips the loader's own folder, plugins load only from `scripts`, `plugins` and update folders |
+| `LoadRecursively` | `1` | also loads plugins from the direct sub folders of `scripts`, `plugins` and update folders |
+| `LoadExtraPlugins` | `modloader\modloader.asi` | plugins loaded first, relative to the loader, separated by `\|` |
+| `DontLoadFromDllMain` | `1` | see above |
+| `LoadFromAPI` | | `[module.]Function`: only this call starts plugin loading. Set to `GetSystemTimeAsFileTime` by itself for GTA V and RDR2 |
+| `UseD3D8to9` | `0` | see [d3d8to9](#d3d8to9) |
+| `Direct3D8DisableMaximizedWindowedModeShim` | `0` | 32-bit: turns off the compatibility shim Windows applies to Direct3D 8 games |
+| `ModernUI` | `1` | `0` uses standard Windows task dialogs |
+| `DebugLog` | `0` | see above |
+| `CxxHotReload` | `0` | see [C++ snippets](#c-snippets-cxx) |
+| `DisableCrashDumps`, `CrashDumpZip`, `CrashDumpFullMemory`, `CrashDumpMaxReports` | | see [CrashDumps](#crashdumps) |
+
+The `[FileLoader]` section has `OverloadFromFolder` (default `update`), see [update folder](#update-folder-overload-from-folder).
+
+## WRITING PLUGINS
+
+An ASI plugin is a DLL renamed to `.asi`. The loader loads it with `LoadLibrary`, then calls its exported `InitializeASI` function. Do the plugin's work there, not in `DllMain`: `DllMain` runs under the Windows loader lock, where showing a window, waiting for a thread, loading DLLs or using COM can deadlock the game. `InitializeASI` runs right after `LoadLibrary`, outside the lock (with the default `DontLoadFromDllMain=1`; with `0` the whole loading happens inside the loader's own `DllMain`).
+
+```cpp
+extern "C" __declspec(dllexport) void InitializeASI()
+{
+    // patches, hooks, settings...
+}
+```
+
+Other ASI loaders only call `LoadLibrary`. A plugin that should work with them too starts from `DllMain` when Ultimate ASI Loader is not the one loading it: the loader is then not on the call stack (it exports `IsUltimateASILoader`). A run-once guard covers loaders that do both:
+
+```cpp
+#include <stacktrace> // C++23
+
+static bool LoadedByUltimateASILoader()
+{
+    for (const auto& frame : std::stacktrace::current())
+    {
+        HMODULE m = nullptr;
+        if (GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, (LPCWSTR)frame.native_handle(), &m) &&
+            GetProcAddress(m, "IsUltimateASILoader"))
+            return true;
+    }
+    return false;
+}
+
+static void InitOnce() { static std::once_flag once; std::call_once(once, Init); }
+
+extern "C" __declspec(dllexport) void InitializeASI() { InitOnce(); }
+
+BOOL WINAPI DllMain(HINSTANCE, DWORD reason, LPVOID)
+{
+    if (reason == DLL_PROCESS_ATTACH && !LoadedByUltimateASILoader()) InitOnce(); // under the loader lock: keep Init simple
+    return TRUE;
+}
+```
+
+If the loader is on the stack because another plugin imported this one, the loader calls `InitializeASI` when it reaches the file in its own scan.
+
+The demo plugins in [`source/plugins`](source/plugins) all follow this pattern; each is one source file (three also ship an `.ini`) (downloads: the [demo-plugins](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/tag/demo-plugins) release):
+
+| Plugin | Shows |
+|---|---|
+| `MessageBox` | the smallest plugin: `InitializeASI`, and why nothing belongs in `DllMain` |
+| `PluginTemplate` | a starting point for a fix: ini settings, a log file, an inline hook (safetyhook), a byte pattern search (Hooking.Patterns), the loader's update folder |
+| `VirtualFiles` | the loader's file API: replaces game files from its ini without touching the disk |
+| `FrameLimiter` | hooking a COM interface in any game: caps the frame rate of Direct3D 9 / 10 / 11 / 12 games |
+| `ExeUnprotect` | makes the game's executable writable for old plugins that patch it without `VirtualProtect` |
+
+## C++ SNIPPETS (.cxx)
+
+Small patches can be written as plain C++ source files with the `.cxx` extension and placed wherever ASI plugins go (the game folder, `scripts`, `plugins`, update folders). The loader compiles them when the game starts; no compiler or SDK is needed. The same file also builds with Visual Studio as a DLL/ASI, so it can be debugged natively.
+
+```cpp
+// scripts\NoIntro.cxx
+#include <injector/injector.hpp>
+#include <Hooking.Patterns.h>
+
+void Init()
+{
+    injector::WriteMemory<uint8_t>(hook::get_pattern("74 10 53 53 6A 1B"), 0xEB, true);
+}
+```
+
+`Init()` runs once the snippet is compiled, and `Shutdown()` when it is unloaded. Snippets can use `injector/injector.hpp` (memory writes, NOP, JMP, CALL), `Hooking.Patterns.h` (pattern scanning) and `safetyhook.hpp` (inline, mid, VMT and VM hooks), and call any function exported by the DLLs loaded in the game (declare it with `extern "C"`). The language is a subset of C++: see [source/loader/cxx/cxxsnippets/README.md](source/loader/cxx/cxxsnippets/README.md) for what is supported.
+
+**[examples/snippets](examples/snippets)** has one example per common task: patching values and jumps, patterns in the exe or a DLL, inline hooks (partial and full replacement, x86 calling conventions), mid hooks, hooking DLL exports and Windows functions, redirecting one call, Direct3D/virtual methods, game structs, DLLs loaded later, ini settings, threads and hotkeys, hot reload. Its README lists what snippets can't do and what to use instead.
+
+Problems never crash the game silently:
+- A compile error shows the file, line and message, and the other snippets still load.
+- A crash in `Init` (or in the snippet's global initialization) is reported with the line that crashed. That snippet is unloaded, and its memory writes are undone.
+- A crash later on, for example in a hook the game calls, is written to `<loader name>.log` with the snippet's file, line and function. If a `CrashDumps` folder exists, the crash report names that line too.
+
+`[GlobalSets] CxxHotReload=1` reloads a snippet when its file is saved while the game runs (or a header in its folder changes). The edit is compiled first: if it has errors, they are shown and the running version stays. Otherwise the running version is unloaded and the new one starts. Unloading runs `Shutdown()`, removes its hooks and restores every byte it changed through `WriteMemory`, `MakeNOP`, `MakeJMP` and similar.
 
 ## UPDATE FOLDER (Overload From Folder)
 
@@ -90,7 +189,7 @@ Resident Evil 5\update\nativePC_MT\Image\Archive\ChapterEnd11.arc
 
 To revert the game to its initial state, simply remove the `update` folder.
 
-Please note that the `update` folder is relative to the location of the ASI loader, so you need to adjust paths accordingly. For example:
+Please note that the `update` folder is relative to the game's executable (where the ASI loader is installed), so you need to adjust paths accordingly. For example:
 
 ```
 \Gameface\Content\Movies\1080\GTA_SA_CREDITS_FINAL_1920x1080.mp4
@@ -121,33 +220,35 @@ To create a custom header, create `update.txt` inside `update` or total conversi
 Resident Evil 5 - Nightmare (Story mode mod)
 ```
 
+The selector picks the first folder by itself after 10 seconds, unless you use the keyboard or the mouse. It is the loader's own window (light or dark like Windows, keyboard: arrow keys, Enter, Esc, 1-9); `[GlobalSets] ModernUI=0` uses a standard Windows task dialog instead. Error messages use the same style.
+
+The game sees the update folder merged into its own folders: files and folders that exist only in `update` appear in the game folder too (file listings included), and files added to or removed from `update` while the game runs are picked up. New files the game creates are written to the game folder, never into `update`.
+
+### Zip packages
+
+Instead of a folder, the files can come from a zip archive in the `packages` folder: `packages\<anything>.zip`, or an archive split into parts (`<name>.zip.001`, `<name>.zip.002`, ... or `.zip.1`, `.zip.2`, ...). The top-level folder inside the archive names the update folder it provides (`update\...`, `nightmare\...`; case does not matter). If the folder also exists on disk, both are used and files in the folder win. Several archives providing the same folder are merged (the last one by name wins). Files are read directly from the archive and nothing is extracted to disk. The folder appears at `<game>\update`, so plugins can list and read it with the normal file functions, and `GetOverloadPath` returns that path. ASI plugins inside archives are not loaded. A zip-provided folder is marked `[ZIP]` in the selector dialog.
+
 To get the current update path, use the ASI Loader's `GetOverloadPathA` or `GetOverloadPathW` exports from the ASI plugin.
 
 ```cpp
+// The loader can have any proxy name: find it by its IsUltimateASILoader export
 bool (WINAPI* GetOverloadPathW)(wchar_t* out, size_t out_size) = nullptr;
+HMODULE modules[1024];
+DWORD needed = 0;
+K32EnumProcessModules(GetCurrentProcess(), modules, sizeof(modules), &needed);
+for (DWORD i = 0; i < needed / sizeof(HMODULE) && i < 1024; ++i)
+    if (GetProcAddress(modules[i], "IsUltimateASILoader"))
+        GetOverloadPathW = (decltype(GetOverloadPathW))GetProcAddress(modules[i], "GetOverloadPathW");
 
-ModuleList dlls;
-dlls.Enumerate(ModuleList::SearchLocation::LocalOnly);
-for (auto& e : dlls.m_moduleList)
-{
-    auto m = std::get<HMODULE>(e);
-    if (IsModuleUAL(m)) {
-        GetOverloadPathW = (decltype(GetOverloadPathW))GetProcAddress(m, "GetOverloadPathW");
-        break;
-    }
-}
-
-std::wstring s;
-s.resize(MAX_PATH, L'\0');
-if (!GetOverloadPathW || !GetOverloadPathW(s.data(), s.size()))
-    s = GetExeModulePath() / L"update";
-
-auto updatePath = std::filesystem::path(s.data());
+wchar_t path[MAX_PATH * 4];
+std::filesystem::path updatePath;
+if (GetOverloadPathW && GetOverloadPathW(path, std::size(path)))
+    updatePath = path; // no update folder is active otherwise
 ```
 
 ## ADDITIONAL WINDOWED MODE FEATURE (x86 builds only, legacy feature)
 
-The 32-bit version of the ASI loader has a built-in wndmode.dll, which can be loaded if you create an empty wndmode.ini in the folder with the ASI loader's DLL. It will be automatically filled with example configuration at the first run of the game. Settings are not universal and should be changed for each specific game, but usually, it works as is.
+The 32-bit version of the ASI loader has a built-in window mode, which is enabled if you create an empty wndmode.ini in the folder with the ASI loader's DLL. It will be automatically filled with example configuration at the first run of the game. Settings are not universal and should be changed for each specific game, but usually, it works as is.
 
 ## D3D8TO9
 
@@ -159,11 +260,26 @@ UseD3D8to9=1
 ```
 The ASI Loader must be named `d3d8.dll` in order for this feature to take effect.
 
-[See an example of global.ini here](https://github.com/ThirteenAG/Ultimate-ASI-Loader/blob/master/data/scripts/global.ini#L8).
+[See an example of global.ini here](https://github.com/ThirteenAG/Ultimate-ASI-Loader/blob/master/data/plugins/global.ini#L8).
 
 ## CrashDumps
 
-The ASI loader is now capable of generating crash minidumps and crash logs. To use this feature, create a folder named `CrashDumps` in the folder with the ASI loader's DLL. You can disable it via the `DisableCrashDumps=1` ini option.
+The ASI loader can write a crash report when the game crashes. To use this feature, create a folder named `CrashDumps` next to the ASI loader's DLL (or next to the game executable). Each crash produces:
+
+- `<game>.exe.<date>_<time>.log`: a readable report. It starts with a summary of what crashed and where, and names the plugin if the crash happened inside one. Every code address is given as module+offset, with the function and source line when symbols are available, and as the address in IDA (the module at its own image base, ready for Go to address). For the crash location and the call stack it adds a byte pattern with wildcards that is unique in the module file, or the match number when no unique pattern exists, to find the place with IDA's binary search or a pattern scanner. The report also lists system information, the exception (including the type and message of C++ exceptions), return addresses found on the stack, registers, code and stack memory around the crash, the other threads, the loaded plugins and every loaded module with its version and image base.
+- `<game>.exe.<date>_<time>.dmp`: the minidump. Open it in Visual Studio or WinDbg.
+- `<game>.exe.<date>_<time>.zip`: the minidump and the log in one file. Attach this file when reporting a crash.
+
+Options in `[GlobalSets]`:
+
+| Option | Default | |
+|---|---|---|
+| `DisableCrashDumps` | `0` | `1` turns crash reports off even if the folder exists |
+| `CrashDumpZip` | `1` | `0` skips the `.zip`, leaving the `.log` and `.dmp` |
+| `CrashDumpFullMemory` | `0` | `1` writes a full memory dump (large, but contains everything) |
+| `CrashDumpMaxReports` | `10` | number of reports kept in the folder; older ones are deleted (`0` keeps all) |
+
+The report is written by a separate thread, so crashes such as stack overflows are captured too. Once installed, the game cannot replace the crash handler.
 
 ## Using with UWP games
 
