@@ -123,6 +123,7 @@ function ual_loader_sources(p, v)
    includedirs { p .. "external/injector/minhook/include", p .. "external/miniz", p .. "source/shared" }
    files { p .. "external/injector/minhook/include/*.h", p .. "external/injector/minhook/src/**.h", p .. "external/injector/minhook/src/**.c" }
    files { p .. "external/miniz/miniz*.c", p .. "external/miniz/miniz*.h" } -- miniz_export.h: source/shared
+   files { p .. "source/compat/xidi/*.hpp", p .. "source/compat/xidi/*.cpp" } -- Xidi.32.dll / Xidi.64.dll without its forwarders
 
    filter "platforms:Win32"
       -- backwards compatibility (Win32 games)

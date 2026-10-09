@@ -540,6 +540,34 @@ HOST_SCENARIO(hooked_sentinel)
         host.Skip("no sentinel for " + ualtest::utf8(proxy));
 }
 
+// Xidi.32.dll / Xidi.64.dll serves what Xidi replaces, the rest still comes from System32
+HOST_SCENARIO(xidi_sentinel)
+{
+    if (!host.RequireUal()) return;
+    std::wstring proxy = Lower(args);
+    if (proxy == L"dinput8.dll")
+    {
+        void* obj = (void*)1;
+        HRESULT hr = Fn<HRESULT(WINAPI*)(HINSTANCE, DWORD, REFIID, LPVOID*, LPUNKNOWN)>(host.ual.module, "DirectInput8Create")(GetModuleHandleW(nullptr), DIRECTINPUT_VERSION, IID_IDirectInput8W, &obj, nullptr);
+        host.CheckEq((long)hr, ualtest::kFakeXidiDirectInput8CreateResult, "DirectInput8Create is forwarded to Xidi's dinput8_DirectInput8Create");
+    }
+    else if (proxy == L"dinput.dll")
+    {
+        void* obj = (void*)1;
+        HRESULT hr = Fn<HRESULT(WINAPI*)(HINSTANCE, DWORD, LPVOID*, LPUNKNOWN)>(host.ual.module, "DirectInputCreateA")(GetModuleHandleW(nullptr), 0x0700, &obj, nullptr);
+        host.CheckEq((long)hr, ualtest::kFakeXidiDirectInputCreateResult, "DirectInputCreateA is forwarded to Xidi's dinput_DirectInputCreateA");
+    }
+    else if (proxy == L"winmm.dll")
+    {
+        UINT n = Fn<UINT(WINAPI*)()>(host.ual.module, "joyGetNumDevs")();
+        host.CheckEq(n, ualtest::kFakeXidiJoyGetNumDevs, "joyGetNumDevs is forwarded to Xidi's winmm_joyGetNumDevs");
+        DWORD t = Fn<DWORD(WINAPI*)()>(host.ual.module, "timeGetTime")();
+        host.Check(t != ualtest::kFakeTimeGetTime, "timeGetTime still comes from the system winmm.dll");
+    }
+    else
+        host.Skip("no sentinel for " + ualtest::utf8(proxy));
+}
+
 // --- zip packages
 
 // AddVirtualFileForOverload returns true but the zip package's file still wins

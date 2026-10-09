@@ -4,3 +4,6 @@ EXPORTS
     GetFileVersionInfoSizeW
     timeGetTime
     ov_streams
+    dinput8_DirectInput8Create
+    winmm_joyGetNumDevs
+    dinput_DirectInputCreateA

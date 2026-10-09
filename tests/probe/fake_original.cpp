@@ -26,6 +26,24 @@ extern "C" long __cdecl ov_streams(void*)
     return ualtest::kFakeOvStreams;
 }
 
+// Xidi.32.dll / Xidi.64.dll exports, see source/compat/xidi
+extern "C" HRESULT WINAPI dinput8_DirectInput8Create(HINSTANCE, DWORD, const void*, void** ppvOut, void*)
+{
+    if (ppvOut) *ppvOut = nullptr;
+    return ualtest::kFakeXidiDirectInput8CreateResult;
+}
+
+extern "C" HRESULT WINAPI dinput_DirectInputCreateA(HINSTANCE, DWORD, void** ppDI, void*)
+{
+    if (ppDI) *ppDI = nullptr;
+    return ualtest::kFakeXidiDirectInputCreateResult;
+}
+
+extern "C" UINT WINAPI winmm_joyGetNumDevs()
+{
+    return ualtest::kFakeXidiJoyGetNumDevs;
+}
+
 BOOL APIENTRY DllMain(HMODULE, DWORD, LPVOID)
 {
     return TRUE;

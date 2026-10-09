@@ -59,6 +59,7 @@ This is a DLL file that adds ASI plugin loading functionality to any game that u
 | [xinputuap.dll](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/Win32-latest/xinputuap-Win32.zip)     |  [xinputuap.dll](https://github.com/ThirteenAG/Ultimate-ASI-Loader/releases/download/x64-latest/xinputuap-x64.zip)    |
 
 It is possible (and sometimes necessary) to load the original DLL by renaming it to `<dllname>Hooked.dll`, e.g. `d3d12Hooked.dll`.
+[Xidi](https://github.com/samuelgr/Xidi) needs no renaming: with the loader named **dinput8.dll**, **dinput.dll** or **winmm.dll**, put `Xidi.32.dll` or `Xidi.64.dll` next to it instead of Xidi's DLL of that name. A `<dllname>Hooked.dll` takes precedence.
 The bink proxies (**binkw32.dll**, **bink2w32.dll**, **binkw64.dll**, **bink2w64.dll**) need the original: rename the game's `binkw32.dll` to `binkw32Hooked.dll` and put the loader in its place. **vorbisFile.dll** can replace the original outright. Back up any file before replacing it.
 The original **vorbisFile.dll** can be kept as `vorbisFileHooked.dll` or `vorbisHooked.dll`. Without it, the loader's built-in vorbisfile (built from the official libvorbis 1.3.7 sources) is used, decoding with the game's `vorbis.dll` when the game has one.
 

@@ -4,6 +4,8 @@
 #include "../core/paths.hpp"
 #include "../core/pe.hpp"
 #include "../core/strings.hpp"
+#include "../core/log.hpp"
+#include "../../compat/xidi/xidi.hpp"
 #ifndef _WIN64
 #include "../../compat/vorbisfile/vorbisfile.hpp"
 #include <d3d8to9/source/d3d8to9.hpp>
@@ -115,6 +117,22 @@ namespace ual::proxy
             MessageBoxW(nullptr, msg.c_str(), L"ASI Loader", MB_ICONERROR | MB_OK);
         }
 
+        // Xidi.32.dll / Xidi.64.dll next to the loader replaces what Xidi's forwarder of this name would
+        void FillFromXidi(const char* proxy)
+        {
+            HMODULE xidi = compat::xidi::Load(proxy, Self().dir);
+            if (!xidi) return;
+            int n = 0;
+            for (const auto& s : kSlots)
+                if (s.name && (!strcmp(s.proxy, proxy) || !strcmp(s.proxy, "shared")))
+                    if (FARPROC f = compat::xidi::Export(xidi, proxy, s.name))
+                    {
+                        *s.slot = f;
+                        ++n;
+                    }
+            UAL_LOG("Xidi: %d %s exports", n, proxy);
+        }
+
 #ifndef _WIN64
         // vorbisFileHooked.dll or vorbisHooked.dll next to the loader (both names are in use),
         // otherwise the built-in vorbisfile from compat/vorbisfile
@@ -200,6 +218,7 @@ namespace ual::proxy
                 if (p->flags & UAL_SHARED) LoadSharedExports(m);
                 if (p->flags & UAL_APPCOMPAT) Fill("appcompat", m);
             }
+            if (!hooked) FillFromXidi(entry->proxy);
 #ifndef _WIN64
             if (!strcmp(entry->proxy, "d3d8") && !hooked && GetSettings().useD3D8to9) g_slots.d3d8_Direct3DCreate8 = (FARPROC)Direct3DCreate8;
 #endif

@@ -598,6 +598,31 @@ ARCH_TEST("a local <name>Hooked.dll is used as the original library instead of S
     }
 }
 
+ARCH_TEST("Xidi.32.dll / Xidi.64.dll next to dinput8.dll, dinput.dll or winmm.dll is used like Xidi's own forwarder", "[loading][chaining]")
+{
+    std::wstring xidi = arch.is64() ? L"Xidi.64.dll" : L"Xidi.32.dll";
+    std::vector<std::wstring> names = { L"dinput8.dll", L"winmm.dll" };
+    if (!arch.is64()) names.push_back(L"dinput.dll"); // the dinput.dll proxy is 32-bit only
+    for (const auto& name : names)
+    {
+        INFO(name == L"dinput8.dll" ? "dinput8.dll" : name == L"dinput.dll" ? "dinput.dll" : "winmm.dll");
+        Sandbox sb(arch);
+        sb.Loader(name);
+        sb.Copy(arch.fakeOriginal(), xidi);
+        sb.Host();
+        auto r = sb.Run({ L"load:" + std::wstring(name), L"trigger:Sleep", L"scenario:xidi_sentinel|" + std::wstring(name) });
+        REQUIRE_SCENARIO(r, "xidi_sentinel");
+    }
+    // <name>Hooked.dll wins over Xidi
+    Sandbox sb(arch);
+    sb.Loader(L"dinput8.dll");
+    sb.Copy(arch.fakeOriginal(), xidi);
+    sb.Copy(arch.fakeOriginal(), L"dinput8Hooked.dll");
+    sb.Host();
+    auto r = sb.Run({ L"load:dinput8.dll", L"trigger:Sleep", L"scenario:hooked_sentinel|dinput8.dll" });
+    REQUIRE_SCENARIO(r, "hooked_sentinel");
+}
+
 WIN32_TEST("vorbisFile.dll uses its built-in vorbisfile without a local original", "[loading][chaining][x86]")
 {
     for (bool withVorbisDll : { true, false }) // game's vorbis.dll if present, else built-in libvorbis
