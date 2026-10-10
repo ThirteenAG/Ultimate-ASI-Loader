@@ -163,41 +163,41 @@ namespace wndmode
         HRESULT STDMETHODCALLTYPE D9_Present(IDirect3DDevice9* dev, const RECT* s, const RECT* d, HWND w, const RGNDATA* r)
         {
             FpsTick(g_fps);
-            return Orig<decltype(&D9_Present)>(dev, DEV9_Present)(dev, s, d, w, r);
+            return OrigMethod(dev, DEV9_Present, D9_Present)(dev, s, d, w, r);
         }
 
         HRESULT STDMETHODCALLTYPE D9_PresentEx(IDirect3DDevice9Ex* dev, const RECT* s, const RECT* d, HWND w, const RGNDATA* r, DWORD f)
         {
             FpsTick(g_fps);
-            return Orig<decltype(&D9_PresentEx)>(dev, DEV9EX_PresentEx)(dev, s, d, w, r, f);
+            return OrigMethod(dev, DEV9EX_PresentEx, D9_PresentEx)(dev, s, d, w, r, f);
         }
 
         HRESULT STDMETHODCALLTYPE D9_Reset(IDirect3DDevice9* dev, D3DPRESENT_PARAMETERS* pp)
         {
-            if (!pp) return Orig<decltype(&D9_Reset)>(dev, DEV9_Reset)(dev, pp);
+            if (!pp) return OrigMethod(dev, DEV9_Reset, D9_Reset)(dev, pp);
             DeviceChangeScope quiet;
             D3DPRESENT_PARAMETERS copy = *pp;
             bool fixed = FixDevice9(dev, *pp, copy);
-            HRESULT hr = Orig<decltype(&D9_Reset)>(dev, DEV9_Reset)(dev, &copy);
+            HRESULT hr = OrigMethod(dev, DEV9_Reset, D9_Reset)(dev, &copy);
             if (fixed && SUCCEEDED(hr)) CopyBack(*pp, copy);
             return hr;
         }
 
         HRESULT STDMETHODCALLTYPE D9_ResetEx(IDirect3DDevice9Ex* dev, D3DPRESENT_PARAMETERS* pp, D3DDISPLAYMODEEX* mode)
         {
-            if (!pp) return Orig<decltype(&D9_ResetEx)>(dev, DEV9EX_ResetEx)(dev, pp, mode);
+            if (!pp) return OrigMethod(dev, DEV9EX_ResetEx, D9_ResetEx)(dev, pp, mode);
             DeviceChangeScope quiet;
             D3DPRESENT_PARAMETERS copy = *pp;
             bool fixed = FixDevice9(dev, *pp, copy);
             if (fixed) mode = nullptr; // windowed devices take no fullscreen display mode
-            HRESULT hr = Orig<decltype(&D9_ResetEx)>(dev, DEV9EX_ResetEx)(dev, &copy, mode);
+            HRESULT hr = OrigMethod(dev, DEV9EX_ResetEx, D9_ResetEx)(dev, &copy, mode);
             if (fixed && SUCCEEDED(hr)) CopyBack(*pp, copy);
             return hr;
         }
 
         HRESULT STDMETHODCALLTYPE D9_CreateAdditionalSwapChain(IDirect3DDevice9* dev, D3DPRESENT_PARAMETERS* pp, IDirect3DSwapChain9** out)
         {
-            if (!pp) return Orig<decltype(&D9_CreateAdditionalSwapChain)>(dev, DEV9_CreateAdditionalSwapChain)(dev, pp, out);
+            if (!pp) return OrigMethod(dev, DEV9_CreateAdditionalSwapChain, D9_CreateAdditionalSwapChain)(dev, pp, out);
             D3DPRESENT_PARAMETERS copy = *pp;
             D3DDEVICE_CREATION_PARAMETERS cp{};
             dev->GetCreationParameters(&cp);
@@ -205,14 +205,14 @@ namespace wndmode
             dev->GetDirect3D(&d3d);
             FixPP9(copy, d3d, cp.AdapterOrdinal, cp.DeviceType);
             if (d3d) d3d->Release();
-            return Orig<decltype(&D9_CreateAdditionalSwapChain)>(dev, DEV9_CreateAdditionalSwapChain)(dev, &copy, out);
+            return OrigMethod(dev, DEV9_CreateAdditionalSwapChain, D9_CreateAdditionalSwapChain)(dev, &copy, out);
         }
 
         // In windowed mode the front buffer is the whole desktop; games pass a
         // surface the size of their back buffer, which would make the call fail.
         HRESULT STDMETHODCALLTYPE D9_GetFrontBufferData(IDirect3DDevice9* dev, UINT swapChain, IDirect3DSurface9* dest)
         {
-            auto orig = Orig<decltype(&D9_GetFrontBufferData)>(dev, DEV9_GetFrontBufferData);
+            auto orig = OrigMethod(dev, DEV9_GetFrontBufferData, D9_GetFrontBufferData);
             if (g_forced && MainWindow() && IsIconic(MainWindow())) return D3D_OK; // nothing of the game is on screen
             D3DSURFACE_DESC dd{};
             D3DDISPLAYMODE dm{};
@@ -242,14 +242,14 @@ namespace wndmode
 
         void PatchDevice9(IDirect3DDevice9* dev, bool ex)
         {
-            PatchVtable(dev, DEV9_CreateAdditionalSwapChain, (void*)D9_CreateAdditionalSwapChain);
-            PatchVtable(dev, DEV9_Reset, (void*)D9_Reset);
-            PatchVtable(dev, DEV9_Present, (void*)D9_Present);
-            PatchVtable(dev, DEV9_GetFrontBufferData, (void*)D9_GetFrontBufferData);
+            HookMethod(dev, DEV9_CreateAdditionalSwapChain, (void*)D9_CreateAdditionalSwapChain);
+            HookMethod(dev, DEV9_Reset, (void*)D9_Reset);
+            HookMethod(dev, DEV9_Present, (void*)D9_Present);
+            HookMethod(dev, DEV9_GetFrontBufferData, (void*)D9_GetFrontBufferData);
             if (ex)
             {
-                PatchVtable(dev, DEV9EX_PresentEx, (void*)D9_PresentEx);
-                PatchVtable(dev, DEV9EX_ResetEx, (void*)D9_ResetEx);
+                HookMethod(dev, DEV9EX_PresentEx, (void*)D9_PresentEx);
+                HookMethod(dev, DEV9EX_ResetEx, (void*)D9_ResetEx);
             }
         }
 

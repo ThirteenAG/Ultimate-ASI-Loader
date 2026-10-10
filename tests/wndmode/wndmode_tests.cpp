@@ -183,6 +183,9 @@ namespace child
         IDirect3DDevice9* dev = CreateD3D9Fullscreen(d3d, hwnd, 640, 480);
         if (!dev) ExitProcess(1);
         Check(g_sizeMessages == 0, "the game sees no WM_SIZE caused by the window change during CreateDevice", Str(g_sizeMessages));
+        // d3d9 keeps a vtable copy per device and rebuilds it (d3dx9 effects do), so a patched slot doesn't last
+        const void* reset = (*(void***)dev)[16];
+        Check(!InThisModule(reset) && IsDetoured(reset), "IDirect3DDevice9::Reset is hooked in d3d9's code, not in the device's vtable");
         IDirect3DSwapChain9* sc = nullptr;
         D3DPRESENT_PARAMETERS actual{};
         if (SUCCEEDED(dev->GetSwapChain(0, &sc)))

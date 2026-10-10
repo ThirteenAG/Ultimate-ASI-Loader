@@ -74,6 +74,17 @@ namespace wndmode
         return reinterpret_cast<F>(Original(object, slot));
     }
 
+    // Hooks the code a vtable slot points to instead of the slot. d3d9 keeps a copy of the vtable in
+    // each device and rebuilds it (d3dx9 effects do that), which drops slot patches.
+    void HookMethod(void* object, int slot, void* detour);
+    void* MethodOriginal(void* object, int slot, void* detour);
+
+    template<class F>
+    F OrigMethod(void* object, int slot, F detour)
+    {
+        return reinterpret_cast<F>(MethodOriginal(object, slot, (void*)detour));
+    }
+
     void SubclassWindow(HWND hwnd);
     // Restyles, sets the client size and centres the window on monitor (default: its own).
     // 0 keeps the client size. Posted to the window's thread when called from another.

@@ -23,10 +23,18 @@ namespace wndmode
             void* original;
         };
 
+        struct MethodHook
+        {
+            void* target; // the implementation, hooked in place
+            void* detour;
+            void* original;
+        };
+
         CRITICAL_SECTION g_hookCs;
         std::vector<ExportHook> g_exports;
         SRWLOCK g_vtLock = SRWLOCK_INIT;
         std::vector<VtableSlot> g_slots;
+        std::vector<MethodHook> g_methods; // under g_vtLock
         std::vector<std::pair<void**, int>> g_tags;
         void* g_dllCookie = nullptr;
         bool g_init = false;
@@ -77,6 +85,15 @@ namespace wndmode
                 *h.original = nullptr;
                 any = true;
             }
+            AcquireSRWLockExclusive(&g_vtLock);
+            for (size_t i = g_methods.size(); i-- > 0;)
+                if ((uintptr_t)g_methods[i].target >= (uintptr_t)base && (uintptr_t)g_methods[i].target < (uintptr_t)base + size)
+                {
+                    MH_RemoveHook(g_methods[i].target);
+                    g_methods.erase(g_methods.begin() + i);
+                    any = true;
+                }
+            ReleaseSRWLockExclusive(&g_vtLock);
             if (any) Log("module at %p unloaded, its hooks are pending again", base);
         }
 
@@ -213,6 +230,10 @@ namespace wndmode
             MH_ApplyQueued();
         }
         AcquireSRWLockExclusive(&g_vtLock);
+        for (auto& m : g_methods)
+            MH_QueueDisableHook(m.target);
+        MH_ApplyQueued();
+        g_methods.clear();
         for (auto& s : g_slots)
         {
             DWORD old;
@@ -257,6 +278,46 @@ namespace wndmode
             if (s.vtbl == vtbl && s.slot == slot) { result = s.original; break; }
         ReleaseSRWLockShared(&g_vtLock);
         return result ? result : vtbl[slot];
+    }
+
+    void HookMethod(void* object, int slot, void* detour)
+    {
+        if (!object) return;
+        EnsureInit();
+        void* target = (*(void***)object)[slot];
+        if (target == detour) return;
+        AcquireSRWLockExclusive(&g_vtLock);
+        bool done = false;
+        for (auto& m : g_methods)
+            if (m.target == target || m.original == target) { done = true; break; }
+        if (!done)
+        {
+            void* original = nullptr;
+            MH_STATUS st = MH_CreateHook(target, detour, &original);
+            if (st == MH_OK && (st = MH_EnableHook(target)) == MH_OK)
+                g_methods.push_back({ target, detour, original });
+            else
+            {
+                if (original) MH_RemoveHook(target);
+                Log("method hook %d failed: %d", slot, st);
+            }
+        }
+        ReleaseSRWLockExclusive(&g_vtLock);
+    }
+
+    void* MethodOriginal(void* object, int slot, void* detour)
+    {
+        void* current = (*(void***)object)[slot];
+        void* result = nullptr;
+        AcquireSRWLockShared(&g_vtLock);
+        for (auto& m : g_methods)
+            if (m.detour == detour && (m.target == current || !result))
+            {
+                result = m.original;
+                if (m.target == current) break;
+            }
+        ReleaseSRWLockShared(&g_vtLock);
+        return result ? result : current; // not hooked: the slot is the real method
     }
 
     void SetVtableTag(void* object, int tag)
