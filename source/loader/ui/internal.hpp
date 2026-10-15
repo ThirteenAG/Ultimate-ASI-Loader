@@ -31,6 +31,17 @@ namespace ual::ui
     // http(s) only
     void OpenUrl(HWND owner, const wchar_t* url);
 
+    // Mouse movement that stops the countdown, polled from the dialog's timer. A low-level mouse hook would
+    // make every mouse move of the system wait for the dialog's thread. A cursor moved by something other than
+    // the user (a display change) doesn't count: some input must have happened since Start.
+    struct MouseWatch
+    {
+        POINT pos{};
+        DWORD input = 0;
+        void Start();
+        bool Moved() const;
+    };
+
     // False if nothing could be shown. Task dialogs fail under the loader lock during process start.
     namespace taskdialog
     {

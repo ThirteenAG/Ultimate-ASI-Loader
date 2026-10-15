@@ -44,6 +44,20 @@ namespace ual::ui
         if (url && (!_wcsnicmp(url, L"https://", 8) || !_wcsnicmp(url, L"http://", 7))) ShellExecuteW(owner, L"open", url, nullptr, nullptr, SW_SHOWNORMAL);
     }
 
+    void MouseWatch::Start()
+    {
+        GetCursorPos(&pos);
+        LASTINPUTINFO li{ sizeof(li) };
+        input = GetLastInputInfo(&li) ? li.dwTime : 0;
+    }
+
+    bool MouseWatch::Moved() const
+    {
+        POINT p;
+        LASTINPUTINFO li{ sizeof(li) };
+        return GetCursorPos(&p) && (p.x != pos.x || p.y != pos.y) && GetLastInputInfo(&li) && li.dwTime != input;
+    }
+
     bool IsPackagedProcess()
     {
         using GetPackageFamilyNameFn = LONG(WINAPI*)(HANDLE, UINT32*, PWSTR);
@@ -86,9 +100,11 @@ namespace ual::ui
         {
             for (size_t i = 0; i < choices.size(); ++i)
             {
-                std::wstring msg = L"Multiple folders have been specified for file overloading.\nUse this folder?\n\n" + ChoiceCaptionText(choices[i]) + L"\n" +
+                std::wstring msg = L"Multiple folders have been specified for file overloading.\nUse this folder? Cancel quits the game.\n\n" + ChoiceCaptionText(choices[i]) + L"\n" +
                                    ChoiceDetailText(choices[i]);
-                if (MessageBoxW(nullptr, msg.c_str(), kTitle, MB_YESNO | MB_ICONQUESTION) == IDYES) return (int)i;
+                int answer = MessageBoxW(nullptr, msg.c_str(), kTitle, MB_YESNOCANCEL | MB_ICONQUESTION);
+                if (answer == IDYES) return (int)i;
+                if (answer == IDCANCEL) return kChoiceCancelled; // also the close button
             }
             return -1;
         }

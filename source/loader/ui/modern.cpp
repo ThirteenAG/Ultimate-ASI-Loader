@@ -24,7 +24,9 @@ namespace ual::ui::modern
     {
         constexpr wchar_t kWindowClass[] = L"UltimateASILoaderDialog";
         constexpr UINT_PTR kTimerFrame = 1;
-        constexpr float kWidth = 600.0f;
+        constexpr float kWidth = 600.0f;    // initial width; the height fits the content
+        constexpr float kMinWidth = 460.0f; // the user can resize the window down to this
+        constexpr float kResizeBorder = 6.0f;
         constexpr float kPad = 28.0f;
         constexpr float kTitleBarHeight = 40.0f;
         constexpr float kWindowButtonWidth = 46.0f;
@@ -226,24 +228,6 @@ namespace ual::ui::modern
             return s;
         }
 
-        // input that stops the countdown
-
-        HWND g_window = nullptr; // one dialog at a time
-        POINT g_lastMouse{ -1, -1 };
-        HHOOK g_mouseHook = nullptr;
-        void NotifyActivity();
-
-        LRESULT CALLBACK MouseHook(int code, WPARAM wp, LPARAM lp)
-        {
-            if (code == HC_ACTION && wp == WM_MOUSEMOVE && lp)
-            {
-                POINT pt = ((MSLLHOOKSTRUCT*)lp)->pt;
-                if (g_lastMouse.x != -1 && (pt.x != g_lastMouse.x || pt.y != g_lastMouse.y)) NotifyActivity();
-                g_lastMouse = pt;
-            }
-            return CallNextHookEx(nullptr, code, wp, lp);
-        }
-
         // the dialog
 
         class Dialog
@@ -255,7 +239,7 @@ namespace ual::ui::modern
             std::vector<Choice> choices;
             bool countdown = false;
 
-            int result = -1;                 // chosen index, or 0 for Continue
+            int result = -1;                 // chosen index, kChoiceCancelled, or 0 for Continue
 
             explicit Dialog(Factories& f) : f_(f) {}
 
@@ -274,11 +258,6 @@ namespace ual::ui::modern
             {
                 if (!countdown || stopped_) return;
                 stopped_ = true;
-                if (g_mouseHook)
-                {
-                    UnhookWindowsHookEx(g_mouseHook);
-                    g_mouseHook = nullptr;
-                }
                 UpdateFooterText();
                 Invalidate();
             }
@@ -288,6 +267,7 @@ namespace ual::ui::modern
             {
                 None,
                 Minimize,
+                Maximize,
                 Close,
                 Row,
                 ContentLink,
@@ -308,8 +288,9 @@ namespace ual::ui::modern
                 {
                     ComPtr<IDWriteTextLayout> text;
                     float width;
+                    float x = 0, y = 0; // from the row's top left
                 };
-                std::vector<Pill> pills;
+                std::vector<Pill> pills;   // next to the caption, or below the path when they don't fit there
                 float top = 0, height = 0; // in the list
                 float hot = 0;             // hover, animated 0..1
             };
@@ -328,7 +309,8 @@ namespace ual::ui::modern
             HICON taskbarIcon_ = nullptr, smallIcon_ = nullptr;
             std::vector<HWND> automation_; // hidden children: [0] instruction, [1] content, [2] footer, then choices / button
 
-            // layout, in DIPs
+            // layout, in DIPs. The window starts at kWidth and the content's height; once shown, the layout follows its size.
+            float width_ = kWidth, rowWidth_ = 0, minHeight_ = 0;
             float height_ = 0, headerTextX_ = 0, instructionTop_ = 0, contentTop_ = 0, listTop_ = 0, listHeight_ = 0, listContent_ = 0, barTop_ = 0, footerTop_ = 0;
             float scroll_ = 0;
 
@@ -338,7 +320,8 @@ namespace ual::ui::modern
             bool stopped_ = false;     // countdown
             bool done_ = false;
             ULONGLONG shownAt_ = 0, lastFrame_ = 0;
-            float hotMinimize_ = 0, hotClose_ = 0, hotButton_ = 0, hotFooterLink_ = 0;
+            MouseWatch mouse_;         // a move stops the countdown
+            float hotMinimize_ = 0, hotMaximize_ = 0, hotClose_ = 0, hotButton_ = 0, hotFooterLink_ = 0;
             int lastSecond_ = 0;
 
             // setup
@@ -393,39 +376,21 @@ namespace ual::ui::modern
                     fmt->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
                     fmt->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
                 }
+                // a folder name too long for the row ends with "..."
+                ComPtr<IDWriteInlineObject> ellipsis;
+                DWRITE_TRIMMING trimming{ DWRITE_TRIMMING_GRANULARITY_CHARACTER, 0, 0 };
+                if (SUCCEEDED(f_.dwrite->CreateEllipsisTrimmingSign(fPill_.Get(), &ellipsis))) fPill_->SetTrimming(&trimming, ellipsis.Get());
 
                 lTitle_ = Layout(kTitle, fTitle_.Get(), 400);
-                headerTextX_ = kPad + kLogoSize + 18.0f;
-                float textWidth = kWidth - headerTextX_ - kPad;
-                lInstruction_ = Layout(instruction, fInstruction_.Get(), textWidth);
-                lContent_ = Layout(content.text, fBody_.Get(), textWidth);
-                UnderlineLinks(lContent_.Get(), content);
                 lButton_ = Layout(L"Continue", fButton_.Get(), kButtonWidth);
                 lButton_->SetMaxHeight(kButtonHeight); // centered in the button
                 lGlyphInfo_ = Layout(L"i", fGlyph_.Get(), 16);
                 lGlyphError_ = Layout(L"!", fGlyph_.Get(), 16);
+                rows_.resize(choices.size());
 
-                float rowWidth = kWidth - 2 * kPad;
-                for (const auto& c : choices)
-                {
-                    Row r;
-                    if (c.zip) r.pills.push_back({ Layout(L"ZIP", fPill_.Get(), 200), 0 });
-                    for (const auto& inc : c.includes) r.pills.push_back({ Layout(L"+ " + inc, fPill_.Get(), 400), 0 });
-                    float pillsWidth = 0;
-                    for (auto& p : r.pills)
-                    {
-                        p.width = TextWidth(p.text.Get()) + 16.0f;
-                        p.text->SetMaxWidth(p.width);
-                        p.text->SetMaxHeight(20.0f);
-                        pillsWidth += p.width + 6.0f;
-                    }
-                    float textWidth2 = rowWidth - kRowIconWidth - 16.0f;
-                    r.caption = Layout(c.caption, fCaption_.Get(), textWidth2 - pillsWidth);
-                    r.path = Layout(WrappablePath(c.path), fPath_.Get(), textWidth2);
-                    r.height = (std::max)(58.0f, 12.0f + TextHeight(r.caption.Get()) + 3.0f + TextHeight(r.path.Get()) + 12.0f);
-                    rows_.push_back(std::move(r));
-                }
-                UpdateFooterText();
+                // the smallest window keeps the header, one choice and the footer whole
+                Relayout(kMinWidth, 0.0f, false);
+                minHeight_ = rows_.empty() ? height_ : listTop_ + (std::min)(listContent_, rows_.front().height) + Rest();
             }
 
             void UpdateFooterText()
@@ -438,13 +403,86 @@ namespace ual::ui::modern
                 }
                 else
                     footer_ = RichText::Parse(std::wstring(L"<a href=\"") + kUpdateUrl + L"\">" + kUpdateUrl + L"</a>");
-                lFooter_ = Layout(footer_.text, fFooter_.Get(), kWidth - 2 * kPad - 28.0f);
+                lFooter_ = Layout(footer_.text, fFooter_.Get(), width_ - 2 * kPad - 28.0f);
                 UnderlineLinks(lFooter_.Get(), footer_);
                 if (automation_.size() > 2) SetWindowTextW(automation_[2], footer_.text.c_str());
             }
 
-            // vertical positions, given the height available for the window
-            void ComputeLayout(float maxHeight)
+            // caption with the pills on its right if both fit on one line, else the pills wrap below the path
+            void LayoutRow(Row& r, const Choice& c, float rowWidth)
+            {
+                float textWidth = rowWidth - kRowIconWidth - 16.0f;
+                r.pills.clear();
+                if (c.zip) r.pills.push_back({ Layout(L"ZIP", fPill_.Get(), 10000), 0 });
+                for (const auto& inc : c.includes) r.pills.push_back({ Layout(L"+ " + inc, fPill_.Get(), 10000), 0 });
+                float pillsWidth = 0;
+                for (auto& p : r.pills)
+                {
+                    p.width = (std::min)(TextWidth(p.text.Get()) + 16.0f, textWidth);
+                    p.text->SetMaxWidth(p.width - 12.0f); // drawn 6 in, centered
+                    p.text->SetMaxHeight(20.0f);
+                    pillsWidth += p.width + 6.0f;
+                }
+                r.caption = Layout(c.caption, fCaption_.Get(), textWidth);
+                r.path = Layout(WrappablePath(c.path), fPath_.Get(), textWidth);
+                DWRITE_TEXT_METRICS caption{};
+                r.caption->GetMetrics(&caption);
+                float bottom = 12.0f + caption.height + 3.0f + TextHeight(r.path.Get());
+                if (!r.pills.empty() && caption.lineCount == 1 && caption.width + 12.0f + pillsWidth - 6.0f <= textWidth)
+                {
+                    float x = rowWidth - 14.0f;
+                    for (auto it = r.pills.rbegin(); it != r.pills.rend(); ++it)
+                    {
+                        x -= it->width;
+                        it->x = x, it->y = 13.0f;
+                        x -= 6.0f;
+                    }
+                }
+                else if (!r.pills.empty())
+                {
+                    float x = kRowIconWidth, y = bottom + 6.0f;
+                    for (auto& p : r.pills)
+                    {
+                        if (x > kRowIconWidth && x + p.width > kRowIconWidth + textWidth) x = kRowIconWidth, y += 20.0f + 4.0f;
+                        p.x = x, p.y = y;
+                        x += p.width + 6.0f;
+                    }
+                    bottom = y + 20.0f;
+                }
+                r.height = (std::max)(58.0f, bottom + 12.0f);
+            }
+
+            void LayoutRows(float rowWidth)
+            {
+                rowWidth_ = rowWidth;
+                for (size_t i = 0; i < rows_.size(); ++i) LayoutRow(rows_[i], choices[i], rowWidth);
+            }
+
+            // below the list: the countdown bar and the footer
+            float Rest() const { return (countdown ? 18.0f + 4.0f : 0.0f) + 18.0f + kFooterHeight; }
+
+            // Lays everything out for a window of the given width. fit: the height follows the content, the list
+            // scrolls beyond height; otherwise the window is that high and the list takes what is left.
+            void Relayout(float width, float height, bool fit)
+            {
+                width_ = width;
+                headerTextX_ = kPad + kLogoSize + 18.0f;
+                float textWidth = width_ - headerTextX_ - kPad;
+                lInstruction_ = Layout(instruction, fInstruction_.Get(), textWidth);
+                lContent_ = Layout(content.text, fBody_.Get(), textWidth);
+                UnderlineLinks(lContent_.Get(), content);
+                UpdateFooterText();
+                LayoutRows(width_ - 2 * kPad);
+                ComputeLayout(height, fit);
+                if (listContent_ > listHeight_ + 0.5f) // room for the scrollbar
+                {
+                    LayoutRows(width_ - 2 * kPad - 10.0f);
+                    ComputeLayout(height, fit);
+                }
+            }
+
+            // vertical positions
+            void ComputeLayout(float height, bool fit)
             {
                 instructionTop_ = kTitleBarHeight + 14.0f;
                 contentTop_ = instructionTop_ + TextHeight(lInstruction_.Get()) + (content.text.empty() ? 0.0f : 6.0f);
@@ -457,11 +495,18 @@ namespace ual::ui::modern
                     listContent_ += r.height + kRowGap;
                 }
                 if (!rows_.empty()) listContent_ -= kRowGap;
-                float rest = (countdown ? 18.0f + 4.0f : 0.0f) + 18.0f + kFooterHeight;
-                float available = (std::max)(rows_.empty() ? 0.0f : rows_.front().height, maxHeight - listTop_ - rest);
-                listHeight_ = (std::min)(listContent_, available);
-                barTop_ = listTop_ + listHeight_ + 18.0f;
-                footerTop_ = (rows_.empty() ? listTop_ - 4.0f : barTop_ + (countdown ? 4.0f + 18.0f : 0.0f));
+                if (rows_.empty())
+                {
+                    listHeight_ = 0;
+                    footerTop_ = fit ? listTop_ - 4.0f : (std::max)(listTop_ - 4.0f, height - kFooterHeight);
+                }
+                else
+                {
+                    float available = height - listTop_ - Rest();
+                    listHeight_ = fit ? (std::min)(listContent_, (std::max)(rows_.front().height, available)) : (std::max)(0.0f, available);
+                    barTop_ = listTop_ + listHeight_ + 18.0f;
+                    footerTop_ = barTop_ + (countdown ? 4.0f + 18.0f : 0.0f);
+                }
                 height_ = footerTop_ + kFooterHeight;
                 ClampScroll();
             }
@@ -533,17 +578,19 @@ namespace ual::ui::modern
 
                 BuildText();
                 float s = dpi_ / 96.0f;
-                ComputeLayout((mi.rcWork.bottom - mi.rcWork.top) * 0.9f / s);
+                Relayout(kWidth, (mi.rcWork.bottom - mi.rcWork.top) * 0.9f / s, true);
                 int w = (int)std::lround(kWidth * s), h = (int)std::lround(height_ * s);
                 int x = mi.rcWork.left + (mi.rcWork.right - mi.rcWork.left - w) / 2;
                 int y = mi.rcWork.top + (mi.rcWork.bottom - mi.rcWork.top - h) / 2;
 
-                hwnd_ = CreateWindowExW(WS_EX_APPWINDOW, kWindowClass, kTitle, WS_POPUP | WS_MINIMIZEBOX | WS_SYSMENU, x, y, w, h, nullptr, nullptr,
-                                        Self().module ? Self().module : GetModuleHandleW(nullptr), this);
+                // WS_THICKFRAME for resizing and snapping; WM_NCCALCSIZE gives the whole window to the client area
+                hwnd_ = CreateWindowExW(WS_EX_APPWINDOW, kWindowClass, kTitle, WS_POPUP | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_SYSMENU, x, y, w, h,
+                                        nullptr, nullptr, Self().module ? Self().module : GetModuleHandleW(nullptr), this);
                 if (!hwnd_) return false;
+                SetWindowPos(hwnd_, nullptr, 0, 0, 0, 0, SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
                 using GetDpiForWindowFn = UINT(WINAPI*)(HWND);
                 if (auto getDpi = SystemFunction<GetDpiForWindowFn>(L"user32.dll", "GetDpiForWindow"))
-                    if (UINT actual = getDpi(hwnd_); actual && actual != dpi_) dpi_ = actual, ResizeToContent(nullptr);
+                    if (UINT actual = getDpi(hwnd_); actual && actual != dpi_) dpi_ = actual, ResizeToFit();
 
                 D2D1_RENDER_TARGET_PROPERTIES props = D2D1::RenderTargetProperties(D2D1_RENDER_TARGET_TYPE_DEFAULT,
                                                                                    D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED));
@@ -574,13 +621,11 @@ namespace ual::ui::modern
                 if (smallIcon_) SendMessageW(hwnd_, WM_SETICON, ICON_SMALL, (LPARAM)smallIcon_);
 
                 CreateAutomationTexts();
-                g_window = hwnd_;
                 shownAt_ = lastFrame_ = GetTickCount64();
                 UpdateFooterText();
                 if (countdown)
                 {
-                    g_lastMouse = { -1, -1 };
-                    g_mouseHook = SetWindowsHookExW(WH_MOUSE_LL, MouseHook, GetModuleHandleW(nullptr), 0);
+                    mouse_.Start(); // polled in Tick
                     SetTimer(hwnd_, kTimerFrame, 16, nullptr);
                 }
                 ShowWindow(hwnd_, SW_SHOW);
@@ -601,22 +646,55 @@ namespace ual::ui::modern
                 if (error) add(L"Continue", kFirstButton);
             }
 
-            void ResizeToContent(const RECT* suggested)
+            // the initial size at the window's actual DPI
+            void ResizeToFit()
             {
                 HMONITOR monitor = MonitorFromWindow(hwnd_, MONITOR_DEFAULTTONEAREST);
                 MONITORINFO mi{ sizeof(mi) };
                 GetMonitorInfoW(monitor, &mi);
                 float s = dpi_ / 96.0f;
-                ComputeLayout((mi.rcWork.bottom - mi.rcWork.top) * 0.9f / s);
+                Relayout(kWidth, (mi.rcWork.bottom - mi.rcWork.top) * 0.9f / s, true);
                 int w = (int)std::lround(kWidth * s), h = (int)std::lround(height_ * s);
-                RECT now;
-                GetWindowRect(hwnd_, &now);
-                int x = suggested ? suggested->left : now.left, y = suggested ? suggested->top : now.top;
-                SetWindowPos(hwnd_, nullptr, x, y, w, h, SWP_NOZORDER | SWP_NOACTIVATE);
-                if (rt_)
+                SetWindowPos(hwnd_, nullptr, 0, 0, w, h, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+            }
+
+            // the layout follows the window's size
+            void OnSize(UINT w, UINT h)
+            {
+                if (w == 0 || h == 0) return; // minimized
+                if (rt_) rt_->Resize(D2D1::SizeU(w, h));
+                float s = 96.0f / dpi_;
+                Relayout(w * s, h * s, false);
+                Invalidate();
+            }
+
+            // resize borders on the edges, unless maximized
+            LRESULT EdgeHitTest(POINT pt) const
+            {
+                if (IsZoomed(hwnd_)) return HTNOWHERE;
+                RECT rc;
+                GetClientRect(hwnd_, &rc);
+                int b = (std::max)(2, (int)std::lround(kResizeBorder * dpi_ / 96.0f));
+                bool left = pt.x < b, right = pt.x >= rc.right - b, top = pt.y < b, bottom = pt.y >= rc.bottom - b;
+                if (top) return left ? HTTOPLEFT : right ? HTTOPRIGHT : HTTOP;
+                if (bottom) return left ? HTBOTTOMLEFT : right ? HTBOTTOMRIGHT : HTBOTTOM;
+                if (left) return HTLEFT;
+                if (right) return HTRIGHT;
+                return HTNOWHERE;
+            }
+
+            void MinMaxInfo(MINMAXINFO* mmi) const
+            {
+                float s = dpi_ / 96.0f;
+                mmi->ptMinTrackSize.x = (LONG)std::lround(kMinWidth * s);
+                mmi->ptMinTrackSize.y = (LONG)std::lround(minHeight_ * s);
+                // maximized: the work area of the window's monitor, not covering the taskbar
+                HMONITOR monitor = MonitorFromWindow(hwnd_, MONITOR_DEFAULTTONEAREST);
+                MONITORINFO mi{ sizeof(mi) };
+                if (GetMonitorInfoW(monitor, &mi))
                 {
-                    rt_->SetDpi((float)dpi_, (float)dpi_);
-                    LoadLogo();
+                    mmi->ptMaxPosition = { mi.rcWork.left - mi.rcMonitor.left, mi.rcWork.top - mi.rcMonitor.top };
+                    mmi->ptMaxSize = { mi.rcWork.right - mi.rcWork.left, mi.rcWork.bottom - mi.rcWork.top };
                 }
             }
 
@@ -647,12 +725,6 @@ namespace ual::ui::modern
                     TranslateMessage(&msg);
                     DispatchMessageW(&msg);
                 }
-                if (g_mouseHook)
-                {
-                    UnhookWindowsHookEx(g_mouseHook);
-                    g_mouseHook = nullptr;
-                }
-                g_window = nullptr;
                 if (hwnd_) DestroyWindow(hwnd_);
                 if (taskbarIcon_) DestroyIcon(taskbarIcon_);
                 if (smallIcon_) DestroyIcon(smallIcon_);
@@ -673,18 +745,19 @@ namespace ual::ui::modern
 
             // geometry
 
-            D2D1_RECT_F MinimizeRect() const { return D2D1::RectF(kWidth - 2 * kWindowButtonWidth, 0, kWidth - kWindowButtonWidth, kTitleBarHeight); }
-            D2D1_RECT_F CloseRect() const { return D2D1::RectF(kWidth - kWindowButtonWidth, 0, kWidth, kTitleBarHeight); }
-            D2D1_RECT_F ListRect() const { return D2D1::RectF(kPad, listTop_, kWidth - kPad, listTop_ + listHeight_); }
+            D2D1_RECT_F MinimizeRect() const { return D2D1::RectF(width_ - 3 * kWindowButtonWidth, 0, width_ - 2 * kWindowButtonWidth, kTitleBarHeight); }
+            D2D1_RECT_F MaximizeRect() const { return D2D1::RectF(width_ - 2 * kWindowButtonWidth, 0, width_ - kWindowButtonWidth, kTitleBarHeight); }
+            D2D1_RECT_F CloseRect() const { return D2D1::RectF(width_ - kWindowButtonWidth, 0, width_, kTitleBarHeight); }
+            D2D1_RECT_F ListRect() const { return D2D1::RectF(kPad, listTop_, width_ - kPad, listTop_ + listHeight_); }
             D2D1_RECT_F RowRect(const Row& r) const
             {
                 float top = listTop_ + r.top - scroll_;
-                return D2D1::RectF(kPad, top, kWidth - kPad - (listContent_ > listHeight_ ? 10.0f : 0.0f), top + r.height);
+                return D2D1::RectF(kPad, top, kPad + rowWidth_, top + r.height);
             }
             D2D1_RECT_F ButtonRect() const
             {
                 float top = footerTop_ + (kFooterHeight - kButtonHeight) / 2;
-                return D2D1::RectF(kWidth - kPad - kButtonWidth, top, kWidth - kPad, top + kButtonHeight);
+                return D2D1::RectF(width_ - kPad - kButtonWidth, top, width_ - kPad, top + kButtonHeight);
             }
             D2D1_POINT_2F FooterTextOrigin() const { return D2D1::Point2F(kPad + 28.0f, footerTop_ + (kFooterHeight - TextHeight(lFooter_.Get())) / 2); }
 
@@ -706,6 +779,7 @@ namespace ual::ui::modern
             Hit HitTest(D2D1_POINT_2F p) const
             {
                 if (Inside(CloseRect(), p)) return { Part::Close };
+                if (Inside(MaximizeRect(), p)) return { Part::Maximize };
                 if (Inside(MinimizeRect(), p)) return { Part::Minimize };
                 if (Inside(ListRect(), p))
                     for (size_t i = 0; i < rows_.size(); ++i)
@@ -798,16 +872,27 @@ namespace ual::ui::modern
                 rt_->CreateGradientStopCollection(gs, 2, &stops);
                 ComPtr<ID2D1LinearGradientBrush> band;
                 if (stops) rt_->CreateLinearGradientBrush(D2D1::LinearGradientBrushProperties(D2D1::Point2F(0, 0), D2D1::Point2F(0, 160)), stops.Get(), &band);
-                if (band) rt_->FillRectangle(D2D1::RectF(0, 0, kWidth, 160), band.Get());
+                if (band) rt_->FillRectangle(D2D1::RectF(0, 0, width_, 160), band.Get());
 
                 // title bar
                 Text(lTitle_.Get(), 16, (kTitleBarHeight - TextHeight(lTitle_.Get())) / 2, theme_.textDim);
                 Fill(MinimizeRect(), WithAlpha(theme_.text, 0.08f * hotMinimize_));
+                Fill(MaximizeRect(), WithAlpha(theme_.text, 0.08f * hotMaximize_));
                 Fill(CloseRect(), WithAlpha(theme_.closeHot, hotClose_));
                 {
                     auto m = MinimizeRect();
                     float cx = (m.left + m.right) / 2, cy = kTitleBarHeight / 2;
                     Line(cx - 5, cy, cx + 5, cy, theme_.text, 1.0f);
+                    auto x = MaximizeRect();
+                    cx = (x.left + x.right) / 2;
+                    if (IsZoomed(hwnd_)) // restore: two overlapping squares
+                    {
+                        StrokeRounded(D2D1::RectF(cx - 5, cy - 3, cx + 3, cy + 5), 1.0f, theme_.text, 1.0f);
+                        Line(cx - 3, cy - 5, cx + 5, cy - 5, theme_.text, 1.0f);
+                        Line(cx + 5, cy - 5, cx + 5, cy + 3, theme_.text, 1.0f);
+                    }
+                    else
+                        StrokeRounded(D2D1::RectF(cx - 5, cy - 5, cx + 5, cy + 5), 1.0f, theme_.text, 1.0f);
                     auto c = CloseRect();
                     cx = (c.left + c.right) / 2;
                     auto glyph = Mix(theme_.text, D2D1::ColorF(1, 1, 1), hotClose_);
@@ -844,20 +929,17 @@ namespace ual::ui::modern
                         FolderGlyph(rc.left + 18, rc.top + (r.height - 17) / 2, Mix(theme_.textDim, theme_.accent, (std::max)(r.hot, focused ? 1.0f : 0.0f)), choices[i].zip);
                         Text(r.caption.Get(), textX, captionY, theme_.text);
                         Text(r.path.Get(), textX, captionY + TextHeight(r.caption.Get()) + 3, theme_.textDim);
-                        float pillX = rc.right - 14;
-                        for (auto it = r.pills.rbegin(); it != r.pills.rend(); ++it)
+                        for (const auto& p : r.pills)
                         {
-                            pillX -= it->width;
-                            auto pill = D2D1::RectF(pillX, captionY + 1, pillX + it->width, captionY + 21);
+                            auto pill = D2D1::RectF(rc.left + p.x, rc.top + p.y, rc.left + p.x + p.width, rc.top + p.y + 20);
                             FillRounded(pill, 10, WithAlpha(theme_.accent, theme_.dark ? 0.28f : 0.14f));
-                            Text(it->text.Get(), pill.left, pill.top, theme_.dark ? theme_.text : theme_.accent);
-                            pillX -= 6;
+                            Text(p.text.Get(), pill.left + 6, pill.top, theme_.dark ? theme_.text : theme_.accent);
                         }
                     }
                     rt_->PopAxisAlignedClip();
                     if (listContent_ > listHeight_) // scrollbar
                     {
-                        float x = kWidth - kPad - 3;
+                        float x = width_ - kPad - 3;
                         float thumb = (std::max)(24.0f, listHeight_ * listHeight_ / listContent_);
                         float y = listTop_ + (listHeight_ - thumb) * scroll_ / (listContent_ - listHeight_);
                         FillRounded(D2D1::RectF(x, listTop_, x + 3, listTop_ + listHeight_), 1.5f, WithAlpha(theme_.text, 0.06f));
@@ -870,14 +952,14 @@ namespace ual::ui::modern
                 {
                     float total = kCountdownSeconds * 1000.0f;
                     float left = stopped_ ? 0.0f : (std::max)(0.0f, 1.0f - (GetTickCount64() - shownAt_) / total);
-                    auto track = D2D1::RectF(kPad, barTop_, kWidth - kPad, barTop_ + 4);
+                    auto track = D2D1::RectF(kPad, barTop_, width_ - kPad, barTop_ + 4);
                     FillRounded(track, 2, WithAlpha(theme_.text, 0.08f));
                     if (left > 0) FillRounded(D2D1::RectF(track.left, track.top, track.left + (track.right - track.left) * left, track.bottom), 2, theme_.accent);
                 }
 
                 // footer
-                Fill(D2D1::RectF(0, footerTop_, kWidth, footerTop_ + kFooterHeight), theme_.footer);
-                Line(0, footerTop_ + 0.5f, kWidth, footerTop_ + 0.5f, theme_.border, 1.0f);
+                Fill(D2D1::RectF(0, footerTop_, width_, footerTop_ + kFooterHeight), theme_.footer);
+                Line(0, footerTop_ + 0.5f, width_, footerTop_ + 0.5f, theme_.border, 1.0f);
                 if (error)
                 {
                     auto b = ButtonRect();
@@ -895,7 +977,7 @@ namespace ual::ui::modern
                 }
 
                 // hairline border, Windows 10 draws none
-                StrokeRounded(D2D1::RectF(0, 0, kWidth, height_), 0, WithAlpha(theme_.text, 0.12f), 1.0f);
+                if (!IsZoomed(hwnd_)) StrokeRounded(D2D1::RectF(0, 0, width_, height_), 0, WithAlpha(theme_.text, 0.12f), 1.0f);
 
                 if (rt_->EndDraw() == D2DERR_RECREATE_TARGET)
                 {
@@ -939,6 +1021,7 @@ namespace ual::ui::modern
                 };
                 for (size_t i = 0; i < rows_.size(); ++i) approach(rows_[i].hot, hover_.part == Part::Row && hover_.index == (int)i);
                 approach(hotMinimize_, hover_.part == Part::Minimize);
+                approach(hotMaximize_, hover_.part == Part::Maximize);
                 approach(hotClose_, hover_.part == Part::Close);
                 approach(hotButton_, hover_.part == Part::Button);
                 approach(hotFooterLink_, hover_.part == Part::FooterLink);
@@ -948,6 +1031,7 @@ namespace ual::ui::modern
             void Tick()
             {
                 bool moving = Animate();
+                if (countdown && !stopped_ && mouse_.Moved()) Activity();
                 if (countdown && !stopped_)
                 {
                     if (GetTickCount64() - shownAt_ >= (ULONGLONG)kCountdownSeconds * 1000)
@@ -990,8 +1074,9 @@ namespace ual::ui::modern
             {
                 switch (h.part)
                 {
-                case Part::Close: Finish(error ? 0 : -1); break;
+                case Part::Close: Finish(error ? 0 : kChoiceCancelled); break;
                 case Part::Minimize: ShowWindow(hwnd_, SW_MINIMIZE); break;
+                case Part::Maximize: ShowWindow(hwnd_, IsZoomed(hwnd_) ? SW_RESTORE : SW_MAXIMIZE); break;
                 case Part::Row: Finish(h.index); break;
                 case Part::Button: Finish(0); break;
                 case Part::ContentLink: OpenUrl(hwnd_, content.links[h.index].url.c_str()); break;
@@ -1015,7 +1100,7 @@ namespace ual::ui::modern
                 int count = (int)rows_.size();
                 switch (key)
                 {
-                case VK_ESCAPE: Finish(error ? 0 : -1); return;
+                case VK_ESCAPE: Finish(error ? 0 : kChoiceCancelled); return; // same as the close button
                 case VK_RETURN:
                 case VK_SPACE: Finish(error ? 0 : focus_); return;
                 case VK_UP:
@@ -1059,25 +1144,43 @@ namespace ual::ui::modern
                     return 0;
                 }
                 case WM_ERASEBKGND: return 1;
+                case WM_NCCALCSIZE:
+                    if (wp) return 0; // no frame: the client area is the whole window
+                    break;
+                case WM_GETMINMAXINFO:
+                    d->MinMaxInfo((MINMAXINFO*)lp);
+                    return 0;
                 case WM_SIZE:
-                    if (d->rt_) d->rt_->Resize(D2D1::SizeU(LOWORD(lp), HIWORD(lp)));
-                    d->Invalidate();
+                    d->OnSize(LOWORD(lp), HIWORD(lp));
                     return 0;
                 case WM_DPICHANGED:
+                {
                     d->dpi_ = HIWORD(wp);
-                    d->ResizeToContent((RECT*)lp);
+                    if (d->rt_)
+                    {
+                        d->rt_->SetDpi((float)d->dpi_, (float)d->dpi_);
+                        d->LoadLogo();
+                    }
+                    auto rc = (RECT*)lp; // keeps the size in DIPs, WM_SIZE lays out again
+                    SetWindowPos(hwnd, nullptr, rc->left, rc->top, rc->right - rc->left, rc->bottom - rc->top, SWP_NOZORDER | SWP_NOACTIVATE);
                     d->Invalidate();
                     return 0;
+                }
                 case WM_NCHITTEST:
                 {
-                    LRESULT hit = DefWindowProcW(hwnd, msg, wp, lp);
-                    if (hit != HTCLIENT) return hit;
                     POINT pt{ GET_X_LPARAM(lp), GET_Y_LPARAM(lp) };
                     ScreenToClient(hwnd, &pt);
+                    if (LRESULT edge = d->EdgeHitTest(pt); edge != HTNOWHERE) return edge;
                     float s = 96.0f / d->dpi_;
                     return d->HitTest(D2D1::Point2F(pt.x * s, pt.y * s)).part == Part::None ? HTCAPTION : HTCLIENT; // drag by the background
                 }
-                case WM_NCLBUTTONDBLCLK: return 0; // no maximizing
+                case WM_NCLBUTTONDBLCLK: // maximize from the title bar only, not from the background between the rows
+                {
+                    POINT pt{ GET_X_LPARAM(lp), GET_Y_LPARAM(lp) };
+                    ScreenToClient(hwnd, &pt);
+                    if (wp == HTCAPTION && pt.y * 96.0f / d->dpi_ >= kTitleBarHeight) return 0;
+                    break;
+                }
                 case WM_NCMOUSEMOVE:
                     d->SetHover({});
                     break;
@@ -1128,11 +1231,11 @@ namespace ual::ui::modern
                 case WM_SYSCOMMAND:
                     if ((wp & 0xFFF0) == SC_CLOSE)
                     {
-                        d->Finish(d->error ? 0 : -1);
+                        d->Finish(d->error ? 0 : kChoiceCancelled);
                         return 0;
                     }
                     break;
-                case WM_CLOSE: d->Finish(d->error ? 0 : -1); return 0;
+                case WM_CLOSE: d->Finish(d->error ? 0 : kChoiceCancelled); return 0; // the caller quits the game
                 case WM_TIMER:
                     if (wp == kTimerFrame) d->Tick();
                     return 0;
@@ -1153,13 +1256,6 @@ namespace ual::ui::modern
             }
         };
 
-        Dialog* g_current = nullptr;
-
-        void NotifyActivity()
-        {
-            if (g_current) g_current->Activity();
-        }
-
         bool Usable()
         {
             return !LoaderLockHeldByThisThread() && GetFactories() != nullptr;
@@ -1173,10 +1269,7 @@ namespace ual::ui::modern
         d.error = true;
         d.instruction = header;
         d.content = RichText::Parse(content);
-        g_current = &d;
-        bool shown = d.Run();
-        g_current = nullptr;
-        return shown;
+        return d.Run();
     }
 
     bool ChooseOverloadFolder(const std::vector<Choice>& choices, int& result)
@@ -1187,10 +1280,7 @@ namespace ual::ui::modern
         d.content = RichText::Parse(kChooseContent);
         d.choices = choices;
         d.countdown = true;
-        g_current = &d;
-        bool shown = d.Run();
-        g_current = nullptr;
-        if (!shown) return false;
+        if (!d.Run()) return false;
         result = d.result;
         return true;
     }

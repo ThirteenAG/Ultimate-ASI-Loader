@@ -13,13 +13,17 @@ namespace ual::ui
 
     struct Choice
     {
-        std::wstring caption;               // update.txt caption or the folder name
-        std::wstring path;                  // folder, or where a zip package is mounted
+        std::wstring caption;               // the first folder's update.txt caption or name
+        std::wstring path;                  // the first folder, or where its zip package is mounted
         bool zip = false;                   // from a zip package, also if only an included folder is
-        std::vector<std::wstring> includes; // activated with it, at lower priority
+        std::vector<std::wstring> includes; // the other folders of the choice, in priority order
     };
 
-    // Picks the first folder after 10 seconds unless the user interacts. Returns -1 if nothing was chosen.
+    // ChooseOverloadFolder result when the user closed the window (X, Alt+F4, Esc): the caller quits the game.
+    constexpr int kChoiceCancelled = -2;
+
+    // Picks the first choice after 10 seconds unless the user interacts.
+    // Returns the chosen index, -1 if nothing was chosen, or kChoiceCancelled.
     int ChooseOverloadFolder(const std::vector<Choice>& choices);
 
     bool IsPackagedProcess();

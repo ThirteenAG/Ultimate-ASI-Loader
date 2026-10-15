@@ -18,17 +18,15 @@ namespace ual::ui::taskdialog
             HWND hwnd = nullptr;
             bool countdown = false;
             bool interacted = false;
-            POINT lastMouse{ -1, -1 };
-            HHOOK mouseHook = nullptr;
-            HHOOK messageHook = nullptr;
+            MouseWatch mouse;
+            HHOOK messageHook = nullptr; // this thread only
             HICON taskbarIcon = nullptr;
         } g_dialog;
 
         void Unhook()
         {
-            if (g_dialog.mouseHook) UnhookWindowsHookEx(g_dialog.mouseHook);
             if (g_dialog.messageHook) UnhookWindowsHookEx(g_dialog.messageHook);
-            g_dialog.mouseHook = g_dialog.messageHook = nullptr;
+            g_dialog.messageHook = nullptr;
         }
 
         // any user activity stops the countdown
@@ -42,17 +40,6 @@ namespace ual::ui::taskdialog
                 SendMessageW(g_dialog.hwnd, TDM_SET_PROGRESS_BAR_POS, 0, 0);
             }
             Unhook();
-        }
-
-        LRESULT CALLBACK MouseProc(int code, WPARAM wp, LPARAM lp)
-        {
-            if (code == HC_ACTION && wp == WM_MOUSEMOVE && lp)
-            {
-                POINT pt = ((MSLLHOOKSTRUCT*)lp)->pt;
-                if (g_dialog.lastMouse.x != -1 && (pt.x != g_dialog.lastMouse.x || pt.y != g_dialog.lastMouse.y)) StopCountdown();
-                g_dialog.lastMouse = pt;
-            }
-            return CallNextHookEx(nullptr, code, wp, lp);
         }
 
         LRESULT CALLBACK MessageProc(int code, WPARAM wp, LPARAM lp)
@@ -77,19 +64,23 @@ namespace ual::ui::taskdialog
             case TDN_CREATED:
                 g_dialog.hwnd = hwnd;
                 g_dialog.interacted = false;
-                g_dialog.lastMouse = { -1, -1 };
+                g_dialog.mouse.Start();
                 if ((g_dialog.taskbarIcon = ExecutableIcon()) != nullptr) SendMessageW(hwnd, WM_SETICON, ICON_BIG, (LPARAM)g_dialog.taskbarIcon);
                 if (g_dialog.countdown)
                 {
                     SendMessageW(hwnd, TDM_SET_PROGRESS_BAR_RANGE, 0, MAKELPARAM(0, kCountdownSeconds * 10));
                     SendMessageW(hwnd, TDM_SET_PROGRESS_BAR_POS, kCountdownSeconds * 10, 0);
-                    g_dialog.mouseHook = SetWindowsHookExW(WH_MOUSE_LL, MouseProc, GetModuleHandleW(nullptr), 0);
                     g_dialog.messageHook = SetWindowsHookExW(WH_GETMESSAGE, MessageProc, nullptr, GetCurrentThreadId());
                 }
                 break;
             case TDN_TIMER: // wp is ms since creation, fires about every 200 ms
                 if (g_dialog.countdown && !g_dialog.interacted)
                 {
+                    if (g_dialog.mouse.Moved()) // polled, see MouseWatch
+                    {
+                        StopCountdown();
+                        break;
+                    }
                     int remainingTenths = kCountdownSeconds * 10 - (int)(wp / 100);
                     if (remainingTenths <= 0)
                     {
@@ -159,7 +150,8 @@ namespace ual::ui::taskdialog
             buttons.push_back({ kFirstButton + (int)i, texts.back().c_str() });
         }
         TASKDIALOGCONFIG tdc{ sizeof(tdc) };
-        tdc.dwFlags = TDF_USE_COMMAND_LINKS | TDF_ENABLE_HYPERLINKS | TDF_SIZE_TO_CONTENT | TDF_CAN_BE_MINIMIZED | TDF_SHOW_PROGRESS_BAR | TDF_CALLBACK_TIMER;
+        tdc.dwFlags = TDF_USE_COMMAND_LINKS | TDF_ENABLE_HYPERLINKS | TDF_SIZE_TO_CONTENT | TDF_CAN_BE_MINIMIZED | TDF_SHOW_PROGRESS_BAR | TDF_CALLBACK_TIMER |
+                      TDF_ALLOW_DIALOG_CANCELLATION; // X, Alt+F4 and Esc return IDCANCEL
         tdc.pButtons = buttons.data();
         tdc.cButtons = (UINT)buttons.size();
         tdc.nDefaultButton = kFirstButton;
@@ -173,7 +165,8 @@ namespace ual::ui::taskdialog
         g_dialog.countdown = true;
         int clicked = 0;
         if (FAILED(TaskDialogIndirect(&tdc, &clicked, nullptr, nullptr))) return false;
-        result = clicked >= kFirstButton && clicked < kFirstButton + (int)choices.size() ? clicked - kFirstButton : -1;
+        if (clicked == IDCANCEL) result = kChoiceCancelled;
+        else result = clicked >= kFirstButton && clicked < kFirstButton + (int)choices.size() ? clicked - kFirstButton : -1;
         return true;
     }
 }

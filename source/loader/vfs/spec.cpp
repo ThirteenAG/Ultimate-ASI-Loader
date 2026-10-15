@@ -14,90 +14,51 @@ namespace ual::vfs
             return s.folders.size() - 1;
         };
 
-        // tokens and the operator before each
         size_t start = 0;
-        wchar_t op = L'|';
-        size_t previous = SIZE_MAX;
         while (start <= text.size())
         {
-            size_t end = text.find_first_of(L"|<>", start);
+            size_t end = text.find(L'|', start);
             if (end == std::wstring_view::npos) end = text.size();
-            auto folder = Unquote(Trim(text.substr(start, end - start)));
-            if (!folder.empty())
-            {
-                size_t current = indexOf(folder);
-                if (previous != SIZE_MAX && current != previous)
-                {
-                    if (op == L'<') s.overrides.emplace_back(current, previous); // previous < current
-                    else if (op == L'>') s.overrides.emplace_back(previous, current);
-                }
-                previous = current;
-            }
-            if (end >= text.size()) break;
-            op = text[end];
-            if (op == L'|') previous = SIZE_MAX; // '|' starts an independent group
+            auto part = text.substr(start, end - start);
             start = end + 1;
-        }
 
-        // Topological order of the relations, ties broken by order of appearance.
-        // Relations that would form a cycle are dropped.
-        size_t n = s.folders.size();
-        std::vector<std::vector<size_t>> below(n);
-        auto reaches = [&](size_t from, size_t to) {
-            std::vector<size_t> stack{ from };
-            std::vector<bool> seen(n);
-            while (!stack.empty())
+            // folders of the part as written, and its operators
+            std::vector<std::wstring> names;
+            bool less = false, greater = false;
+            size_t from = 0;
+            while (from <= part.size())
             {
-                size_t x = stack.back();
-                stack.pop_back();
-                if (x == to) return true;
-                if (seen[x]) continue;
-                seen[x] = true;
-                for (size_t y : below[x]) stack.push_back(y);
+                size_t to = part.find_first_of(L"<>", from);
+                if (to == std::wstring_view::npos) to = part.size();
+                auto folder = Unquote(Trim(part.substr(from, to - from)));
+                if (!folder.empty()) names.push_back(std::move(folder));
+                if (to >= part.size()) break;
+                (part[to] == L'<' ? less : greater) = true;
+                from = to + 1;
             }
-            return false;
-        };
-        std::vector<std::pair<size_t, size_t>> kept;
-        for (auto [hi, lo] : s.overrides)
-            if (!reaches(lo, hi) && std::find(below[hi].begin(), below[hi].end(), lo) == below[hi].end())
+            if (names.empty()) continue;
+            if (less && greater)
             {
-                below[hi].push_back(lo);
-                kept.emplace_back(hi, lo);
+                s.ignored.push_back(Trim(part));
+                continue;
             }
-        s.overrides = std::move(kept);
+            if (less) std::reverse(names.begin(), names.end()); // "a < b" is "b > a"
 
-        std::vector<int> above(n, 0);
-        for (auto [hi, lo] : s.overrides) ++above[lo];
-        std::vector<bool> placed(n);
-        for (size_t k = 0; k < n; ++k)
-        {
-            size_t pick = SIZE_MAX;
-            for (size_t i = 0; i < n && pick == SIZE_MAX; ++i)
-                if (!placed[i] && above[i] == 0) pick = i;
-            if (pick == SIZE_MAX) break; // unreachable, cycles were removed
-            placed[pick] = true;
-            s.priorityOrder.push_back(pick);
-            for (size_t lo : below[pick]) --above[lo];
+            // the first mention of a folder sets its priority
+            std::vector<std::wstring> chain;
+            for (auto& n : names)
+                if (std::none_of(chain.begin(), chain.end(), [&](const std::wstring& c) { return IEquals(c, n); })) chain.push_back(std::move(n));
+
+            Entry e;
+            for (const auto& n : chain)
+            {
+                if (!e.id.empty()) e.id += L" > ";
+                e.id += n;
+            }
+            if (std::any_of(s.entries.begin(), s.entries.end(), [&](const Entry& o) { return IEquals(o.id, e.id); })) continue;
+            for (const auto& n : chain) e.folders.push_back(indexOf(n));
+            s.entries.push_back(std::move(e));
         }
         return s;
-    }
-
-    std::vector<size_t> OverloadSpec::Activate(size_t selected) const
-    {
-        std::vector<bool> active(folders.size());
-        std::vector<size_t> stack{ selected };
-        while (!stack.empty())
-        {
-            size_t x = stack.back();
-            stack.pop_back();
-            if (x >= active.size() || active[x]) continue;
-            active[x] = true;
-            for (auto [hi, lo] : overrides)
-                if (hi == x) stack.push_back(lo);
-        }
-        std::vector<size_t> result;
-        for (size_t i : priorityOrder)
-            if (active[i]) result.push_back(i);
-        return result;
     }
 }

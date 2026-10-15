@@ -100,20 +100,19 @@ namespace
         return nullptr;
     }
 
-    std::vector<std::wstring> Names(const OverloadSpec& s, const std::vector<size_t>& idx)
+    // the folders of each choice, highest priority first
+    std::vector<std::vector<std::wstring>> Choices(const OverloadSpec& s)
     {
-        std::vector<std::wstring> r;
-        for (size_t i : idx) r.push_back(s.folders[i]);
+        std::vector<std::vector<std::wstring>> r;
+        for (const auto& e : s.entries)
+        {
+            r.emplace_back();
+            for (size_t i : e.folders) r.back().push_back(s.folders[i]);
+        }
         return r;
     }
 
-    size_t Rank(const OverloadSpec& s, const wchar_t* folder) // 0 = highest priority
-    {
-        for (size_t r = 0; r < s.priorityOrder.size(); ++r)
-            if (s.folders[s.priorityOrder[r]] == folder) return r;
-        FAIL("folder " + ut::narrow(folder) + " not found");
-        return SIZE_MAX;
-    }
+    using ChoiceList = std::vector<std::vector<std::wstring>>;
 }
 
 // --- strings
@@ -207,77 +206,62 @@ TEST_CASE("IniString returns values longer than MAX_PATH unchanged", "[ini]")
 
 TEST_CASE("OverloadSpec: separators, trimming, quotes and duplicates", "[overload][parse]")
 {
-    CHECK(OverloadSpec::Parse(L"").folders.empty());
-    CHECK(OverloadSpec::Parse(L"  |  | ").folders.empty());
+    CHECK(OverloadSpec::Parse(L"").entries.empty());
+    CHECK(OverloadSpec::Parse(L"  |  | ").entries.empty());
+    CHECK(OverloadSpec::Parse(L" > | < ").entries.empty());
 
     auto one = OverloadSpec::Parse(L"update");
-    REQUIRE_EQ(one.folders.size(), (size_t)1);
-    CHECK_EQ(one.folders[0], std::wstring(L"update"));
-    CHECK(one.overrides.empty());
+    CHECK(Choices(one) == (ChoiceList{ { L"update" } }));
+    CHECK_EQ(one.entries[0].id, std::wstring(L"update"));
 
     auto three = OverloadSpec::Parse(L"  update | nightmare\t|mods  ");
+    CHECK(Choices(three) == (ChoiceList{ { L"update" }, { L"nightmare" }, { L"mods" } }));
     CHECK(three.folders == (std::vector<std::wstring>{ L"update", L"nightmare", L"mods" }));
-    CHECK(three.priorityOrder == (std::vector<size_t>{ 0, 1, 2 })); // earlier = higher
 
-    auto quoted = OverloadSpec::Parse(L"\"my mods\" | \"C:\\Program Files\\x\"");
-    CHECK(quoted.folders == (std::vector<std::wstring>{ L"my mods", L"C:\\Program Files\\x" }));
+    auto quoted = OverloadSpec::Parse(L"\"my mods\" | \"C:\\Program Files\\x\" > \"my mods\"");
+    CHECK(Choices(quoted) == (ChoiceList{ { L"my mods" }, { L"C:\\Program Files\\x", L"my mods" } }));
+    CHECK_EQ(quoted.folders.size(), (size_t)2);
 
-    CHECK_EQ(OverloadSpec::Parse(L"a | b | A | b").folders.size(), (size_t)2);
+    // a repeated choice is offered once, case-insensitively
+    CHECK(Choices(OverloadSpec::Parse(L"a | b | A | b")) == (ChoiceList{ { L"a" }, { L"b" } }));
+    CHECK_EQ(OverloadSpec::Parse(L"a > b | A>B").entries.size(), (size_t)1);
 }
 
-TEST_CASE("OverloadSpec: 'a < b' and 'a > b' relations", "[overload][parse][priority]")
+TEST_CASE("OverloadSpec: each '|' part is one choice, '>' chains folders highest priority first", "[overload][parse][priority]")
 {
-    auto lt = OverloadSpec::Parse(L"base < patch");
-    CHECK(Rank(lt, L"patch") < Rank(lt, L"base"));
-    auto gt = OverloadSpec::Parse(L"addon | main > addon");
-    CHECK(Rank(gt, L"main") < Rank(gt, L"addon"));
-    auto chainLt = OverloadSpec::Parse(L"a < b < c");
-    CHECK(Rank(chainLt, L"c") < Rank(chainLt, L"b"));
-    CHECK(Rank(chainLt, L"b") < Rank(chainLt, L"a"));
-    auto chainGt = OverloadSpec::Parse(L"a > b > c");
-    CHECK(Rank(chainGt, L"a") < Rank(chainGt, L"b"));
-    CHECK(Rank(chainGt, L"b") < Rank(chainGt, L"c"));
+    // the documented example
+    auto doc = OverloadSpec::Parse(L"update | TJGMTest1 > update | TJGMTest2 > TJGMTest1");
+    CHECK(Choices(doc) == (ChoiceList{ { L"update" }, { L"TJGMTest1", L"update" }, { L"TJGMTest2", L"TJGMTest1" } }));
+    CHECK_EQ(doc.entries[1].id, std::wstring(L"TJGMTest1 > update"));
+    CHECK(doc.ignored.empty());
+
+    auto gt = OverloadSpec::Parse(L"update | update > TJGMTest1 | TJGMTest1 > TJGMTest2");
+    CHECK(Choices(gt) == (ChoiceList{ { L"update" }, { L"update", L"TJGMTest1" }, { L"TJGMTest1", L"TJGMTest2" } }));
+
+    CHECK(Choices(OverloadSpec::Parse(L"a > b > c")) == (ChoiceList{ { L"a", L"b", L"c" } }));
+    CHECK(Choices(OverloadSpec::Parse(L"a | b")) == (ChoiceList{ { L"a" }, { L"b" } }));
+
+    // relations don't leak between parts: TJGMTest2 doesn't bring update along
+    auto separate = OverloadSpec::Parse(L"TJGMTest1 > update | TJGMTest2 > TJGMTest1");
+    CHECK(Choices(separate)[1] == (std::vector<std::wstring>{ L"TJGMTest2", L"TJGMTest1" }));
+
+    // a folder repeated inside a part keeps its first, highest, place
+    CHECK(Choices(OverloadSpec::Parse(L"a > b > A > c")) == (ChoiceList{ { L"a", L"b", L"c" } }));
 }
 
-TEST_CASE("a folder used with both '<' and '>' keeps both relations", "[overload][parse][priority]")
+TEST_CASE("OverloadSpec: '<' is the reverse of '>', mixing both ignores the part", "[overload][parse][priority]")
 {
-    auto s = OverloadSpec::Parse(L"a < b | a > c");
-    CHECK(Rank(s, L"b") < Rank(s, L"a"));
-    CHECK(Rank(s, L"a") < Rank(s, L"c"));
-    CHECK(Names(s, s.Activate(1)) == (std::vector<std::wstring>{ L"b", L"a", L"c" }));
+    auto lt = OverloadSpec::Parse(L"update | update < TJGMTest1 | TJGMTest1 < TJGMTest2");
+    CHECK(Choices(lt) == (ChoiceList{ { L"update" }, { L"TJGMTest1", L"update" }, { L"TJGMTest2", L"TJGMTest1" } }));
+    CHECK_EQ(lt.entries[2].id, std::wstring(L"TJGMTest2 > TJGMTest1"));
+    CHECK(Choices(OverloadSpec::Parse(L"a < b < c")) == (ChoiceList{ { L"c", L"b", L"a" } }));
+    CHECK_EQ(OverloadSpec::Parse(L"a < b | b > a").entries.size(), (size_t)1); // the same choice
+
+    auto mixed = OverloadSpec::Parse(L"update | a > b < c | d < e");
+    CHECK(Choices(mixed) == (ChoiceList{ { L"update" }, { L"e", L"d" } }));
+    CHECK(mixed.ignored == (std::vector<std::wstring>{ L"a > b < c" }));
+    CHECK(std::none_of(mixed.folders.begin(), mixed.folders.end(), [](const std::wstring& f) { return f == L"a"; }));
 }
-
-TEST_CASE("priorities satisfy every relation of a dependency chain written in any order", "[overload][parse][priority]")
-{
-    auto s = OverloadSpec::Parse(L"p < q | t < s | s < r | r < p");
-    CHECK(Rank(s, L"q") < Rank(s, L"p"));
-    CHECK(Rank(s, L"p") < Rank(s, L"r"));
-    CHECK(Rank(s, L"r") < Rank(s, L"s"));
-    CHECK(Rank(s, L"s") < Rank(s, L"t"));
-}
-
-TEST_CASE("OverloadSpec::Activate follows relations and orders by priority", "[overload][priority]")
-{
-    auto single = OverloadSpec::Parse(L"update | nightmare");
-    CHECK(Names(single, single.Activate(1)) == std::vector<std::wstring>{ L"nightmare" });
-
-    auto lt = OverloadSpec::Parse(L"base < patch");
-    CHECK(Names(lt, lt.Activate(1)) == (std::vector<std::wstring>{ L"patch", L"base" }));
-    CHECK(Names(lt, lt.Activate(0)) == std::vector<std::wstring>{ L"base" });
-
-    auto gt = OverloadSpec::Parse(L"main > addon");
-    CHECK(Names(gt, gt.Activate(0)) == (std::vector<std::wstring>{ L"main", L"addon" }));
-    CHECK(Names(gt, gt.Activate(1)) == std::vector<std::wstring>{ L"addon" });
-
-    auto chain = OverloadSpec::Parse(L"a > b > c");
-    CHECK(Names(chain, chain.Activate(0)) == (std::vector<std::wstring>{ L"a", L"b", L"c" }));
-
-    auto cyc = OverloadSpec::Parse(L"x < y | y < x"); // the relation closing the cycle is dropped
-    CHECK_EQ(cyc.priorityOrder.size(), (size_t)2);
-    CHECK_EQ(cyc.Activate(1).size(), (size_t)2);
-    CHECK_EQ(cyc.Activate(0).size(), (size_t)1);
-}
-
 // --- keys
 
 TEST_CASE("MakeKey: lower case paths relative to the game folder", "[vfs][keys]")

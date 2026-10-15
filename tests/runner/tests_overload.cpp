@@ -314,6 +314,12 @@ namespace
         return modern ? "ModernUI=1" : "task dialog";
     }
 
+    // The window steals the focus: a key typed elsewhere meanwhile (Esc, Alt+F4) closes it, which quits the game
+    void SkipIfClosedByUser(const RunResult& r)
+    {
+        if (r.userInput && !r.HostFinished() && !r.dialogs.empty()) SKIP("inconclusive: keyboard/mouse input reached the session and the game quit while the dialog was shown");
+    }
+
     // Records the dialog and clicks <id>
     DialogHandler Click(int id, std::vector<DialogInfo>* seen = nullptr)
     {
@@ -341,6 +347,7 @@ ARCH_TEST("several existing folders show a selection dialog; the chosen folder i
             RunOptions o;
             o.onDialog = Click(choice);
             auto r = sb.Run({ L"read:data.txt", L"ovpath" }, o);
+            SkipIfClosedByUser(r);
             REQUIRE_HOST_OK(r);
             REQUIRE_EQ(r.dialogs.size(), (size_t)1);
             auto& d = r.dialogs.front();
@@ -376,6 +383,7 @@ ARCH_TEST("the folder selection dialog closes by itself and selects the first fo
         o.timeoutMs = 60000;
         auto r = sb.Run({ L"read:data.txt" }, o);
         if (r.userInput) SKIP("keyboard/mouse input during the test stops the dialog's countdown (by design)");
+        SkipIfClosedByUser(r);
         REQUIRE_HOST_OK(r);
         REQUIRE_EQ(r.dialogs.size(), (size_t)1);
         CHECK_EQ(r.dialogs.front().isModern, modern);
@@ -400,6 +408,7 @@ ARCH_TEST("the folder selection dialog auto-closes after the announced 10 second
         o.timeoutMs = 60000;
         auto r = sb.Run({ L"read:data.txt" }, o);
         if (r.userInput) SKIP("keyboard/mouse input during the test stops the dialog's countdown (by design)");
+        SkipIfClosedByUser(r);
         REQUIRE_HOST_OK(r);
         REQUIRE_EQ(r.dialogs.size(), (size_t)1);
         auto& d = r.dialogs.front();
@@ -409,7 +418,7 @@ ARCH_TEST("the folder selection dialog auto-closes after the announced 10 second
     }
 }
 
-ARCH_TEST("'base < patch': selecting patch also activates base with lower priority", "[overload][dialog][ui][priority]")
+ARCH_TEST("'patch > base': the choice uses patch and base, patch winning", "[overload][dialog][ui][priority]")
 {
     struct Case { int click; std::string both, baseOnly, patchOnly; };
     for (bool modern : kDialogStyles)
@@ -427,11 +436,12 @@ ARCH_TEST("'base < patch': selecting patch also activates base with lower priori
             sb.Write(L"base/base_only.txt", "BASE-ONLY");
             sb.Write(L"patch/both.txt", "PATCH");
             sb.Write(L"patch/patch_only.txt", "PATCH-ONLY");
-            sb.Ini(L"global.ini", L"FileLoader", L"OverloadFromFolder", L"base < patch");
+            sb.Ini(L"global.ini", L"FileLoader", L"OverloadFromFolder", L"base | patch > base");
             RunOptions o;
             std::vector<DialogInfo> seen;
             o.onDialog = Click(c.click, &seen);
             auto r = sb.Run({ L"read:both.txt", L"read:base_only.txt", L"read:patch_only.txt" }, o);
+            SkipIfClosedByUser(r);
             REQUIRE_HOST_OK(r);
             INFO("clicked " + std::to_string(c.click));
             REQUIRE_EQ(seen.size(), (size_t)1);
@@ -444,7 +454,7 @@ ARCH_TEST("'base < patch': selecting patch also activates base with lower priori
         }
 }
 
-ARCH_TEST("'main > addon': selecting main also activates addon with lower priority", "[overload][dialog][ui][priority]")
+ARCH_TEST("'<' is the reverse of '>': 'addon < main' lets main win over addon", "[overload][dialog][ui][priority]")
 {
     struct Case { int click; std::string both, addonOnly; };
     for (bool modern : kDialogStyles)
@@ -460,10 +470,11 @@ ARCH_TEST("'main > addon': selecting main also activates addon with lower priori
             sb.Write(L"main/both.txt", "MAIN");
             sb.Write(L"addon/both.txt", "ADDON");
             sb.Write(L"addon/addon_only.txt", "ADDON-ONLY");
-            sb.Ini(L"global.ini", L"FileLoader", L"OverloadFromFolder", L"main > addon");
+            sb.Ini(L"global.ini", L"FileLoader", L"OverloadFromFolder", L"addon < main | addon");
             RunOptions o;
             o.onDialog = Click(c.click);
             auto r = sb.Run({ L"read:both.txt", L"read:addon_only.txt" }, o);
+            SkipIfClosedByUser(r);
             REQUIRE_HOST_OK(r);
             INFO("clicked " + std::to_string(c.click));
             CHECK_EQ(Data(r, "read", "both.txt"), c.both);
@@ -472,6 +483,93 @@ ARCH_TEST("'main > addon': selecting main also activates addon with lower priori
         }
 }
 
+ARCH_TEST("a choice uses only its own folders, not those of other choices", "[overload][dialog][ui][priority]")
+{
+    // the documented example: TJGMTest2 > TJGMTest1 doesn't bring update along
+    Sandbox sb(arch);
+    DeployOverloadTree(sb);
+    UseDialogStyle(sb, true);
+    sb.Write(L"TJGMTest1/data.txt", "TEST1");
+    sb.Write(L"TJGMTest1/one.txt", "ONE");
+    sb.Write(L"TJGMTest2/data.txt", "TEST2");
+    sb.Write(L"update/one.txt", "UPDATE-ONE");
+    sb.Write(L"update/only_update.txt", "UPDATE-ONLY");
+    sb.Write(L"only_update.txt", "ORIG");
+    sb.Ini(L"global.ini", L"FileLoader", L"OverloadFromFolder", L"update | TJGMTest1 > update | TJGMTest2 > TJGMTest1");
+    RunOptions o;
+    std::vector<DialogInfo> seen;
+    o.onDialog = Click(1002, &seen);
+    auto r = sb.Run({ L"read:data.txt", L"read:one.txt", L"read:only_update.txt" }, o);
+    SkipIfClosedByUser(r);
+    REQUIRE_HOST_OK(r);
+    REQUIRE_EQ(seen.size(), (size_t)1);
+    CHECK_MSG(seen[0].Contains(L"+ TJGMTest1") && seen[0].Contains(L"+ update"), ut::narrow(seen[0].AllText()));
+    CHECK_EQ(Data(r, "read", "data.txt"), std::string("TEST2"));
+    CHECK_EQ(Data(r, "read", "one.txt"), std::string("ONE"));
+    CHECK_EQ(Data(r, "read", "only_update.txt"), std::string("ORIG"));
+    ForgiveUserInterference(r);
+}
+
+ARCH_TEST("a single chain is used without asking", "[overload][dialog][ui][priority]")
+{
+    Sandbox sb(arch);
+    sb.Loader();
+    sb.Host(L"dinput8");
+    sb.Write(L"both.txt", "ORIG");
+    sb.Write(L"base_only.txt", "ORIG");
+    sb.Write(L"base/both.txt", "BASE");
+    sb.Write(L"base/base_only.txt", "BASE-ONLY");
+    sb.Write(L"patch/both.txt", "PATCH");
+    sb.Ini(L"global.ini", L"FileLoader", L"OverloadFromFolder", L"patch > base");
+    auto r = sb.Run({ L"read:both.txt", L"read:base_only.txt" });
+    SkipIfClosedByUser(r);
+    REQUIRE_HOST_OK(r);
+    CHECK(r.dialogs.empty());
+    CHECK_EQ(Data(r, "read", "both.txt"), std::string("PATCH"));
+    CHECK_EQ(Data(r, "read", "base_only.txt"), std::string("BASE-ONLY"));
+}
+
+ARCH_TEST("closing the folder selection window quits the game", "[overload][dialog][ui]")
+{
+    for (bool modern : kDialogStyles)
+    {
+        INFO(StyleName(modern));
+        Sandbox sb(arch);
+        DeployOverloadTree(sb);
+        UseDialogStyle(sb, modern);
+        sb.Write(L"nightmare/data.txt", "NIGHTMARE");
+        sb.Ini(L"global.ini", L"FileLoader", L"OverloadFromFolder", L"update | nightmare");
+        RunOptions o;
+        o.onDialog = [](const DialogInfo& d) {
+            PostMessageW(d.hwnd, WM_CLOSE, 0, 0); // the X button, Alt+F4
+            return DialogAction::LeaveOpen();
+        };
+        auto r = sb.Run({ L"read:data.txt" }, o);
+        REQUIRE_EQ(r.dialogs.size(), (size_t)1);
+        CHECK(!r.timedOut);
+        CHECK_EQ(r.exitCode, (DWORD)0);
+        CHECK_MSG(!r.HostFinished(), "the game went on after the window was closed");
+        CHECK(r.Events("host", "read").empty());
+    }
+}
+
+ARCH_TEST("Esc in the ModernUI selection window quits the game", "[overload][dialog][ui][modern]")
+{
+    Sandbox sb(arch);
+    DeployOverloadTree(sb);
+    UseDialogStyle(sb, true);
+    sb.Write(L"nightmare/data.txt", "NIGHTMARE");
+    sb.Ini(L"global.ini", L"FileLoader", L"OverloadFromFolder", L"update | nightmare");
+    RunOptions o;
+    o.onDialog = [](const DialogInfo& d) {
+        PostMessageW(d.hwnd, WM_KEYDOWN, VK_ESCAPE, 0);
+        return DialogAction::LeaveOpen();
+    };
+    auto r = sb.Run({ L"read:data.txt" }, o);
+    REQUIRE_EQ(r.dialogs.size(), (size_t)1);
+    CHECK_EQ(r.exitCode, (DWORD)0);
+    CHECK(!r.HostFinished());
+}
 ARCH_TEST("a UTF-8 update.txt caption is shown correctly in the selection dialog", "[overload][dialog][ui][unicode]")
 {
     std::wstring caption = L"Кошмар — Nightmare édition";
@@ -486,6 +584,7 @@ ARCH_TEST("a UTF-8 update.txt caption is shown correctly in the selection dialog
         sb.Write(L"nightmare/data.txt", "NIGHTMARE");
         sb.Ini(L"global.ini", L"FileLoader", L"OverloadFromFolder", L"update | nightmare");
         auto r = sb.Run({ L"read:data.txt" });
+        SkipIfClosedByUser(r);
         REQUIRE_HOST_OK(r);
         REQUIRE_EQ(r.dialogs.size(), (size_t)1);
         CHECK_EQ(r.dialogs.front().isModern, modern);
@@ -506,6 +605,7 @@ ARCH_TEST("under the loader lock (DontLoadFromDllMain=0) the first folder is use
         sb.Write(L"nightmare/data.txt", "NIGHTMARE");
         sb.Ini(L"global.ini", L"FileLoader", L"OverloadFromFolder", L"update | nightmare");
         auto r = sb.Run({ L"read:data.txt" });
+        SkipIfClosedByUser(r);
         REQUIRE_HOST_OK(r);
         CHECK_EQ(r.dialogs.size(), (size_t)0);
         CHECK_EQ(Data(r, "read", "data.txt"), kUpdated);
@@ -530,6 +630,7 @@ ARCH_TEST("the ModernUI dialog can be used with the keyboard", "[overload][dialo
         return DialogAction::LeaveOpen();
     };
     auto r = sb.Run({ L"read:data.txt" }, o);
+    SkipIfClosedByUser(r);
     REQUIRE_HOST_OK(r);
     REQUIRE_EQ(r.dialogs.size(), (size_t)1);
     CHECK(r.dialogs.front().isModern);

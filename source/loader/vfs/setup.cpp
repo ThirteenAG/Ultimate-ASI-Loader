@@ -4,6 +4,7 @@
 #include "server.hpp"
 #include "spec.hpp"
 #include "../core/loader.hpp"
+#include "../core/log.hpp"
 #include "../core/paths.hpp"
 #include "../core/strings.hpp"
 #include "../ui/dialogs.hpp"
@@ -49,6 +50,8 @@ namespace ual::vfs
             return {};
         }
 
+        constexpr wchar_t kCancelledMark[] = L"|cancelled"; // no choice id contains '|'
+
         // One dialog per game at a time. Another process of the same game started meanwhile,
         // for example relaunched by its launcher, waits and reuses the choice.
         int ChooseOnce(const std::vector<ui::Choice>& choices, const std::vector<std::wstring>& ids)
@@ -74,11 +77,16 @@ namespace ual::vfs
                 if (waited) w = WaitForSingleObject(mutex, INFINITE); // a dialog is open in another process
                 if (w == WAIT_OBJECT_0 || w == WAIT_ABANDONED)
                 {
-                    // reuse the other process's answer, "none" included, if it applies here
+                    // reuse the other process's answer, "none" and "quit" included, if it applies here
                     bool reused = false;
                     if (waited && w == WAIT_OBJECT_0 && shared->sequence != before)
                     {
                         if (!shared->chosen[0]) reused = true;
+                        if (!wcscmp(shared->chosen, kCancelledMark))
+                        {
+                            result = ui::kChoiceCancelled;
+                            reused = true;
+                        }
                         for (size_t i = 0; i < ids.size() && !reused; ++i)
                             if (IEquals(ids[i], shared->chosen))
                             {
@@ -89,7 +97,7 @@ namespace ual::vfs
                     if (!reused)
                     {
                         result = ui::ChooseOverloadFolder(choices);
-                        wcsncpy_s(shared->chosen, result >= 0 ? ids[result].c_str() : L"", _TRUNCATE);
+                        wcsncpy_s(shared->chosen, result >= 0 ? ids[result].c_str() : result == ui::kChoiceCancelled ? kCancelledMark : L"", _TRUNCATE);
                         InterlockedIncrement(&shared->sequence);
                     }
                     ReleaseMutex(mutex);
@@ -110,7 +118,19 @@ namespace ual::vfs
     {
         std::call_once(g_setup, [] {
             auto spec = OverloadSpec::Parse(GetSettings().overloadFromFolder);
-            if (spec.folders.empty()) return;
+            if (!spec.ignored.empty())
+            {
+                std::wstring parts;
+                for (const auto& p : spec.ignored)
+                {
+                    UAL_LOG("OverloadFromFolder: \"%s\" mixes '<' and '>', ignored", WideToUtf8(p).c_str());
+                    parts += L"\n    " + p;
+                }
+                ui::ShowError(L"OverloadFromFolder: choice ignored",
+                              L"These parts of [FileLoader] OverloadFromFolder mix '<' and '>', so their priority order is unclear:" + parts +
+                                  L"\n\nWrite each choice as a chain with '>' only, highest priority first, for example: mod > update");
+            }
+            if (spec.entries.empty()) return;
             auto packages = ScanPackages(GameDir() + L"packages");
 
             // a configured folder comes from disk, from packages, or both: files on disk win over the
@@ -138,46 +158,74 @@ namespace ual::vfs
                 candidates.push_back(std::move(c));
             }
             if (candidates.empty()) return;
+            auto candidateOf = [&](size_t folder) -> Candidate* {
+                for (auto& c : candidates)
+                    if (c.folder == folder) return &c;
+                return nullptr;
+            };
 
-            size_t selected = candidates.front().folder;
-            if (candidates.size() > 1)
+            // the choices: each entry with its folders that exist, highest priority first. Missing folders are
+            // skipped; an entry left with nothing, or with the same folders as an earlier one, is not offered.
+            struct Option
+            {
+                const OverloadSpec::Entry* entry;
+                std::vector<Candidate*> folders;
+            };
+            std::vector<Option> options;
+            for (const auto& e : spec.entries)
+            {
+                Option o{ &e, {} };
+                for (size_t f : e.folders)
+                    if (auto c = candidateOf(f)) o.folders.push_back(c);
+                if (o.folders.empty()) continue;
+                if (std::any_of(options.begin(), options.end(), [&](const Option& p) { return p.folders == o.folders; })) continue;
+                options.push_back(std::move(o));
+            }
+            if (options.empty()) return;
+
+            size_t selected = 0;
+            if (options.size() > 1)
             {
                 std::vector<ui::Choice> choices;
                 std::vector<std::wstring> ids;
-                for (auto& c : candidates)
+                for (const auto& o : options)
                 {
-                    c.caption = Caption(c.layer);
-                    if (c.caption.empty() && !c.zips.archives.empty()) c.caption = Caption(c.zips);
-                    ui::Choice choice{ c.caption.empty() ? c.layer.name : c.caption, c.layer.root, !c.layer.archives.empty() || !c.zips.archives.empty(), {} };
-                    for (size_t r : spec.Activate(c.folder))
+                    Candidate& top = *o.folders.front();
+                    if (top.caption.empty()) top.caption = Caption(top.layer);
+                    if (top.caption.empty() && !top.zips.archives.empty()) top.caption = Caption(top.zips);
+                    ui::Choice choice{ top.caption.empty() ? top.layer.name : top.caption, top.layer.root, false, {} };
+                    for (const Candidate* c : o.folders)
                     {
-                        if (r == c.folder) continue;
-                        choice.includes.push_back(FileNameOf(spec.folders[r]));
-                        for (auto& o : candidates)
-                            if (o.folder == r) choice.zip |= !o.layer.archives.empty() || !o.zips.archives.empty();
+                        if (c != &top) choice.includes.push_back(FileNameOf(c->layer.name));
+                        choice.zip |= !c->layer.archives.empty() || !c->zips.archives.empty();
                     }
                     choices.push_back(std::move(choice));
-                    ids.push_back(c.layer.name);
+                    ids.push_back(o.entry->id);
                 }
                 int chosen = ChooseOnce(choices, ids);
+                if (chosen == ui::kChoiceCancelled)
+                {
+                    // Nothing of the game has run yet. TerminateProcess skips the DLL detach notifications, which could
+                    // reach this half-initialized loader (we are inside its one-time setup) or code of the game.
+                    UAL_LOG("folder selection window closed: quitting the game");
+                    TerminateProcess(GetCurrentProcess(), 0);
+                }
                 if (chosen < 0) return;
-                selected = candidates[chosen].folder;
+                selected = (size_t)chosen;
             }
 
             std::vector<LayerSpec> layers;
             int priority = 1000;
-            for (size_t f : spec.Activate(selected))
-                for (auto& c : candidates)
-                    if (c.folder == f)
-                    {
-                        c.layer.priority = priority--;
-                        layers.push_back(c.layer);
-                        if (!c.zips.archives.empty())
-                        {
-                            c.zips.priority = priority--;
-                            layers.push_back(c.zips);
-                        }
-                    }
+            for (Candidate* c : options[selected].folders)
+            {
+                c->layer.priority = priority--;
+                layers.push_back(c->layer);
+                if (!c->zips.archives.empty())
+                {
+                    c->zips.priority = priority--;
+                    layers.push_back(c->zips);
+                }
+            }
             if (layers.empty()) return;
 #ifndef _WIN64
             server::Start(); // keeps zip and plugin files out of the 32-bit address space

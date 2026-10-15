@@ -206,12 +206,37 @@ Starting with version 7.9.0, you can use this functionality for total conversion
 
 ![re5dx9_update](https://github.com/user-attachments/assets/a4baaa7b-d0bc-44ce-ab5e-d5fa8cc3ae43)
 
-Two or more folders must be specified, and exist, for the selector dialog to appear. Define them inside global.ini under `[FileLoader]` section using the `OverloadFromFolder` key. Use the `|` symbol as a separator. If only one folder is specified and exists, it will be used to overload files, but the selector will not appear. Without an ini file, the `update` folder is always used if it exists. Example:
+Define the choices inside global.ini under the `[FileLoader]` section using the `OverloadFromFolder` key:
+
+- `|` separates the choices. Each part is one choice in the selector.
+- Inside a choice, `>` means "wins over": `A > B > C` uses the folders A, B and C together, with A's files winning over B's and B's over C's. Read it left to right, highest priority first. The selector shows the choice the same way: A as its title, then `+ B` and `+ C`.
+- A single folder (`update`) is a choice with just that folder.
+- Choices are independent of each other: a folder can appear in several of them, and picking one choice uses exactly its folders.
 
 ```ini
 [FileLoader]
 OverloadFromFolder=update | nightmare
 ```
+
+offers `update` and `nightmare`, and
+
+```ini
+[FileLoader]
+OverloadFromFolder=update | nightmare > update | hdtextures > nightmare
+```
+
+offers three choices: `update`, `nightmare + update` and `hdtextures + nightmare` (the last one does not include `update`).
+
+Without `|` there is only one choice, so no selector appears:
+
+```ini
+[FileLoader]
+OverloadFromFolder=nightmare > update
+```
+
+always uses both folders, `nightmare`'s files winning over `update`'s.
+
+Folders that do not exist are skipped. The selector appears only when two or more choices are left; a single choice is used without asking. Without an ini file, the `update` folder is always used if it exists. Older configs may use `<`, the reverse of `>`: `update < nightmare` is the same as `nightmare > update`, one choice with both folders, not two choices. A choice that mixes `<` and `>` is ignored and an error message names it.
 
 To create a custom header, create `update.txt` inside `update` or total conversion folder and insert the custom name there.
 
@@ -221,7 +246,7 @@ To create a custom header, create `update.txt` inside `update` or total conversi
 Resident Evil 5 - Nightmare (Story mode mod)
 ```
 
-The selector picks the first folder by itself after 10 seconds, unless you use the keyboard or the mouse. It is the loader's own window (light or dark like Windows, keyboard: arrow keys, Enter, Esc, 1-9); `[GlobalSets] ModernUI=0` uses a standard Windows task dialog instead. Error messages use the same style.
+The selector picks the first choice by itself after 10 seconds, unless you use the keyboard or the mouse. Closing it (the X button, Alt+F4 or Esc) quits the game. It is the loader's own window (light or dark like Windows, resizable, keyboard: arrow keys, Enter, Esc, 1-9); `[GlobalSets] ModernUI=0` uses a standard Windows task dialog instead. Error messages use the same style.
 
 The game sees the update folder merged into its own folders: files and folders that exist only in `update` appear in the game folder too (file listings included), and files added to or removed from `update` while the game runs are picked up. New files the game creates are written to the game folder, never into `update`.
 
