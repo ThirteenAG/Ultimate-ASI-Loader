@@ -2,10 +2,13 @@
 #define WIN32_LEAN_AND_MEAN
 #include "builtins.hpp"
 #include <windows.h>
+#include <tlhelp32.h>
 #include <cstdint>
 #include <cstring>
 #include <memory>
+#include <mutex>
 #include <stdexcept>
+#include <vector>
 #include <safetyhook.hpp>
 #include <injector/injector.hpp>
 #include <Hooking.Patterns.h>
@@ -121,6 +124,89 @@ using InlineHook=::SafetyHookInline; using MidHook=::SafetyHookMid; using VmtHoo
 }
 namespace
 {
+// safetyhook keeps other threads out of the bytes it patches by making the page non-executable and moving
+// threads that fault there. It skips that for code in its own module (the host's) and next to VirtualProtect,
+// where it would trap itself; there the patch runs with the other threads suspended outside those bytes.
+bool Untrapped(const uint8_t *target, size_t size)
+{
+    MEMORY_BASIC_INFORMATION self{}, mbi{};
+    if (!target || !VirtualQuery((void *)&Untrapped, &self, sizeof(self)) || !VirtualQuery(target, &mbi, sizeof(mbi)))
+        return false;
+    auto first = (uintptr_t)target & ~uintptr_t(0xfff);
+    auto last = ((uintptr_t)target + size + 0xfff) & ~uintptr_t(0xfff);
+    auto vp = (uintptr_t)&VirtualProtect;
+    return self.AllocationBase == mbi.AllocationBase || !(last < vp || vp + 0x20 < first);
+}
+std::mutex freezeMutex;
+template <typename F> void Frozen(const uint8_t *target, size_t size, F &&patch)
+{
+    std::lock_guard<std::mutex> lock(freezeMutex);
+    // holding the heap lock keeps a suspended thread from owning it while the patch allocates
+    auto heap = GetProcessHeap();
+    for (;;)
+    {
+        HeapLock(heap);
+        std::vector<HANDLE> threads;
+        bool busy = false;
+        auto snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
+        THREADENTRY32 entry{sizeof(entry)};
+        for (auto ok = snapshot != INVALID_HANDLE_VALUE && Thread32First(snapshot, &entry); ok && !busy;
+             ok = Thread32Next(snapshot, &entry))
+        {
+            if (entry.th32OwnerProcessID != GetCurrentProcessId() || entry.th32ThreadID == GetCurrentThreadId())
+                continue;
+            auto thread = OpenThread(THREAD_SUSPEND_RESUME | THREAD_GET_CONTEXT, FALSE, entry.th32ThreadID);
+            if (!thread)
+                continue;
+            if (SuspendThread(thread) == (DWORD)-1)
+            {
+                CloseHandle(thread);
+                continue;
+            }
+            threads.push_back(thread);
+            CONTEXT context{};
+            context.ContextFlags = CONTEXT_CONTROL;
+            if (GetThreadContext(thread, &context))
+            {
+#ifdef _WIN64
+                auto ip = (uintptr_t)context.Rip;
+#else
+                auto ip = (uintptr_t)context.Eip;
+#endif
+                busy = ip > (uintptr_t)target && ip < (uintptr_t)target + size;
+            }
+        }
+        if (snapshot != INVALID_HANDLE_VALUE)
+            CloseHandle(snapshot);
+        if (!busy)
+            patch();
+        for (auto thread : threads)
+        {
+            ResumeThread(thread);
+            CloseHandle(thread);
+        }
+        HeapUnlock(heap);
+        if (!busy)
+            return;
+        Sleep(0);
+    }
+}
+template <typename H> bool Enable(H &hook)
+{
+    if (!Untrapped(hook.target(), hook.original_bytes().size()))
+        return bool(hook.enable());
+    bool ok = false;
+    Frozen(hook.target(), hook.original_bytes().size(), [&] { ok = bool(hook.enable()); });
+    return ok;
+}
+template <typename H> bool Disable(H &hook)
+{
+    if (!hook.enabled() || !Untrapped(hook.target(), hook.original_bytes().size()))
+        return bool(hook.disable());
+    bool ok = false;
+    Frozen(hook.target(), hook.original_bytes().size(), [&] { ok = bool(hook.disable()); });
+    return ok;
+}
 struct Inline
 {
     SafetyHookInline hook;
@@ -129,8 +215,10 @@ struct Inline
 void *InlineNew(void *target, void *dest, int flags)
 {
     auto p = std::make_unique<Inline>();
-    p->hook = safetyhook::create_inline(target, dest, (SafetyHookInline::Flags)flags);
-    return p->hook ? p.release() : nullptr;
+    p->hook = safetyhook::create_inline(target, dest, SafetyHookInline::StartDisabled);
+    if (!p->hook || (!(flags & SafetyHookInline::StartDisabled) && !Enable(p->hook)))
+        return nullptr;
+    return p.release();
 }
 void InlineRelease(void *handle)
 {
@@ -139,6 +227,7 @@ void InlineRelease(void *handle)
         return;
     // a thread between inline_enter and inline_leave (calling the original) still owns the mutex: wait for it
     p->mutex.lock();
+    (void)Disable(p->hook);
     p->mutex.unlock();
     delete p;
 }
@@ -147,6 +236,7 @@ void InlineReset(Inline *p)
     if (p)
     {
         std::lock_guard<std::recursive_mutex> lock(p->mutex);
+        (void)Disable(p->hook);
         p->hook.reset();
     }
 }
@@ -156,11 +246,11 @@ bool InlineBool(Inline *p)
 }
 bool InlineEnable(Inline *p)
 {
-    return p && bool(p->hook.enable());
+    return p && Enable(p->hook);
 }
 bool InlineDisable(Inline *p)
 {
-    return p && bool(p->hook.disable());
+    return p && Disable(p->hook);
 }
 bool InlineEnabled(Inline *p)
 {
@@ -188,17 +278,25 @@ void InlineLeave(Inline *p)
 }
 SafetyHookMid *MidNew(void *target, void (*dest)(SafetyHookContext &), int flags)
 {
-    auto p = std::make_unique<SafetyHookMid>(safetyhook::create_mid(target, dest, (SafetyHookMid::Flags)flags));
-    return *p ? p.release() : nullptr;
+    auto p = std::make_unique<SafetyHookMid>(safetyhook::create_mid(target, dest, SafetyHookMid::StartDisabled));
+    if (!*p || (!(flags & SafetyHookMid::StartDisabled) && !Enable(*p)))
+        return nullptr;
+    return p.release();
 }
-void MidRelease(void *p)
+void MidRelease(void *handle)
 {
-    delete static_cast<SafetyHookMid *>(p);
+    auto p = static_cast<SafetyHookMid *>(handle);
+    if (p)
+        (void)Disable(*p);
+    delete p;
 }
 void MidReset(SafetyHookMid *p)
 {
     if (p)
+    {
+        (void)Disable(*p);
         p->reset();
+    }
 }
 bool MidBool(SafetyHookMid *p)
 {
@@ -206,11 +304,11 @@ bool MidBool(SafetyHookMid *p)
 }
 bool MidEnable(SafetyHookMid *p)
 {
-    return p && bool(p->enable());
+    return p && Enable(*p);
 }
 bool MidDisable(SafetyHookMid *p)
 {
-    return p && bool(p->disable());
+    return p && Disable(*p);
 }
 bool MidEnabled(SafetyHookMid *p)
 {
