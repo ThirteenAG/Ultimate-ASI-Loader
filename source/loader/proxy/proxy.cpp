@@ -229,7 +229,16 @@ namespace ual::proxy
     {
         static volatile DWORD loadingThread = 0;
         if (g_loading == 2 || loadingThread == GetCurrentThreadId()) return; // done, or re-entered while loading
-        AcquireSRWLockExclusive(&g_loadLock); // other threads wait until the original is usable
+        if (LoaderLockHeldByThisThread())
+        {
+            // A DllMain thread-attach call holds the loader lock that the loading thread's LoadLibrary needs,
+            // so waiting here would never end. The hooked function itself doesn't need the original.
+            if (!TryAcquireSRWLockExclusive(&g_loadLock)) return;
+        }
+        else
+        {
+            AcquireSRWLockExclusive(&g_loadLock); // other threads wait until the original is usable
+        }
         if (g_loading == 0)
         {
             g_loading = 1;
