@@ -142,8 +142,10 @@ namespace ual::plugins
             {
                 SetCurrentDirectoryW(selfDir.c_str());
                 // once per module: the same file is skipped when its folder is scanned below
-                if (HMODULE m = LoadLibraryW(extra.c_str()))
-                    if (g_initialized.insert(m).second) CallInitializeASI(m);
+                HMODULE m = LoadLibraryW(extra.c_str());
+                DWORD error = m ? 0 : GetLastError();
+                UAL_LOG("extra plugin %ls: %s%s", extra.c_str(), m ? "loaded" : "error ", m ? "" : std::to_string(error).c_str());
+                if (m && g_initialized.insert(m).second) CallInitializeASI(m);
             }
             if (!s.loadFromScriptsOnly) LoadFolder(selfDir);
             LoadTree(self.dir + L"scripts", s.loadRecursively);

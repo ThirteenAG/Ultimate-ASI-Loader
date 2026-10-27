@@ -1204,6 +1204,22 @@ ARCH_TEST("DebugLog=1 writes <loader>.log with what started plugin loading", "[l
     CHECK(log.find("plugins loaded") != std::string::npos);
 }
 
+ARCH_TEST("DebugLog=1 also lists the plugins of LoadExtraPlugins", "[loading][ini][extra]")
+{
+    Sandbox sb(arch);
+    sb.Loader(L"dinput8.dll");
+    sb.Host(L"dinput8");
+    sb.Probe(L"extra/a.asi");
+    sb.Write(L"dinput8.ini", "[GlobalSets]\nDebugLog=1\nLoadExtraPlugins=extra\\a.asi | missing\\nope.dll\n");
+    auto r = sb.Run({ L"trigger:Sleep" });
+    REQUIRE_HOST_OK(r);
+    REQUIRE(sb.Exists(L"dinput8.log"));
+    std::string log = sb.Read(L"dinput8.log");
+    INFO(log);
+    CHECK(log.find("extra plugin extra\\a.asi: loaded") != std::string::npos);
+    CHECK(log.find("extra plugin missing\\nope.dll: error") != std::string::npos);
+}
+
 ARCH_TEST("without DebugLog no log file is written", "[loading][ini]")
 {
     Sandbox sb(arch);
