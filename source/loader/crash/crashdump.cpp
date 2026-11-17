@@ -33,8 +33,11 @@ namespace crashdump
             char* log = nullptr;
             bool installed = false;
             void (*onCrash)() = nullptr;
-            void* volatile gameFilter = nullptr; // LPTOP_LEVEL_EXCEPTION_FILTER the game tried to set; returned to it, never called
+            void* volatile gameFilter = nullptr; // LPTOP_LEVEL_EXCEPTION_FILTER the game set (or the one before ours), called first
         } g;
+
+        // the exception whose game filter is running on this thread; a process exit from in there gets reported first
+        thread_local EXCEPTION_POINTERS* t_gameFilterException = nullptr;
 
         bool DirExists(const wchar_t* p)
         {
@@ -357,15 +360,15 @@ namespace crashdump
             }
         }
 
-        LONG WINAPI Filter(EXCEPTION_POINTERS* ep)
+        // Writes the report once per process; a later caller waits until it is done.
+        void ReportCrash(EXCEPTION_POINTERS* ep)
         {
-            if (GetCurrentThreadId() == g.reporterId) return EXCEPTION_CONTINUE_SEARCH;
             if (g.onCrash) g.onCrash(); // e.g. make the file hooks pass through: the reporter must not block on their locks
             if (InterlockedCompareExchange(&g.crashing, 1, 0) != 0)
             {
-                // another thread is already reporting, wait for it
+                // another thread is already reporting (or this one already did), wait for it
                 if (g.done) WaitForSingleObject(g.done, Timeout());
-                return EXCEPTION_CONTINUE_SEARCH;
+                return;
             }
             g.crash.ep = ep;
             g.crash.threadId = GetCurrentThreadId();
@@ -385,12 +388,47 @@ namespace crashdump
             // games clip and hide the cursor
             ClipCursor(nullptr);
             ShowCursor(TRUE);
-            return EXCEPTION_CONTINUE_SEARCH;
         }
 
-        // The game's (or a launcher's) SetUnhandledExceptionFilter must not replace ours. Instead of patching the
-        // system function's code, it is hooked: the game's filter is accepted and remembered, so the game sees the
-        // usual return value, but it stays inactive. The crash still reaches Windows Error Reporting afterwards.
+        LONG CallGameFilter(LPTOP_LEVEL_EXCEPTION_FILTER filter, EXCEPTION_POINTERS* ep)
+        {
+            EXCEPTION_POINTERS* outer = t_gameFilterException;
+            t_gameFilterException = ep;
+            LONG result;
+            __try
+            {
+                result = filter(ep);
+            }
+            __except (EXCEPTION_EXECUTE_HANDLER)
+            {
+                result = EXCEPTION_CONTINUE_SEARCH; // a broken filter must not hide the crash
+            }
+            t_gameFilterException = outer;
+            return result;
+        }
+
+        // The game's filter decides first: DRM and some engines raise exceptions on purpose and continue from their
+        // filter. Whatever ends the process gets a report: the filter returning, or exiting from inside (hooks below).
+        LONG WINAPI Filter(EXCEPTION_POINTERS* ep)
+        {
+            if (GetCurrentThreadId() == g.reporterId) return EXCEPTION_CONTINUE_SEARCH;
+            // these can't be continued, and calling the game's filter can end the process out of reach (the CRT's
+            // filter fail-fasts on C++ exceptions, a second stack overflow kills it): report first
+            bool fatal = (ep->ExceptionRecord->ExceptionFlags & EXCEPTION_NONCONTINUABLE) || ep->ExceptionRecord->ExceptionCode == EXCEPTION_STACK_OVERFLOW;
+            if (fatal) ReportCrash(ep);
+            LONG result = EXCEPTION_CONTINUE_SEARCH;
+            if (auto filter = (LPTOP_LEVEL_EXCEPTION_FILTER)g.gameFilter)
+            {
+                result = CallGameFilter(filter, ep);
+                if (result == EXCEPTION_CONTINUE_EXECUTION) return result;
+            }
+            if (!fatal) ReportCrash(ep);
+            return result;
+        }
+
+        // The game's (or a launcher's) SetUnhandledExceptionFilter must not replace ours. Its filter is remembered
+        // instead and the game sees the usual return value; Filter calls it. Unless it handles the crash, the crash
+        // still reaches Windows Error Reporting.
         decltype(&SetUnhandledExceptionFilter) oSetUnhandledExceptionFilter = nullptr;
         LPTOP_LEVEL_EXCEPTION_FILTER WINAPI hkSetUnhandledExceptionFilter(LPTOP_LEVEL_EXCEPTION_FILTER filter)
         {
@@ -398,11 +436,81 @@ namespace crashdump
             return (LPTOP_LEVEL_EXCEPTION_FILTER)InterlockedExchangePointer((void* volatile*)&g.gameFilter, (void*)filter);
         }
 
+        // A game's filter often shows its own crash message and exits the process. These pass through, except from
+        // inside a game filter, where the crash is reported first.
+        void ReportFromGameFilter()
+        {
+            if (EXCEPTION_POINTERS* ep = t_gameFilterException)
+            {
+                t_gameFilterException = nullptr;
+                ReportCrash(ep);
+            }
+        }
+
+        decltype(&ExitProcess) oExitProcess = nullptr;
+        void WINAPI hkExitProcess(UINT code)
+        {
+            ReportFromGameFilter();
+            oExitProcess(code);
+        }
+
+        decltype(&TerminateProcess) oTerminateProcess = nullptr;
+        BOOL WINAPI hkTerminateProcess(HANDLE process, UINT code)
+        {
+            if (t_gameFilterException && (process == GetCurrentProcess() || GetProcessId(process) == GetCurrentProcessId())) ReportFromGameFilter();
+            return oTerminateProcess(process, code);
+        }
+
+        decltype(&RaiseFailFastException) oRaiseFailFastException = nullptr;
+        void WINAPI hkRaiseFailFastException(PEXCEPTION_RECORD record, PCONTEXT context, DWORD flags)
+        {
+            ReportFromGameFilter();
+            oRaiseFailFastException(record, context, flags);
+        }
+
+        // kernel32's export is a stub that jumps through kernel32's own import table into kernelbase
+        void** Kernel32Import(const char* function)
+        {
+            auto base = (BYTE*)GetModuleHandleW(L"kernel32.dll");
+            auto nt = (IMAGE_NT_HEADERS*)(base + ((IMAGE_DOS_HEADER*)base)->e_lfanew);
+            auto& dir = nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT];
+            if (!dir.VirtualAddress) return nullptr;
+            for (auto d = (IMAGE_IMPORT_DESCRIPTOR*)(base + dir.VirtualAddress); d->Name; ++d)
+            {
+                if (!d->OriginalFirstThunk) continue;
+                auto names = (IMAGE_THUNK_DATA*)(base + d->OriginalFirstThunk);
+                auto slots = (void**)(base + d->FirstThunk);
+                for (size_t i = 0; names[i].u1.AddressOfData; ++i)
+                    if (!IMAGE_SNAP_BY_ORDINAL(names[i].u1.Ordinal) && !strcmp((const char*)((IMAGE_IMPORT_BY_NAME*)(base + names[i].u1.AddressOfData))->Name, function))
+                        return &slots[i];
+            }
+            return nullptr;
+        }
+
         void LockFilter()
         {
-            ual::InstallHooks({ { L"kernelbase.dll", "SetUnhandledExceptionFilter", (void*)hkSetUnhandledExceptionFilter, (void**)&oSetUnhandledExceptionFilter } });
-            if (!oSetUnhandledExceptionFilter) // older Windows: the implementation lives in kernel32
-                ual::InstallHooks({ { L"kernel32.dll", "SetUnhandledExceptionFilter", (void*)hkSetUnhandledExceptionFilter, (void**)&oSetUnhandledExceptionFilter } });
+            // DRM such as Max Payne 3's rejects a patched SetUnhandledExceptionFilter, so kernel32's import entry is
+            // redirected instead of hooking the code; that covers games, which import it from kernel32
+            if (void** slot = Kernel32Import("SetUnhandledExceptionFilter"))
+            {
+                DWORD protect;
+                if (VirtualProtect(slot, sizeof(void*), PAGE_READWRITE, &protect))
+                {
+                    oSetUnhandledExceptionFilter = (decltype(oSetUnhandledExceptionFilter))*slot;
+                    oSetUnhandledExceptionFilter = (decltype(oSetUnhandledExceptionFilter))InterlockedExchangePointer(slot, (void*)hkSetUnhandledExceptionFilter);
+                    VirtualProtect(slot, sizeof(void*), protect, &protect);
+                }
+            }
+            // older Windows: the implementations live in kernel32 (then SetUnhandledExceptionFilter is hooked there)
+            for (const wchar_t* module : { L"kernelbase.dll", L"kernel32.dll" })
+            {
+                ual::InstallHooks({
+                    { L"kernel32.dll", "SetUnhandledExceptionFilter", (void*)hkSetUnhandledExceptionFilter, (void**)&oSetUnhandledExceptionFilter },
+                    { module, "TerminateProcess", (void*)hkTerminateProcess, (void**)&oTerminateProcess },
+                    { module, "RaiseFailFastException", (void*)hkRaiseFailFastException, (void**)&oRaiseFailFastException },
+                    { L"kernel32.dll", "ExitProcess", (void*)hkExitProcess, (void**)&oExitProcess },
+                });
+            }
         }
 
         void NameThread(HANDLE t, const wchar_t* name)
@@ -469,7 +577,8 @@ namespace crashdump
         // the filter and reporter thread run our code until process exit
         HMODULE pinned;
         GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_PIN, (LPCWSTR)&Filter, &pinned);
-        SetUnhandledExceptionFilter(Filter);
+        // a filter set before ours (a protection stub, another loader) is chained like the game's
+        g.gameFilter = (void*)SetUnhandledExceptionFilter(Filter);
         LockFilter();
 
         if (HANDLE hk = CreateThread(nullptr, 0, Housekeeping, nullptr, CREATE_SUSPENDED, nullptr))

@@ -958,7 +958,8 @@ ARCH_TEST("crash reports: an unhandled C++ exception shows its type and message"
     sb.Host(L"dinput8");
     sb.Mkdir(L"CrashDumps");
     auto r = sb.Run({ L"throw:the answer is 42" });
-    CHECK_EQ(r.exitCode, (DWORD)0xE06D7363);
+    // the CRT's filter of the game ends the process with a fail fast, after the report
+    CHECK_EQ(r.exitCode, (DWORD)STATUS_STACK_BUFFER_OVERRUN);
     auto rep = OnlyReport(sb, true);
     CHECK_MSG(Contains(rep.text, "C++ exception (0xE06D7363): std::runtime_error: \"the answer is 42\""), rep.text.substr(0, 800));
     CHECK_MSG(Contains(rep.text, "Caller:    game.exe+0x"), "the summary points at the code that threw, not at RaiseException");
@@ -1032,15 +1033,52 @@ ARCH_TEST("crash reports: a minidump left unzipped is archived on the next start
     CHECK_EQ(zip["game.exe.20200101_000000.dmp"].size(), (size_t)4096);
 }
 
-ARCH_TEST("the game cannot replace the crash dump handler once it is installed", "[crashdumps]")
+ARCH_TEST("the game cannot replace the crash dump handler once it is installed, its filter is called first", "[crashdumps]")
 {
     Sandbox sb(arch);
     sb.Loader();
     sb.Host(L"dinput8");
     sb.Mkdir(L"CrashDumps");
     auto r = sb.Run({ L"setfilter", L"crash" });
-    CHECK_EQ(r.Events("host", "host_filter_called").size(), (size_t)0);
+    CHECK_EQ(r.Events("host", "host_filter_called").size(), (size_t)1);
+    CHECK_EQ(r.exitCode, (DWORD)EXCEPTION_ACCESS_VIOLATION);
     CHECK_EQ(DumpFiles(sb, L".zip").size(), (size_t)1);
+}
+
+ARCH_TEST("crash reports: an exception the game's filter continues from is no crash", "[crashdumps]")
+{
+    Sandbox sb(arch);
+    sb.Loader();
+    sb.Host(L"dinput8");
+    sb.Mkdir(L"CrashDumps");
+    auto r = sb.Run({ L"setfilter:continue", L"raise" });
+    CHECK_EQ(r.Events("host", "host_filter_called").size(), (size_t)1);
+    CHECK_EQ(r.Events("host", "resumed").size(), (size_t)1);
+    CHECK_EQ(r.exitCode, (DWORD)0);
+    CHECK_EQ(DumpFiles(sb, L".log").size(), (size_t)0);
+    CHECK_EQ(DumpFiles(sb, L".dmp").size(), (size_t)0);
+}
+
+ARCH_TEST("crash reports: a crash the game's filter handles or exits on is still reported", "[crashdumps]")
+{
+    struct Case
+    {
+        const wchar_t* mode;
+        DWORD exitCode;
+    };
+    for (const Case& c : { Case{ L"handle", (DWORD)EXCEPTION_ACCESS_VIOLATION }, Case{ L"exit", 7u }, Case{ L"terminate", 8u } })
+    {
+        Sandbox sb(arch);
+        sb.Loader();
+        sb.Host(L"dinput8");
+        sb.Mkdir(L"CrashDumps");
+        auto r = sb.Run({ std::wstring(L"setfilter:") + c.mode, L"crash" });
+        INFO(ut::narrow(c.mode));
+        CHECK_EQ(r.Events("host", "host_filter_called").size(), (size_t)1);
+        CHECK_EQ(r.exitCode, c.exitCode);
+        auto rep = OnlyReport(sb, true);
+        CHECK(Contains(rep.text, "EXCEPTION_ACCESS_VIOLATION"));
+    }
 }
 
 ARCH_TEST("DisableCrashDumps=1 or a missing CrashDumps folder disables crash dumps", "[crashdumps][ini]")

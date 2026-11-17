@@ -21,7 +21,8 @@
 //   vrm:<path>  vrmA:<path>      RemoveVirtualFileFromOverloadW/A
 //   vpath:<orig>|<target>|<prio> vpathA:...  AddVirtualPathForOverloadW/A
 //   vpathrm:<orig> vpathrmA:<orig>           RemoveVirtualPathFromOverloadW/A
-//   setfilter                    SetUnhandledExceptionFilter(host filter)
+//   setfilter[:<mode>]           SetUnhandledExceptionFilter(host filter); mode continue, handle, exit or terminate
+//   raise                        continuable RaiseException, then "resumed"
 //   crash                        access violation, WER UI suppressed
 //   throw:<message>              unhandled std::runtime_error(message)
 //   stackoverflow                unbounded recursion
@@ -503,6 +504,8 @@ static void ActionOverloadQuery(Host& h, const std::wstring& verb, const std::ws
 
 static Host* g_host = nullptr;
 
+static std::wstring g_filterMode; // setfilter:<mode>
+
 static LONG WINAPI HostUnhandledFilter(EXCEPTION_POINTERS*)
 {
     if (g_host)
@@ -511,6 +514,10 @@ static LONG WINAPI HostUnhandledFilter(EXCEPTION_POINTERS*)
         r["ev"] = "host_filter_called";
         g_host->Emit(r);
     }
+    if (g_filterMode == L"continue") return EXCEPTION_CONTINUE_EXECUTION;
+    if (g_filterMode == L"handle") return EXCEPTION_EXECUTE_HANDLER;
+    if (g_filterMode == L"exit") ExitProcess(7);
+    if (g_filterMode == L"terminate") TerminateProcess(GetCurrentProcess(), 8);
     return EXCEPTION_CONTINUE_SEARCH;
 }
 
@@ -622,8 +629,17 @@ int wmain(int argc, wchar_t** argv)
             ActionVirtual(h, verb, arg);
         else if (verb == L"setfilter")
         {
+            g_filterMode = arg;
             SetUnhandledExceptionFilter(HostUnhandledFilter);
-            h.Emit(Base("setfilter", L""));
+            h.Emit(Base("setfilter", arg));
+        }
+        else if (verb == L"raise")
+        {
+            // a continuable exception only the unhandled-exception filter deals with, like DRM code does
+            h.Emit(Base("raise", L""));
+            SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX | SEM_NOOPENFILEERRORBOX);
+            RaiseException(0xE0001234, 0, 0, nullptr);
+            h.Emit(Base("resumed", L""));
         }
         else if (verb == L"crash")
         {

@@ -305,7 +305,7 @@ Options in `[GlobalSets]`:
 | `CrashDumpFullMemory` | `0` | `1` writes a full memory dump (large, but contains everything) |
 | `CrashDumpMaxReports` | `10` | number of reports kept in the folder; older ones are deleted (`0` keeps all) |
 
-The report is written by a separate thread, so crashes such as stack overflows are captured too. Once installed, the game cannot replace the crash handler.
+The report is written by a separate thread, so crashes such as stack overflows are captured too. The game's own crash handler still runs first: an exception the game recovers from is not reported, a crash it handles by closing the game is.
 
 ## Using with UWP games
 
