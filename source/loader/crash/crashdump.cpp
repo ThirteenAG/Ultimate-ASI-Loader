@@ -26,6 +26,9 @@ namespace crashdump
             HANDLE reporter = nullptr;
             DWORD reporterId = 0;
             volatile LONG reporterStarted = 0;
+            HANDLE housekeeping = nullptr;
+            DWORD housekeepingId = 0;
+            volatile LONG housekeepingStarted = 0;
             HANDLE request = nullptr;
             HANDLE done = nullptr;
             volatile LONG crashing = 0;
@@ -268,6 +271,7 @@ namespace crashdump
         // removes partial archives and applies the report limit.
         DWORD WINAPI Housekeeping(void*)
         {
+            InterlockedExchange(&g.housekeepingStarted, 1);
             for (auto& r : ListReports())
             {
                 for (auto& f : r.files)
@@ -370,6 +374,15 @@ namespace crashdump
                 if (g.done) WaitForSingleObject(g.done, Timeout());
                 return;
             }
+            // A crash right after startup can catch the low-priority housekeeping thread before or during its work;
+            // with it suspended there by MiniDumpWriteDump, writing the dump could stall for good (seen with few
+            // cores). Let it finish first. If it hasn't started, it may need the loader lock this thread holds (a
+            // crash in a DllMain), so the wait is short then.
+            if (g.housekeeping && GetCurrentThreadId() != g.housekeepingId)
+            {
+                SetThreadPriority(g.housekeeping, THREAD_PRIORITY_NORMAL);
+                WaitForSingleObject(g.housekeeping, g.housekeepingStarted ? 5000 : 200);
+            }
             g.crash.ep = ep;
             g.crash.threadId = GetCurrentThreadId();
             GetLocalTime(&g.crash.localTime);
@@ -468,40 +481,77 @@ namespace crashdump
             oRaiseFailFastException(record, context, flags);
         }
 
-        // kernel32's export is a stub that jumps through kernel32's own import table into kernelbase
-        void** Kernel32Import(const char* function)
+        LONG WINAPI ProbeFilter(EXCEPTION_POINTERS*)
         {
-            auto base = (BYTE*)GetModuleHandleW(L"kernel32.dll");
-            auto nt = (IMAGE_NT_HEADERS*)(base + ((IMAGE_DOS_HEADER*)base)->e_lfanew);
-            auto& dir = nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT];
-            if (!dir.VirtualAddress) return nullptr;
-            for (auto d = (IMAGE_IMPORT_DESCRIPTOR*)(base + dir.VirtualAddress); d->Name; ++d)
+            return EXCEPTION_CONTINUE_SEARCH;
+        }
+
+        // The import slot kernel32's export jumps through into kernelbase: "jmp [slot]" on x86 (alone or after
+        // "mov edi,edi / push ebp / mov ebp,esp / pop ebp"), "jmp [rip+x]" on x64. Null for any other code or a
+        // forwarded export.
+        void** Kernel32JumpSlot(const char* function)
+        {
+            auto base = (const BYTE*)GetModuleHandleW(L"kernel32.dll");
+            auto code = (const BYTE*)GetProcAddress((HMODULE)base, function);
+            if (!code) return nullptr;
+            DWORD size = ((const IMAGE_NT_HEADERS*)(base + ((const IMAGE_DOS_HEADER*)base)->e_lfanew))->OptionalHeader.SizeOfImage;
+            auto inside = [&](const void* p) { return p >= base && p < base + size; };
+            if (!inside(code)) return nullptr;
+#ifdef _WIN64
+            static const BYTE prologue[] = { 0x48 };
+#else
+            static const BYTE prologue[] = { 0x8B, 0xFF, 0x55, 0x8B, 0xEC, 0x5D };
+#endif
+            for (size_t skip : { (size_t)0, sizeof(prologue) })
             {
-                if (!d->OriginalFirstThunk) continue;
-                auto names = (IMAGE_THUNK_DATA*)(base + d->OriginalFirstThunk);
-                auto slots = (void**)(base + d->FirstThunk);
-                for (size_t i = 0; names[i].u1.AddressOfData; ++i)
-                    if (!IMAGE_SNAP_BY_ORDINAL(names[i].u1.Ordinal) && !strcmp((const char*)((IMAGE_IMPORT_BY_NAME*)(base + names[i].u1.AddressOfData))->Name, function))
-                        return &slots[i];
+                if (skip && memcmp(code, prologue, skip)) continue;
+                const BYTE* jmp = code + skip;
+                if (jmp[0] != 0xFF || jmp[1] != 0x25) continue;
+#ifdef _WIN64
+                auto slot = (void**)(jmp + 6 + *(const INT32*)(jmp + 2));
+#else
+                auto slot = *(void***)(jmp + 2);
+#endif
+                return inside(slot) ? slot : nullptr;
             }
             return nullptr;
         }
 
+        bool ReplaceSlot(void** slot, void* value)
+        {
+            DWORD protect;
+            if (!VirtualProtect(slot, sizeof(void*), PAGE_READWRITE, &protect)) return false;
+            InterlockedExchangePointer(slot, value);
+            VirtualProtect(slot, sizeof(void*), protect, &protect);
+            return true;
+        }
+
+        // DRM such as Max Payne 3's rejects a patched SetUnhandledExceptionFilter, so where kernel32's export is a
+        // stub, the import slot it jumps through is redirected instead of hooking code. That covers games, which
+        // import it from kernel32. A test call makes sure it works; otherwise the export's code is hooked.
         void LockFilter()
         {
-            // DRM such as Max Payne 3's rejects a patched SetUnhandledExceptionFilter, so kernel32's import entry is
-            // redirected instead of hooking the code; that covers games, which import it from kernel32
-            if (void** slot = Kernel32Import("SetUnhandledExceptionFilter"))
+            if (void** slot = Kernel32JumpSlot("SetUnhandledExceptionFilter"))
             {
-                DWORD protect;
-                if (VirtualProtect(slot, sizeof(void*), PAGE_READWRITE, &protect))
+                void* original = *slot;
+                oSetUnhandledExceptionFilter = (decltype(oSetUnhandledExceptionFilter))original;
+                if (ReplaceSlot(slot, (void*)hkSetUnhandledExceptionFilter))
                 {
-                    oSetUnhandledExceptionFilter = (decltype(oSetUnhandledExceptionFilter))*slot;
-                    oSetUnhandledExceptionFilter = (decltype(oSetUnhandledExceptionFilter))InterlockedExchangePointer(slot, (void*)hkSetUnhandledExceptionFilter);
-                    VirtualProtect(slot, sizeof(void*), protect, &protect);
+                    auto exported = (decltype(&SetUnhandledExceptionFilter))GetProcAddress(GetModuleHandleW(L"kernel32.dll"), "SetUnhandledExceptionFilter");
+                    LPTOP_LEVEL_EXCEPTION_FILTER previous = exported(ProbeFilter);
+                    if (g.gameFilter == (void*)ProbeFilter)
+                        g.gameFilter = (void*)previous;
+                    else
+                    {
+                        exported(previous); // the test call replaced ours
+                        ReplaceSlot(slot, original);
+                        oSetUnhandledExceptionFilter = nullptr;
+                    }
                 }
+                else
+                    oSetUnhandledExceptionFilter = nullptr;
             }
-            // older Windows: the implementations live in kernel32 (then SetUnhandledExceptionFilter is hooked there)
+            // older Windows: the implementations live in kernel32
             for (const wchar_t* module : { L"kernelbase.dll", L"kernel32.dll" })
             {
                 ual::InstallHooks({
@@ -581,12 +631,12 @@ namespace crashdump
         g.gameFilter = (void*)SetUnhandledExceptionFilter(Filter);
         LockFilter();
 
-        if (HANDLE hk = CreateThread(nullptr, 0, Housekeeping, nullptr, CREATE_SUSPENDED, nullptr))
+        if (HANDLE hk = CreateThread(nullptr, 0, Housekeeping, nullptr, CREATE_SUSPENDED, &g.housekeepingId))
         {
             SetThreadPriority(hk, THREAD_PRIORITY_LOWEST);
             NameThread(hk, L"UAL crash report housekeeping");
+            g.housekeeping = hk;
             ResumeThread(hk);
-            CloseHandle(hk);
         }
         g.installed = true;
         return true;

@@ -1045,6 +1045,25 @@ ARCH_TEST("the game cannot replace the crash dump handler once it is installed, 
     CHECK_EQ(DumpFiles(sb, L".zip").size(), (size_t)1);
 }
 
+ARCH_TEST("crash reports: the code of SetUnhandledExceptionFilter stays unpatched (DRM checks it)", "[crashdumps]")
+{
+    Sandbox sb(arch);
+    sb.Loader();
+    sb.Host(L"dinput8");
+    sb.Mkdir(L"CrashDumps");
+    auto r = sb.Run({ L"patched:kernelbase.dll|SetUnhandledExceptionFilter", L"patched:kernel32.dll|SetUnhandledExceptionFilter", L"setfilter", L"crash" });
+    auto checks = r.Events("host", "patched");
+    REQUIRE_EQ(checks.size(), (size_t)2);
+    for (auto* c : checks)
+    {
+        INFO(c->get("arg"));
+        CHECK_EQ(c->get("found"), std::string("1"));
+        CHECK_EQ(c->get("patched"), std::string("0"));
+    }
+    CHECK_EQ(r.Events("host", "host_filter_called").size(), (size_t)1);
+    CHECK_EQ(DumpFiles(sb, L".zip").size(), (size_t)1);
+}
+
 ARCH_TEST("crash reports: an exception the game's filter continues from is no crash", "[crashdumps]")
 {
     Sandbox sb(arch);

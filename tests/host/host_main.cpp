@@ -23,6 +23,7 @@
 //   vpathrm:<orig> vpathrmA:<orig>           RemoveVirtualPathFromOverloadW/A
 //   setfilter[:<mode>]           SetUnhandledExceptionFilter(host filter); mode continue, handle, exit or terminate
 //   raise                        continuable RaiseException, then "resumed"
+//   patched:<dll>|<function>     whether the function's code starts with a jump (an inline hook)
 //   crash                        access violation, WER UI suppressed
 //   throw:<message>              unhandled std::runtime_error(message)
 //   stackoverflow                unbounded recursion
@@ -632,6 +633,16 @@ int wmain(int argc, wchar_t** argv)
             g_filterMode = arg;
             SetUnhandledExceptionFilter(HostUnhandledFilter);
             h.Emit(Base("setfilter", arg));
+        }
+        else if (verb == L"patched")
+        {
+            // whether a function starts with a jump to a hook (inline patch)
+            auto parts = Split(arg, L'|');
+            auto r = Base("patched", arg);
+            auto code = (const unsigned char*)GetProcAddress(GetModuleHandleW(parts[0].c_str()), ualtest::utf8(parts[1]).c_str());
+            r["found"] = code ? "1" : "0";
+            r["patched"] = code && (code[0] == 0xE9 || (code[0] == 0xFF && code[1] == 0x25 && parts[0] != L"kernel32.dll")) ? "1" : "0";
+            h.Emit(r);
         }
         else if (verb == L"raise")
         {
