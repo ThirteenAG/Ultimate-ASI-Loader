@@ -350,10 +350,32 @@ namespace crashdump::detail
                      LOWORD(ii.version.dwFileVersionLS));
         }
 
+        // The current time, read from the page Windows maps into every process instead of through GetSystemTimeAsFileTime:
+        // plugins hook that function to start up, and a crash inside such a hook leaves its lock held, which would stop
+        // the report here.
+        ULONGLONG SystemTimeNow()
+        {
+            struct KSystemTime
+            {
+                ULONG low;
+                LONG high1;
+                LONG high2;
+            };
+            auto t = (const volatile KSystemTime*)0x7FFE0014; // KUSER_SHARED_DATA.SystemTime
+            LONG high;
+            ULONG low;
+            do
+            {
+                high = t->high1;
+                low = t->low;
+            } while (high != t->high2);
+            return ((ULONGLONG)(ULONG)high << 32) | low;
+        }
+
         // Reproducible builds (all current system DLLs) store a hash here, so only plausible values are shown as a date.
         void WriteBuildDate(Writer& w, DWORD t)
         {
-            __time64_t tt = t, now = _time64(nullptr);
+            __time64_t tt = t, now = (__time64_t)(SystemTimeNow() / 10000000ULL - 11644473600ULL);
             struct tm tmv;
             if (t && tt <= now + 86400 && _gmtime64_s(&tmv, &tt) == 0 && tmv.tm_year >= 95)
                 w.Printf("built %04d-%02d-%02d", tmv.tm_year + 1900, tmv.tm_mon + 1, tmv.tm_mday);
@@ -1182,11 +1204,10 @@ namespace crashdump::detail
             }
             w.NewLine();
 
-            FILETIME created, exited, kernel, user, now;
+            FILETIME created, exited, kernel, user;
             if (GetProcessTimes(GetCurrentProcess(), &created, &exited, &kernel, &user))
             {
-                GetSystemTimeAsFileTime(&now);
-                ULONGLONG secs = (((ULARGE_INTEGER&)now).QuadPart - ((ULARGE_INTEGER&)created).QuadPart) / 10000000ULL;
+                ULONGLONG secs = (SystemTimeNow() - ((ULARGE_INTEGER&)created).QuadPart) / 10000000ULL;
                 w.Line("Uptime:        %llu:%02llu:%02llu", secs / 3600, (secs / 60) % 60, secs % 60);
             }
 
