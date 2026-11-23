@@ -6,6 +6,7 @@
 #include "core/strings.hpp"
 #include "crash/crashdump.hpp"
 #include "proxy/proxy.hpp"
+#include "startup/mtlx.hpp"
 #include "startup/startup.hpp"
 #include "vfs/internal.hpp"
 #include "vfs/vfs.hpp"
@@ -47,6 +48,8 @@ namespace
             UAL_LOG("executable: %ls", Self().exePath.c_str());
             UAL_LOG("DontLoadFromDllMain=%d LoadFromAPI=%ls", (int)s.dontLoadFromDllMain, s.loadFromAPI.empty() ? L"(none)" : s.loadFromAPI.c_str());
         }
+
+        startup::mtlx::Install();
 
         crashdump::Settings crash;
         crash.disabled = s.disableCrashDumps;

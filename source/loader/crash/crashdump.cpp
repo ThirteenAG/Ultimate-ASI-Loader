@@ -39,8 +39,20 @@ namespace crashdump
             void* volatile gameFilter = nullptr; // LPTOP_LEVEL_EXCEPTION_FILTER the game set (or the one before ours), called first
         } g;
 
-        // the exception whose game filter is running on this thread; a process exit from in there gets reported first
-        thread_local EXCEPTION_POINTERS* t_gameFilterException = nullptr;
+        // The exception whose game filter is running on this thread; a process exit from in there gets reported first.
+        // A Win32 TLS slot, not thread_local: protection code starts threads without thread attach (MTLX.dll's), and
+        // those have no thread_local storage, so reading it from them faults inside the crash handler.
+        DWORD g_gameFilterSlot = TLS_OUT_OF_INDEXES;
+
+        EXCEPTION_POINTERS* GameFilterException()
+        {
+            return g_gameFilterSlot == TLS_OUT_OF_INDEXES ? nullptr : (EXCEPTION_POINTERS*)TlsGetValue(g_gameFilterSlot);
+        }
+
+        void SetGameFilterException(EXCEPTION_POINTERS* ep)
+        {
+            if (g_gameFilterSlot != TLS_OUT_OF_INDEXES) TlsSetValue(g_gameFilterSlot, ep);
+        }
 
         bool DirExists(const wchar_t* p)
         {
@@ -405,8 +417,8 @@ namespace crashdump
 
         LONG CallGameFilter(LPTOP_LEVEL_EXCEPTION_FILTER filter, EXCEPTION_POINTERS* ep)
         {
-            EXCEPTION_POINTERS* outer = t_gameFilterException;
-            t_gameFilterException = ep;
+            EXCEPTION_POINTERS* outer = GameFilterException();
+            SetGameFilterException(ep);
             LONG result;
             __try
             {
@@ -416,7 +428,7 @@ namespace crashdump
             {
                 result = EXCEPTION_CONTINUE_SEARCH; // a broken filter must not hide the crash
             }
-            t_gameFilterException = outer;
+            SetGameFilterException(outer);
             return result;
         }
 
@@ -453,9 +465,9 @@ namespace crashdump
         // inside a game filter, where the crash is reported first.
         void ReportFromGameFilter()
         {
-            if (EXCEPTION_POINTERS* ep = t_gameFilterException)
+            if (EXCEPTION_POINTERS* ep = GameFilterException())
             {
-                t_gameFilterException = nullptr;
+                SetGameFilterException(nullptr);
                 ReportCrash(ep);
             }
         }
@@ -470,7 +482,7 @@ namespace crashdump
         decltype(&TerminateProcess) oTerminateProcess = nullptr;
         BOOL WINAPI hkTerminateProcess(HANDLE process, UINT code)
         {
-            if (t_gameFilterException && (process == GetCurrentProcess() || GetProcessId(process) == GetCurrentProcessId())) ReportFromGameFilter();
+            if (GameFilterException() && (process == GetCurrentProcess() || GetProcessId(process) == GetCurrentProcessId())) ReportFromGameFilter();
             return oTerminateProcess(process, code);
         }
 
@@ -608,6 +620,7 @@ namespace crashdump
         g.onCrash = settings.onCrash;
         env.dbghelp.Load(); // without it the text report still works, minus symbols
 
+        g_gameFilterSlot = TlsAlloc();
         g.log = (char*)VirtualAlloc(nullptr, kLogCapacity, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
         g.request = CreateEventW(nullptr, FALSE, FALSE, nullptr);
         g.done = CreateEventW(nullptr, TRUE, FALSE, nullptr);
