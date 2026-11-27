@@ -991,6 +991,56 @@ ARCH_TEST("crash reports: a crash on another thread is reported", "[crashdumps]"
     CHECK(Contains(rep.text, "Other threads"));
 }
 
+// The crashed thread holds the loader's locks there; a reporter that loads a DLL waits for them for good.
+ARCH_TEST("crash reports: a crash inside a DLL load notification is reported", "[crashdumps]")
+{
+    // version.dll: the minidump code loads a version.dll of its own
+    for (const wchar_t* proxy : { L"dinput8.dll", L"version.dll" })
+        for (const wchar_t* crash : { L"crash", L"crashnotify:msimg32.dll" })
+        {
+            Sandbox sb(arch);
+            sb.Loader(proxy);
+            sb.Host();
+            sb.Mkdir(L"CrashDumps");
+            RunOptions o;
+            o.timeoutMs = 60000;
+            auto r = sb.Run({ L"load:" + std::wstring(proxy), L"trigger:Sleep", crash }, o);
+            std::string what = ut::narrow(std::wstring(proxy) + L" " + crash);
+            REQUIRE_MSG(!r.timedOut, "the process hung: " + what);
+            REQUIRE_MSG(!r.Action("notcrashed", "msimg32.dll"), "msimg32.dll was already loaded");
+            CHECK_MSG(r.exitCode == (DWORD)EXCEPTION_ACCESS_VIOLATION, what);
+            auto rep = OnlyReport(sb, true);
+            CHECK_MSG(ReadFileBytes(rep.dmp).starts_with("MDMP"), what);
+            CHECK(Contains(rep.text, "EXCEPTION_ACCESS_VIOLATION"));
+            CHECK(Contains(rep.text, "End of report."));
+            CHECK_MSG(Contains(rep.text, "while Windows was loading a DLL") == (crash[5] == L'n'), what);
+        }
+}
+
+// Some installs have the loader under several proxy names; each copy chains the filter of the one before it.
+ARCH_TEST("crash reports: three loader copies in one process write one report", "[crashdumps][multi]")
+{
+    for (const wchar_t* crash : { L"crash", L"crashnotify:msimg32.dll" })
+    {
+        Sandbox sb(arch);
+        sb.Loader(L"dinput8.dll");
+        sb.Loader(L"version.dll");
+        sb.Loader(L"winmm.dll");
+        sb.Host(L"dinput8");
+        sb.Mkdir(L"CrashDumps");
+        RunOptions o;
+        o.timeoutMs = 60000;
+        auto r = sb.Run({ L"load:version.dll", L"load:winmm.dll", L"trigger:Sleep", L"snapshot", crash }, o);
+        REQUIRE_MSG(!r.timedOut, "the process hung: " + ut::narrow(crash));
+        std::string uals = r.Last("host", "snapshot")->get("uals");
+        CHECK_MSG(std::count(uals.begin(), uals.end(), ';') == 2, "three loader copies: " + uals);
+        CHECK_EQ(r.exitCode, (DWORD)EXCEPTION_ACCESS_VIOLATION);
+        auto rep = OnlyReport(sb, true);
+        CHECK(ReadFileBytes(rep.dmp).starts_with("MDMP"));
+        CHECK(Contains(rep.text, "End of report."));
+    }
+}
+
 ARCH_TEST("crash reports: only the newest CrashDumpMaxReports reports are kept", "[crashdumps][ini]")
 {
     Sandbox sb(arch);

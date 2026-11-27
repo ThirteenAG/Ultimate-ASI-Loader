@@ -387,10 +387,12 @@ namespace crashdump::detail
 
         HANDLE g_symProcess = nullptr;
         bool g_symbols = false;
+        bool g_insideLoader = false; // CrashInfo::insideLoader
 
         void InitSymbols(const Environment& env)
         {
-            if (!env.dbghelp.SymInitializeW) return;
+            // SymInitialize loads DLLs (delay loads in dbghelp and rpcrt4), which waits for the crashed thread
+            if (!env.dbghelp.SymInitializeW || g_insideLoader) return;
             // a separate process handle gives us our own DbgHelp session even if the game uses DbgHelp
             if (!DuplicateHandle(GetCurrentProcess(), GetCurrentProcess(), GetCurrentProcess(), &g_symProcess, 0, FALSE, DUPLICATE_SAME_ACCESS))
                 g_symProcess = GetCurrentProcess();
@@ -657,7 +659,7 @@ namespace crashdump::detail
             }
             else if (c)
                 w.Printf(": %s", c->text);
-            else
+            else if (!g_insideLoader) // FormatMessage can load a MUI file
             {
                 // let ntdll describe unknown NTSTATUS codes
                 char msg[256] = {};
@@ -677,16 +679,64 @@ namespace crashdump::detail
         uintptr_t g_frames[kMaxFrames];
         int g_frameCount = 0;
 
+        uintptr_t StackTop(uintptr_t sp);
+
+        // Without dbghelp: unwind data on x64, the frame pointer chain on x86. Needs nothing but ntdll.
+        void WalkStackNative(const CONTEXT* ctx)
+        {
+            __try
+            {
+#ifdef _WIN64
+                CONTEXT c = *ctx;
+                while (g_frameCount < kMaxFrames && c.Rip)
+                {
+                    g_frames[g_frameCount++] = (uintptr_t)c.Rip;
+                    DWORD64 sp = c.Rsp, base = 0;
+                    if (auto fe = RtlLookupFunctionEntry(c.Rip, &base, nullptr))
+                    {
+                        PVOID handlerData = nullptr;
+                        DWORD64 establisher = 0;
+                        RtlVirtualUnwind(UNW_FLAG_NHANDLER, base, c.Rip, fe, &c, &handlerData, &establisher, nullptr);
+                    }
+                    else // leaf function
+                    {
+                        c.Rip = *(const DWORD64*)c.Rsp;
+                        c.Rsp += 8;
+                    }
+                    if (c.Rsp <= sp) break;
+                }
+#else
+                uintptr_t top = StackTop(ctx->Esp), fp = ctx->Ebp;
+                g_frames[g_frameCount++] = ctx->Eip;
+                while (g_frameCount < kMaxFrames && fp >= ctx->Esp && fp + 8 <= top && !(fp & 3))
+                {
+                    uintptr_t ret = ((const uintptr_t*)fp)[1], next = ((const uintptr_t*)fp)[0];
+                    if (!ret) break;
+                    g_frames[g_frameCount++] = ret;
+                    if (next <= fp) break;
+                    fp = next;
+                }
+#endif
+            }
+            __except (EXCEPTION_EXECUTE_HANDLER)
+            {
+            }
+        }
+
         void WalkStack(const Environment& env, const CONTEXT* ctx)
         {
             g_frameCount = 0;
             if (!env.dbghelp.CanWalk() || !g_symbols)
             {
+                WalkStackNative(ctx);
+                if (!g_frameCount)
+                {
 #ifdef _WIN64
-                g_frames[g_frameCount++] = ctx->Rip;
+                    g_frames[g_frameCount++] = ctx->Rip;
 #else
-                g_frames[g_frameCount++] = ctx->Eip;
+                    g_frames[g_frameCount++] = ctx->Eip;
 #endif
+                }
                 return;
             }
             CONTEXT c = *ctx; // StackWalk64 modifies it
@@ -1544,6 +1594,7 @@ namespace crashdump::detail
 #else
         uintptr_t ip = ctx->Eip, sp = ctx->Esp;
 #endif
+        g_insideLoader = crash.insideLoader;
         CollectModules(env);
         InitSymbols(env);
         WalkStack(env, ctx);
@@ -1610,6 +1661,7 @@ namespace crashdump::detail
         w.Printf("Thread:    %lu", crash.threadId);
         if (crash.threadId == GetThreadId(GetCurrentThread())) w.Raw(" (reporter)");
         w.NewLine();
+        if (crash.insideLoader) w.Line("Loader:    the crash happened while Windows was loading a DLL (in a DllMain or a DLL load notification)");
 
         const ModuleInfo* involved[16];
         int nInvolved = 0;
@@ -1678,7 +1730,8 @@ namespace crashdump::detail
         }
 
         w.Heading("Call stack");
-        if (!g_symbols) w.Line("(symbols unavailable: dbghelp.dll could not be initialized)");
+        if (g_insideLoader) w.Line("(no symbols: dbghelp can't be used while Windows is loading a DLL on the crashed thread)");
+        else if (!g_symbols) w.Line("(symbols unavailable: dbghelp.dll could not be initialized)");
         w.Line("(newest first; below frame #00 the addresses are return addresses, just after the call)");
         for (int i = 0, patterns = 0; i < g_frameCount; ++i)
         {

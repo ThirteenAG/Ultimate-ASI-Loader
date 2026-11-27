@@ -28,12 +28,14 @@
 //   throw:<message>              unhandled std::runtime_error(message)
 //   stackoverflow                unbounded recursion
 //   crashthread                  access violation on a new thread
+//   crashnotify:<dll>            LoadLibraryW(dll), access violation in a DLL load notification (loader locks held)
 //   scenario:<name>[|args]       run an in-process scenario from scenarios_*.cpp
 //   stubcall                     Sleep(0) from the stub section (ual_host_stub.exe only)
 //   target                       report g_ualSnippetTarget, which .cxx snippets patch
 //   exit:<code>                  stop and return <code>
 #include "host.hpp"
 #include <psapi.h>
+#include <winternl.h>
 #include <fstream>
 #include <sstream>
 #include <filesystem>
@@ -547,6 +549,29 @@ static DWORD WINAPI CrashThread(void*)
     return 0;
 }
 
+// LdrRegisterDllNotification; the callback runs with the loader's notification lock held
+using DllNotificationFn = VOID(CALLBACK*)(ULONG reason, const void* data, PVOID context);
+using LdrRegisterDllNotificationFn = LONG(NTAPI*)(ULONG flags, DllNotificationFn callback, PVOID context, PVOID* cookie);
+
+struct DllNotificationData
+{
+    ULONG flags;
+    const UNICODE_STRING* fullDllName;
+    const UNICODE_STRING* baseDllName;
+    PVOID dllBase;
+    ULONG sizeOfImage;
+};
+
+static std::wstring g_crashOnLoadOf;
+
+static VOID CALLBACK CrashOnDllLoad(ULONG reason, const void* data, PVOID)
+{
+    auto name = ((const DllNotificationData*)data)->baseDllName;
+    if (reason == 1 /* LDR_DLL_NOTIFICATION_REASON_LOADED */ &&
+        CompareStringOrdinal(name->Buffer, name->Length / 2, g_crashOnLoadOf.c_str(), (int)g_crashOnLoadOf.size(), TRUE) == CSTR_EQUAL)
+        Crash();
+}
+
 int wmain(int argc, wchar_t** argv)
 {
     InterlockedExchange(&g_ualHostMainEntered, 1);
@@ -668,6 +693,15 @@ int wmain(int argc, wchar_t** argv)
             h.Emit(Base("stackoverflow", L""));
             SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX | SEM_NOOPENFILEERRORBOX);
             Recurse(0);
+        }
+        else if (verb == L"crashnotify")
+        {
+            h.Emit(Base("crashnotify", arg));
+            auto reg = (LdrRegisterDllNotificationFn)GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "LdrRegisterDllNotification");
+            PVOID cookie = nullptr;
+            g_crashOnLoadOf = arg;
+            if (reg && reg(0, CrashOnDllLoad, nullptr, &cookie) >= 0) LoadLibraryW(arg.c_str());
+            h.Emit(Base("notcrashed", arg));
         }
         else if (verb == L"crashthread")
         {

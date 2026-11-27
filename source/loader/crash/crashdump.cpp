@@ -5,6 +5,7 @@
 #include "crashdump.hpp"
 #include "report.hpp"
 #include "../core/hooks.hpp"
+#include "../core/pe.hpp"
 #include <miniz.h>
 #include <algorithm>
 #include <cstdio>
@@ -32,6 +33,9 @@ namespace crashdump
             HANDLE request = nullptr;
             HANDLE done = nullptr;
             volatile LONG crashing = 0;
+            volatile LONG progress = 0; // bumped by the reporter as it writes, see WaitForReport
+            DWORD warmUpThread = 0;     // see WarmUpDump
+            HANDLE instance = nullptr;  // see Install
             CrashInfo crash;
             char* log = nullptr;
             bool installed = false;
@@ -83,6 +87,68 @@ namespace crashdump
             return g.env.fullMemory ? 10 * 60 * 1000 : 2 * 60 * 1000;
         }
 
+        // Whether this thread is inside the loader: it owns the loader lock (DllMain, TLS callbacks) or the current load
+        // (Windows 10+, which sends DLL load notifications with that). Another thread can't load a DLL until it leaves.
+        bool InsideLoader()
+        {
+            auto teb = (const BYTE*)NtCurrentTeb();
+#ifdef _WIN64
+            auto peb = *(const BYTE* const*)(teb + 0x60);
+            auto lock = *(RTL_CRITICAL_SECTION* const*)(peb + 0x110);
+            WORD sameTebFlags = *(const WORD*)(teb + 0x17EE);
+#else
+            auto peb = *(const BYTE* const*)(teb + 0x30);
+            auto lock = *(RTL_CRITICAL_SECTION* const*)(peb + 0xA0);
+            WORD sameTebFlags = *(const WORD*)(teb + 0xFCA);
+#endif
+            constexpr WORD kLoadOwner = 0x1000, kLoaderWorker = 0x2000;
+            if (lock && (DWORD)(ULONG_PTR)lock->OwningThread == GetCurrentThreadId()) return true;
+            return (sameTebFlags & (kLoadOwner | kLoaderWorker)) != 0;
+        }
+
+        // Inside the loader the reporter can't recover from a wait on its locks, so it is given up once it makes no
+        // progress for a while. Otherwise the usual timeout applies. MiniDumpWriteDump suspends this thread while it
+        // collects, which is why nothing in there may load a DLL (see HookDumpLoads, WarmUpDump).
+        void WaitForReport()
+        {
+            if (!g.crash.insideLoader)
+            {
+                WaitForSingleObject(g.done, Timeout());
+                return;
+            }
+            constexpr DWORD kStall = 15000;
+            LONG seen = g.progress;
+            ULONGLONG last = GetTickCount64(), start = last;
+            while (WaitForSingleObject(g.done, 500) == WAIT_TIMEOUT)
+            {
+                ULONGLONG now = GetTickCount64();
+                if (LONG p = g.progress; p != seen)
+                {
+                    seen = p;
+                    last = now;
+                }
+                if (now - last > kStall || now - start > Timeout()) return;
+            }
+        }
+
+        // param: non-null for the warm-up dump, which leaves out all threads and modules
+        BOOL CALLBACK DumpProgress(PVOID param, const PMINIDUMP_CALLBACK_INPUT input, PMINIDUMP_CALLBACK_OUTPUT)
+        {
+            InterlockedIncrement(&g.progress);
+            switch (input->CallbackType)
+            {
+            case IncludeThreadCallback:
+            case IncludeModuleCallback:
+                return param == nullptr;
+            case ThreadCallback:
+            case ThreadExCallback:
+            case ModuleCallback:
+                return TRUE;
+            default:
+                return FALSE;
+            }
+        }
+
         // unique "<folder><exe>.<yyyymmdd_hhmmss>[_n]"
         void MakeBaseName(wchar_t* out, size_t cap, const SYSTEMTIME& t)
         {
@@ -116,6 +182,117 @@ namespace crashdump
             return ok != FALSE;
         }
 
+        // The minidump code calls LoadLibrary on every dump: for modules that are loaded anyway (ntdll.dll, psapi.dll,
+        // which Install keeps loaded), for version.dll, powrprof.dll and verifier.dll, and as data files to read version
+        // resources. After a crash inside the loader a load of a DLL that isn't loaded yet waits for the crashed thread,
+        // which the dump code has suspended: the process hangs for good. Those DLLs only add details (module versions,
+        // handle traces), so there such loads fail instead, and during the warm-up too, which leaves no DLL behind.
+        bool DumpLoadFails(bool loaded, DWORD flags)
+        {
+            DWORD self = GetCurrentThreadId();
+            if (self != g.warmUpThread && (!g.crash.insideLoader || self != g.reporterId)) return false;
+            return !loaded && !(flags & (LOAD_LIBRARY_AS_DATAFILE | LOAD_LIBRARY_AS_DATAFILE_EXCLUSIVE | LOAD_LIBRARY_AS_IMAGE_RESOURCE));
+        }
+
+        decltype(&LoadLibraryA) oDumpLoadLibraryA = nullptr;
+        decltype(&LoadLibraryW) oDumpLoadLibraryW = nullptr;
+        decltype(&LoadLibraryExA) oDumpLoadLibraryExA = nullptr;
+        decltype(&LoadLibraryExW) oDumpLoadLibraryExW = nullptr;
+
+        HMODULE DumpLoadFailed()
+        {
+            SetLastError(ERROR_MOD_NOT_FOUND);
+            return nullptr;
+        }
+
+        HMODULE WINAPI DumpLoadLibraryA(LPCSTR name)
+        {
+            return DumpLoadFails(name && GetModuleHandleA(name), 0) ? DumpLoadFailed() : oDumpLoadLibraryA(name);
+        }
+
+        HMODULE WINAPI DumpLoadLibraryW(LPCWSTR name)
+        {
+            return DumpLoadFails(name && GetModuleHandleW(name), 0) ? DumpLoadFailed() : oDumpLoadLibraryW(name);
+        }
+
+        HMODULE WINAPI DumpLoadLibraryExA(LPCSTR name, HANDLE file, DWORD flags)
+        {
+            return DumpLoadFails(name && GetModuleHandleA(name), flags) ? DumpLoadFailed() : oDumpLoadLibraryExA(name, file, flags);
+        }
+
+        HMODULE WINAPI DumpLoadLibraryExW(LPCWSTR name, HANDLE file, DWORD flags)
+        {
+            return DumpLoadFails(name && GetModuleHandleW(name), flags) ? DumpLoadFailed() : oDumpLoadLibraryExW(name, file, flags);
+        }
+
+        // The import slots of the module that has MiniDumpWriteDump: dbgcore.dll, or dbghelp.dll on older Windows.
+        void HookDumpLoads()
+        {
+            HMODULE m = nullptr;
+            if (!g.env.dbghelp.MiniDumpWriteDump ||
+                !GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, (LPCWSTR)g.env.dbghelp.MiniDumpWriteDump, &m))
+                return;
+            ual::pe::Image image(m);
+            if (!image.Valid()) return;
+            ual::pe::ForEachImport(image, [](const ual::pe::ImportSlot& s) {
+                if (!s.name) return true;
+                struct
+                {
+                    const char* name;
+                    void* hook;
+                    void** original;
+                } hooks[] = {
+                    { "LoadLibraryA", (void*)DumpLoadLibraryA, (void**)&oDumpLoadLibraryA },
+                    { "LoadLibraryW", (void*)DumpLoadLibraryW, (void**)&oDumpLoadLibraryW },
+                    { "LoadLibraryExA", (void*)DumpLoadLibraryExA, (void**)&oDumpLoadLibraryExA },
+                    { "LoadLibraryExW", (void*)DumpLoadLibraryExW, (void**)&oDumpLoadLibraryExW },
+                };
+                for (auto& h : hooks)
+                    if (!strcmp(s.name, h.name) && *s.slot != h.hook)
+                    {
+                        if (!*h.original) *h.original = *s.slot;
+                        ual::pe::WritePointer(s.slot, h.hook);
+                    }
+                return true;
+            });
+        }
+
+        MINIDUMP_TYPE DumpType(bool fullMemory)
+        {
+            int common = MiniDumpWithHandleData | MiniDumpWithUnloadedModules | MiniDumpWithThreadInfo | MiniDumpWithFullMemoryInfo |
+                         MiniDumpWithProcessThreadData;
+            return (MINIDUMP_TYPE)(fullMemory ? common | MiniDumpWithFullMemory
+                                                    : common | MiniDumpWithDataSegs | MiniDumpWithIndirectlyReferencedMemory | MiniDumpIgnoreInaccessibleMemory);
+        }
+
+        // The dump code resolves delay-loaded imports when it first runs (rpcrt4's UuidCreate and others). After a crash
+        // inside the loader those loads would wait for the crashed thread, so a dump without threads and modules is
+        // written to a temporary file at install. That runs on the installing thread: on another thread a crash during
+        // it could leave dbghelp's lock held by a load waiting for the crashed thread.
+        void WarmUpDump()
+        {
+            auto writeDump = g.env.dbghelp.MiniDumpWriteDump;
+            wchar_t dir[MAX_PATH], path[MAX_PATH];
+            if (!writeDump || !GetTempPathW(MAX_PATH, dir) || !GetTempFileNameW(dir, L"ual", 0, path)) return;
+            HANDLE f = CreateFileW(path, GENERIC_READ | GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_TEMPORARY | FILE_FLAG_DELETE_ON_CLOSE, nullptr);
+            if (f == INVALID_HANDLE_VALUE)
+            {
+                DeleteFileW(path);
+                return;
+            }
+            MINIDUMP_CALLBACK_INFORMATION callback{ DumpProgress, (void*)1 };
+            g.warmUpThread = GetCurrentThreadId();
+            __try
+            {
+                writeDump(GetCurrentProcess(), GetCurrentProcessId(), f, DumpType(false), nullptr, nullptr, &callback);
+            }
+            __except (EXCEPTION_EXECUTE_HANDLER)
+            {
+            }
+            g.warmUpThread = 0;
+            CloseHandle(f);
+        }
+
         bool WriteDump(const wchar_t* path, const char* comment, size_t commentSize)
         {
             auto writeDump = g.env.dbghelp.MiniDumpWriteDump;
@@ -125,18 +302,14 @@ namespace crashdump
             MINIDUMP_EXCEPTION_INFORMATION mei{ g.crash.threadId, g.crash.ep, FALSE };
             MINIDUMP_USER_STREAM stream{ CommentStreamA, (ULONG)commentSize, (void*)comment };
             MINIDUMP_USER_STREAM_INFORMATION streams{ commentSize ? 1ul : 0ul, &stream };
-            int common = MiniDumpWithHandleData | MiniDumpWithUnloadedModules | MiniDumpWithThreadInfo | MiniDumpWithFullMemoryInfo |
-                         MiniDumpWithProcessThreadData;
-            int type = g.env.fullMemory ? common | MiniDumpWithFullMemory
-                                        : common | MiniDumpWithDataSegs | MiniDumpWithIndirectlyReferencedMemory | MiniDumpIgnoreInaccessibleMemory;
-            BOOL ok = writeDump(GetCurrentProcess(), GetCurrentProcessId(), f, (MINIDUMP_TYPE)type, &mei, &streams, nullptr);
+            MINIDUMP_CALLBACK_INFORMATION callback{ DumpProgress, nullptr };
+            BOOL ok = writeDump(GetCurrentProcess(), GetCurrentProcessId(), f, DumpType(g.env.fullMemory), &mei, &streams, &callback);
             if (!ok)
             {
                 // older dbghelp versions reject some flags
                 SetFilePointer(f, 0, nullptr, FILE_BEGIN);
                 SetEndOfFile(f);
-                ok = writeDump(GetCurrentProcess(), GetCurrentProcessId(), f, (MINIDUMP_TYPE)(MiniDumpWithDataSegs | MiniDumpWithHandleData), &mei, &streams,
-                               nullptr);
+                ok = writeDump(GetCurrentProcess(), GetCurrentProcessId(), f, (MINIDUMP_TYPE)(MiniDumpWithDataSegs | MiniDumpWithHandleData), &mei, &streams, &callback);
             }
             CloseHandle(f);
             if (!ok) DeleteFileW(path);
@@ -296,6 +469,7 @@ namespace crashdump
 
         void AppendToLogFile(const char* text, size_t size, void* context)
         {
+            InterlockedIncrement(&g.progress);
             DWORD written = 0;
             WriteFile((HANDLE)context, text, (DWORD)size, &written, nullptr);
         }
@@ -383,7 +557,7 @@ namespace crashdump
             if (InterlockedCompareExchange(&g.crashing, 1, 0) != 0)
             {
                 // another thread is already reporting (or this one already did), wait for it
-                if (g.done) WaitForSingleObject(g.done, Timeout());
+                if (g.done) WaitForReport();
                 return;
             }
             // A crash right after startup can catch the low-priority housekeeping thread before or during its work;
@@ -397,13 +571,14 @@ namespace crashdump
             }
             g.crash.ep = ep;
             g.crash.threadId = GetCurrentThreadId();
+            g.crash.insideLoader = InsideLoader();
             GetLocalTime(&g.crash.localTime);
             // the reporter thread can't start under the loader lock (crash during DLL init), so report from here
             bool alive = g.reporter && g.reporterStarted && WaitForSingleObject(g.reporter, 0) == WAIT_TIMEOUT;
             if (alive)
             {
                 SetEvent(g.request);
-                WaitForSingleObject(g.done, Timeout());
+                WaitForReport();
             }
             else
             {
@@ -614,11 +789,31 @@ namespace crashdump
         }
         if (!found) return false;
 
+        // Some installs have the loader under several names (d3d8.dll, dinput.dll, winmm.dll); the first copy reports
+        // for the whole process. More would chain their filters and write one report each, one after the other.
+        wchar_t instance[64];
+        swprintf_s(instance, L"Local\\UltimateASILoader.CrashReports.%lu", GetCurrentProcessId());
+        SetLastError(ERROR_SUCCESS);
+        g.instance = CreateEventW(nullptr, TRUE, FALSE, instance);
+        if (!g.instance) return false;
+        if (GetLastError() == ERROR_ALREADY_EXISTS)
+        {
+            CloseHandle(g.instance);
+            g.instance = nullptr;
+            return false;
+        }
+
         env.fullMemory = settings.fullMemory;
         env.zip = settings.zip;
         env.maxReports = settings.maxReports;
         g.onCrash = settings.onCrash;
         env.dbghelp.Load(); // without it the text report still works, minus symbols
+        // the dump fails without psapi.dll (see DumpLoadFails); it is no proxy name and safe to keep loaded
+        wchar_t psapi[MAX_PATH];
+        UINT sn = GetSystemDirectoryW(psapi, MAX_PATH);
+        if (sn && sn + 11 < MAX_PATH && !wcscat_s(psapi, L"\\psapi.dll")) LoadLibraryExW(psapi, nullptr, LOAD_WITH_ALTERED_SEARCH_PATH);
+        HookDumpLoads();
+        WarmUpDump();
 
         g_gameFilterSlot = TlsAlloc();
         g.log = (char*)VirtualAlloc(nullptr, kLogCapacity, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);

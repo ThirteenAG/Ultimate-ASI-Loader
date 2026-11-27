@@ -92,6 +92,8 @@ namespace crashdump::detail
         EXCEPTION_POINTERS* ep = nullptr;
         DWORD threadId = 0;
         SYSTEMTIME localTime{};
+        // the crashed thread holds the loader's locks (DllMain, TLS callback, DLL load notification): nothing may load a DLL
+        bool insideLoader = false;
     };
 
     void WriteLog(Writer& w, const Environment& env, const CrashInfo& crash);
