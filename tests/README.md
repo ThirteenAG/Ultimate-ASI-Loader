@@ -26,9 +26,10 @@ The test projects produce, in `bin\<arch>\Release\tests`:
 | File | Purpose |
 |---|---|
 | `ual_host.exe` | Test "game" with no proxy import; loads proxies at run time (`load:<dll>`) |
-| `ual_host_<proxy>.exe` | Test "game" that statically imports `<proxy>.dll`, so the loader is mapped before the entry point like in a real game (one per proxy with a Windows SDK import library) |
+| `ual_host_<proxy>.exe` | Test "game" that statically imports `<proxy>.dll`, so the loader is mapped before the entry point like in a real game (one per proxy with a Windows SDK import library). Its entry point `HostEntry` sets the exported `g_ualHostEntryEntered` before the CRT starts, which the probe reports as `hostentry` |
 | `probe.asi` | Instrumented plugin; records `DllMain`/`InitializeASI` calls, loader-lock state, current directory and so on. Behaviour is selected by its file name: `*failinit*` makes `DllMain` fail, `*chdir*` changes the current directory |
 | `probe_missingdep.asi` | Plugin importing `ual_missing_dependency.dll`, which is never deployed |
+| `probe_early.asi`, `probe_early_noinit.asi`, `probe_early_importer.asi`, `probe_missingdep_early.asi` | Plugins marked `UAL_EARLY` (`tests/probe/early.rc`): the probe, the probe without `InitializeASI`, the probe importing `probe.asi`, and `probe_missingdep.asi` |
 | `ual_fake_original.dll` | Stand-in for an original DLL (`<name>Hooked.dll` chaining) that returns sentinel values |
 | `stubs\vorbis.dll` (Win32) | Stand-in for a game's `vorbis.dll`, used by the built-in vorbisfile of the 32-bit loader |
 | `ual_unit_tests.exe`, `ual_tests.exe` | Test runners |

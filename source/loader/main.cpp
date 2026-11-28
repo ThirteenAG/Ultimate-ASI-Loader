@@ -1,10 +1,12 @@
 // The loader poses as a DLL the game uses (dinput8.dll, version.dll, ...) and forwards its exports (proxy/).
 // Plugins load once game code starts running (startup/), or from DllMain with DontLoadFromDllMain=0.
+// Plugins marked UAL_EARLY are loaded from DllMain in any case (plugins/).
 #include "core/loader.hpp"
 #include "core/log.hpp"
 #include "core/paths.hpp"
 #include "core/strings.hpp"
 #include "crash/crashdump.hpp"
+#include "plugins/plugins.hpp"
 #include "proxy/proxy.hpp"
 #include "startup/mtlx.hpp"
 #include "startup/startup.hpp"
@@ -58,6 +60,8 @@ namespace
         crash.maxReports = s.crashDumpMaxReports;
         crash.onCrash = vfs::PassThroughForCrash;
         crashdump::Install(module, crash);
+
+        plugins::LoadEarly(); // whatever the settings below say
 
         if (!s.dontLoadFromDllMain)
         {

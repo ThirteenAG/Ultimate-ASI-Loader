@@ -1,9 +1,9 @@
 // ual_host_stub.exe imitates an Origin/EA protection stub. The entry point and import directory
 // share a section after the code, and the loader is loaded at run time via "load:<dll>".
-// The entry is a const jump to the CRT entry so it lands in .rdata, which the project makes executable.
+// The entry is a const jump to the host's entry (HostEntry, then the CRT) so it lands in .rdata, which the project makes executable.
 #include <cstdint>
 
-extern "C" int wmainCRTStartup();
+extern "C" int HostEntry();
 
 #pragma pack(push, 1)
 struct StubCode
@@ -18,9 +18,9 @@ struct StubCode
 #pragma pack(pop)
 
 #ifdef _WIN64
-extern "C" const StubCode StubEntry = { { 0xFF, 0x25, 0x00, 0x00, 0x00, 0x00 }, wmainCRTStartup };
+extern "C" const StubCode StubEntry = { { 0xFF, 0x25, 0x00, 0x00, 0x00, 0x00 }, HostEntry };
 #else
-extern "C" const StubCode StubEntry = { { 0xE8, 0x00, 0x00, 0x00, 0x00, 0x58, 0xFF, 0x60, 0x04 }, wmainCRTStartup };
+extern "C" const StubCode StubEntry = { { 0xE8, 0x00, 0x00, 0x00, 0x00, 0x58, 0xFF, 0x60, 0x04 }, HostEntry };
 #endif
 
 // Calls fn(0) from the stub section, like a stub before it unpacks the game. No relocations needed.

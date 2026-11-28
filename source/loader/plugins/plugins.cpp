@@ -17,6 +17,7 @@ namespace ual::plugins
     namespace
     {
         std::unordered_set<HMODULE> g_initialized; // modules whose InitializeASI was called
+        std::unordered_set<HMODULE> g_early;       // mapped by LoadEarly: marked plugins and what they import
 
         void CallInitializeASI(HMODULE m)
         {
@@ -24,29 +25,33 @@ namespace ual::plugins
         }
 
         // dir has a trailing backslash; not recursive
-        void LoadAsiFiles(const std::wstring& dir)
+        std::vector<std::wstring> AsiFiles(const std::wstring& dir)
         {
+            std::vector<std::wstring> names;
             WIN32_FIND_DATAW fd;
             HANDLE h = FindFirstFileExW((dir + L"*.asi").c_str(), FindExInfoBasic, &fd, FindExSearchNameMatch, nullptr, FIND_FIRST_EX_LARGE_FETCH);
-            if (h == INVALID_HANDLE_VALUE) return;
-            std::vector<std::wstring> names;
+            if (h == INVALID_HANDLE_VALUE) return names;
             do
             {
                 // "*.asi" also matches "*.asix" through 8.3 names
                 if (!(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) && IEndsWith(fd.cFileName, L".asi")) names.push_back(fd.cFileName);
             } while (FindNextFileW(h, &fd));
             FindClose(h);
+            return names;
+        }
 
-            for (const auto& name : names)
+        void LoadAsiFiles(const std::wstring& dir)
+        {
+            for (const auto& name : AsiFiles(dir))
             {
                 auto path = dir + name;
                 if (HMODULE loaded = GetModuleHandleW(path.c_str()))
                 {
-                    // mapped already as another plugin's import (or by a plugin manager): its DllMain saw the loader on
-                    // the stack and left the work to InitializeASI, so call it, once per module
+                    // mapped already as another plugin's import, by the early pass or by a plugin manager: its DllMain
+                    // saw the loader on the stack and left the work to InitializeASI, so call it, once per module
                     if (g_initialized.insert(loaded).second)
                     {
-                        UAL_LOG("plugin %ls: already loaded, calling InitializeASI", path.c_str());
+                        UAL_LOG("plugin %ls: %s, calling InitializeASI", path.c_str(), g_early.count(loaded) ? "loaded early" : "already loaded");
                         SetCurrentDirectoryW(dir.c_str());
                         CallInitializeASI(loaded);
                     }
@@ -68,17 +73,20 @@ namespace ual::plugins
         }
 
         // *.asi first, then *.cxx snippets
-        void LoadFolder(std::wstring dir)
+        void LoadFolder(const std::wstring& dir)
         {
-            if (!dir.empty() && dir.back() != L'\\' && dir.back() != L'/') dir += L'\\';
             LoadAsiFiles(dir);
             SetCurrentDirectoryW(dir.c_str()); // snippets expect their own folder too
             cxx::LoadFolder(dir);
         }
 
-        // with LoadRecursively, direct sub folders load before dir itself
-        void LoadTree(const std::wstring& dir, bool recursive)
+        // With LoadRecursively, direct sub folders come before dir itself. visit gets a trailing backslash.
+        template <class F> void ForEachFolder(const std::wstring& dir, bool recursive, F&& visit)
         {
+            auto slashed = [](std::wstring d) {
+                if (!d.empty() && d.back() != L'\\' && d.back() != L'/') d += L'\\';
+                return d;
+            };
             if (!DirectoryExists(dir)) return;
             if (recursive)
             {
@@ -94,9 +102,41 @@ namespace ual::plugins
                     } while (FindNextFileW(h, &fd));
                     FindClose(h);
                 }
-                for (const auto& s : subs) LoadFolder(s);
+                for (const auto& s : subs) visit(slashed(s));
             }
-            LoadFolder(dir);
+            visit(slashed(dir));
+        }
+
+        // the loader's folder (unless LoadFromScriptsOnly), scripts\, plugins\, then extraFolders
+        template <class F> void ForEachPluginFolder(const std::vector<std::wstring>& extraFolders, F&& visit)
+        {
+            const auto& self = Self();
+            const auto& s = GetSettings();
+            if (!s.loadFromScriptsOnly) visit(self.dir);
+            ForEachFolder(self.dir + L"scripts", s.loadRecursively, visit);
+            ForEachFolder(self.dir + L"plugins", s.loadRecursively, visit);
+            for (const auto& dir : extraFolders) ForEachFolder(dir, s.loadRecursively, visit);
+        }
+
+        // An UAL_EARLY RCDATA resource. Mapped as a resource file: no DllMain, no imports (needs Vista).
+        bool MarkedEarly(const std::wstring& path)
+        {
+            HMODULE h = LoadLibraryExW(path.c_str(), nullptr, LOAD_LIBRARY_AS_DATAFILE | LOAD_LIBRARY_AS_IMAGE_RESOURCE);
+            if (!h) return false;
+            bool marked = FindResourceW(h, L"UAL_EARLY", RT_RCDATA) != nullptr;
+            FreeLibrary(h);
+            return marked;
+        }
+
+        // path is absolute, or relative to dir (LoadExtraPlugins)
+        void LoadEarlyFile(const std::wstring& dir, const std::wstring& path)
+        {
+            SetCurrentDirectoryW(dir.c_str());
+            if (GetModuleHandleW(path.c_str()) || !MarkedEarly(path)) return;
+            HMODULE m = LoadLibraryW(path.c_str());
+            DWORD error = m ? 0 : GetLastError();
+            // a failed one is tried again by the normal pass, which reports the error there
+            UAL_LOG("early plugin %ls: %s%s", path.c_str(), m ? "loaded" : "error ", m ? "" : std::to_string(error).c_str());
         }
 
 #ifndef _WIN64
@@ -147,12 +187,37 @@ namespace ual::plugins
                 UAL_LOG("extra plugin %ls: %s%s", extra.c_str(), m ? "loaded" : "error ", m ? "" : std::to_string(error).c_str());
                 if (m && g_initialized.insert(m).second) CallInitializeASI(m);
             }
-            if (!s.loadFromScriptsOnly) LoadFolder(selfDir);
-            LoadTree(self.dir + L"scripts", s.loadRecursively);
-            LoadTree(self.dir + L"plugins", s.loadRecursively);
-            for (const auto& dir : extraFolders) LoadTree(dir, s.loadRecursively);
+            ForEachPluginFolder(extraFolders, LoadFolder);
         }
         cxx::StartHotReload(); // now that every snippet folder is known
         SetCurrentDirectoryW(previousDir.c_str());
+    }
+
+    void LoadEarly()
+    {
+        const auto& self = Self();
+        const auto& s = GetSettings();
+        if (!s.loadPlugins) return;
+        auto previousDir = CurrentDirectory();
+        auto before = LoadedModules();
+        auto selfDir = self.dir.substr(0, self.dir.size() - 1);
+        for (const auto& extra : SplitList(s.loadExtraPlugins)) LoadEarlyFile(selfDir, extra);
+        ForEachPluginFolder({}, [](const std::wstring& dir) {
+            for (const auto& name : AsiFiles(dir)) LoadEarlyFile(dir, dir + name);
+        });
+        SetCurrentDirectoryW(previousDir.c_str());
+        for (HMODULE m : LoadedModules())
+            if (std::find(before.begin(), before.end(), m) == before.end()) g_early.insert(m);
+        if (!g_early.empty())
+        {
+            // early plugins may use the loader's exports: a game that frees the loader must not unmap it
+            HMODULE pinned;
+            GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_PIN, (LPCWSTR)&LoadEarly, &pinned);
+        }
+    }
+
+    bool IsEarlyModule(HMODULE m)
+    {
+        return g_early.count(m) != 0;
     }
 }

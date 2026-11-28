@@ -1,0 +1,2 @@
+// Marks the plugin for the loader's early pass
+UAL_EARLY RCDATA { 1 }

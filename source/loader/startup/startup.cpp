@@ -105,7 +105,7 @@ namespace ual::startup
         {
             if (g_exe.Contains(address)) return true;
             HMODULE m = ModuleOf(address);
-            if (!m) return false;
+            if (!m || plugins::IsEarlyModule(m)) return false; // early plugins run before the game, their calls don't count
             wchar_t path[MAX_PATH * 2];
             DWORD n = GetModuleFileNameW(m, path, (DWORD)std::size(path));
             if (!n || n >= std::size(path)) return false;
@@ -562,7 +562,7 @@ namespace ual::startup
         HMODULE exe = GetModuleHandleW(nullptr);
         for (HMODULE mod : LoadedModules())
         {
-            if (mod == Self().module) continue;
+            if (mod == Self().module || plugins::IsEarlyModule(mod)) continue;
             auto path = ModulePath(mod);
             auto file = FileNameOf(path);
             auto stem = file.substr(0, file.find_last_of(L'.'));

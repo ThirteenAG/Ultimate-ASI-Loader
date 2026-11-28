@@ -42,6 +42,8 @@
 #include <stdexcept>
 
 extern "C" __declspec(dllexport) volatile LONG g_ualHostMainEntered = 0;
+// set by the exe's entry point, before the CRT starts
+extern "C" __declspec(dllexport) volatile LONG g_ualHostEntryEntered = 0;
 // .cxx snippets patch this, the "target" action reports it
 extern "C" __declspec(dllexport) volatile int g_ualSnippetTarget[4] = { 1, 2, 3, 4 };
 
@@ -570,6 +572,14 @@ static VOID CALLBACK CrashOnDllLoad(ULONG reason, const void* data, PVOID)
     if (reason == 1 /* LDR_DLL_NOTIFICATION_REASON_LOADED */ &&
         CompareStringOrdinal(name->Buffer, name->Length / 2, g_crashOnLoadOf.c_str(), (int)g_crashOnLoadOf.size(), TRUE) == CSTR_EQUAL)
         Crash();
+}
+
+extern "C" int wmainCRTStartup();
+
+extern "C" int HostEntry()
+{
+    InterlockedExchange(&g_ualHostEntryEntered, 1);
+    return wmainCRTStartup();
 }
 
 int wmain(int argc, wchar_t** argv)

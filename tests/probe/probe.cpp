@@ -3,6 +3,8 @@
 //   *chdir*     DllMain changes the current directory, which the loader must restore
 //   *crashinit* InitializeASI writes to a null pointer
 // Records ev=attach, ev=init (InitializeASI) and ev=detach to UAL_TEST_REPORT.
+// Build variants: probe_early*.asi carry the UAL_EARLY resource (early.rc), UAL_PROBE_NO_INIT leaves out
+// InitializeASI, UAL_PROBE_IMPORTS_PROBE imports ProbeInitCount from probe.asi instead of exporting it.
 #include <windows.h>
 #include <psapi.h>
 #include <intrin.h>
@@ -57,9 +59,9 @@ static int CountUalModules()
     return n;
 }
 
-static long HostMainEntered()
+static long HostFlag(const char* name)
 {
-    auto p = reinterpret_cast<volatile LONG*>(GetProcAddress(GetModuleHandleW(nullptr), "g_ualHostMainEntered"));
+    auto p = reinterpret_cast<volatile LONG*>(GetProcAddress(GetModuleHandleW(nullptr), name));
     return p ? *p : -1;
 }
 
@@ -82,7 +84,8 @@ static void Emit(const char* ev, std::initializer_list<std::pair<const char*, st
     r["tid"] = std::to_string(GetCurrentThreadId());
     r["loaderlock"] = LoaderLockHeldByThisThread() ? "1" : "0";
     r["ualcount"] = std::to_string(CountUalModules());
-    r["hostmain"] = std::to_string(HostMainEntered());
+    r["hostmain"] = std::to_string(HostFlag("g_ualHostMainEntered"));
+    r["hostentry"] = std::to_string(HostFlag("g_ualHostEntryEntered")); // the exe's entry point has run
     r["cwd"] = ualtest::utf8(cwd);
     r["ticks"] = std::to_string(GetTickCount64());
     for (auto& [k, v] : extra)
@@ -90,6 +93,7 @@ static void Emit(const char* ev, std::initializer_list<std::pair<const char*, st
     ualtest::append_record(report, r);
 }
 
+#ifndef UAL_PROBE_NO_INIT
 extern "C" __declspec(dllexport) void InitializeASI()
 {
     LONG n = InterlockedIncrement(&g_initCount);
@@ -101,10 +105,16 @@ extern "C" __declspec(dllexport) void InitializeASI()
     }
 }
 
+#endif
+
+#ifdef UAL_PROBE_IMPORTS_PROBE
+extern "C" __declspec(dllimport) LONG ProbeInitCount();
+#else
 extern "C" __declspec(dllexport) LONG ProbeInitCount()
 {
     return g_initCount;
 }
+#endif
 
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID)
 {
@@ -113,7 +123,11 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID)
         g_self = hModule;
         DisableThreadLibraryCalls(hModule);
         auto name = Lower(FileName(ModulePath(hModule)));
+#ifdef UAL_PROBE_IMPORTS_PROBE
+        Emit("attach", { { "depinit", std::to_string(ProbeInitCount()) } });
+#else
         Emit("attach");
+#endif
 
         if (name.find(L"chdir") != std::wstring::npos)
         {

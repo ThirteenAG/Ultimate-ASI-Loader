@@ -146,6 +146,21 @@ The demo plugins in [`source/plugins`](source/plugins) all follow this pattern; 
 | `FrameLimiter` | hooking a COM interface in any game: caps the frame rate of Direct3D 9 / 10 / 11 / 12 games |
 | `ExeUnprotect` | makes the game's executable writable for old plugins that patch it without `VirtualProtect` |
 
+### Early loading
+
+A plugin that has to patch the game before any of its code runs (static initializers, the CRT startup, a check in the entry point) can ask to be loaded early. Add this line to the plugin's `.rc` file:
+
+```
+UAL_EARLY RCDATA { 1 }
+```
+
+- **When:** from the loader's own `DllMain`, right after it reads its settings. For a game that imports the loader, that is before the game's entry point. A loader loaded with `LoadLibrary` (protection stubs, games that load `d3d9.dll` and the like later) loads early plugins inside that `LoadLibrary` call. `DontLoadFromDllMain` and `LoadFromAPI` do not change this.
+- **Order:** early plugins load first, in the order of the normal pass (`LoadExtraPlugins`, the loader's folder, `scripts`, `plugins`, with their sub folders first when `LoadRecursively=1`). `LoadPlugins`, `LoadFromScriptsOnly` and `LoadRecursively` apply. Update folders are not searched early: plugins there load at the normal time. The other plugins load as before.
+- **What runs:** only `DllMain` (and the DLLs the plugin imports, an imported `.asi` included). `InitializeASI` is still called once, when the normal pass reaches the plugin, at the usual time.
+- **What the plugin may do in `DllMain`:** patch memory, install hooks, read files. It runs under the Windows loader lock, before the game's CRT and its own DLLs are initialized: no windows or message boxes, no COM, no waiting for threads it starts, no `LoadLibrary` of DLLs that do any of this. The update folder and the loader's virtual file functions are not active yet.
+- **Errors:** an early plugin that fails to load (missing dependency, `DllMain` returns `FALSE`) is written to the log (`DebugLog=1`) and tried again by the normal pass, which shows the usual error. Its `DllMain` can therefore run a second time.
+- The loader checks for the resource by mapping each `.asi` as a resource file, without running it. Needs Windows Vista or later.
+
 ## C++ SNIPPETS (.cxx)
 
 Small patches can be written as plain C++ source files with the `.cxx` extension and placed wherever ASI plugins go (the game folder, `scripts`, `plugins`, update folders). The loader compiles them when the game starts; no compiler or SDK is needed. The same file also builds with Visual Studio as a DLL/ASI, so it can be debugged natively.

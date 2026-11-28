@@ -1,6 +1,8 @@
 -- Test projects, included by the root premake5.lua. Outputs go to bin\<Win32|x64>\<config>\tests:
 --   probe.asi                instrumented plugin (tests/probe/probe.cpp)
 --   probe_missingdep.asi     plugin importing a DLL that is never deployed
+--   probe_early*.asi         plugins marked UAL_EARLY: the probe, without InitializeASI, importing probe.asi,
+--                            and probe_missingdep_early.asi
 --   ual_missing_dependency.dll
 --   ual_fake_original.dll    stand-in for an original DLL (<name>Hooked.dll tests)
 --   stubs\vorbis.dll         the game's vorbis.dll, used by the x86 built-in vorbisfile
@@ -62,6 +64,30 @@ test_project("ual_probe_missingdep", "SharedLib")
    files { root .. "/tests/probe/missing_dependency.cpp" }
    links { "ual_missing_dependency" }
 
+-- marked for the early pass by tests/probe/early.rc
+local function early_probe(name, extra)
+   test_project("ual_" .. name, "SharedLib")
+      targetname (name)
+      targetextension ".asi"
+      files { root .. "/tests/probe/early.rc" }
+      if extra then extra() end
+end
+
+early_probe("probe_early", function() files { root .. "/tests/probe/probe.cpp" } end)
+early_probe("probe_early_noinit", function()
+   files { root .. "/tests/probe/probe.cpp" }
+   defines { "UAL_PROBE_NO_INIT" }
+end)
+early_probe("probe_early_importer", function()
+   files { root .. "/tests/probe/probe.cpp" }
+   defines { "UAL_PROBE_IMPORTS_PROBE" }
+   links { "ual_probe" }
+end)
+early_probe("probe_missingdep_early", function()
+   files { root .. "/tests/probe/missing_dependency.cpp" }
+   links { "ual_missing_dependency" }
+end)
+
 test_project("ual_fake_original", "SharedLib")
    files { root .. "/tests/probe/fake_original.cpp", root .. "/tests/probe/fake_original.def" }
 
@@ -78,7 +104,7 @@ test_project("ual_host_core", "StaticLib")
 
 local function host_project(name, define, lib)
    test_project(name, "ConsoleApp")
-      entrypoint "wmainCRTStartup"
+      entrypoint "HostEntry" -- records that the entry point ran, then wmainCRTStartup
       files { root .. "/tests/host/host_imports.cpp" }
       links { "ual_host_core", "ole32", lib }
       linkoptions { "/WHOLEARCHIVE:ual_host_core.lib" } -- keep the self-registering scenarios
